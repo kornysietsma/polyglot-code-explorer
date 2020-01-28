@@ -1,0 +1,517 @@
+{
+  "name": "flare",
+  "children": [
+    {
+      "name": "Cargo.lock",
+      "data": {
+        "git": {
+          "age_in_days": 0,
+          "last_update": 1559671020,
+          "user_count": 1
+        }
+      }
+    },
+    {
+      "name": "Cargo.toml",
+      "data": {
+        "loc": {
+          "blanks": 2,
+          "code": 28,
+          "comments": 0,
+          "language": "TOML",
+          "lines": 30
+        },
+        "git": {
+          "age_in_days": 0,
+          "last_update": 1559671020,
+          "user_count": 1
+        }
+      }
+    },
+    {
+      "name": "LICENSE.txt",
+      "data": {
+        "git": {
+          "age_in_days": 16,
+          "last_update": 1558211712,
+          "user_count": 1
+        },
+        "loc": {
+          "blanks": 0,
+          "code": 13,
+          "comments": 0,
+          "language": "Plain Text",
+          "lines": 13
+        }
+      }
+    },
+    {
+      "name": "README.md",
+      "data": {
+        "git": {
+          "age_in_days": 0,
+          "last_update": 1559672361,
+          "user_count": 1
+        },
+        "loc": {
+          "blanks": 0,
+          "code": 83,
+          "comments": 0,
+          "language": "Markdown",
+          "lines": 83
+        }
+      }
+    },
+    {
+      "name": "src",
+      "children": [
+        {
+          "name": "file_walker.rs",
+          "data": {
+            "loc": {
+              "blanks": 22,
+              "code": 153,
+              "comments": 1,
+              "language": "Rust",
+              "lines": 176
+            },
+            "git": {
+              "age_in_days": 0,
+              "last_update": 1559671020,
+              "user_count": 1
+            }
+          }
+        },
+        {
+          "name": "flare.rs",
+          "data": {
+            "git": {
+              "age_in_days": 0,
+              "last_update": 1559671020,
+              "user_count": 1
+            },
+            "loc": {
+              "blanks": 40,
+              "code": 279,
+              "comments": 2,
+              "language": "Rust",
+              "lines": 321
+            }
+          }
+        },
+        {
+          "name": "git.rs",
+          "data": {
+            "loc": {
+              "blanks": 23,
+              "code": 149,
+              "comments": 7,
+              "language": "Rust",
+              "lines": 179
+            },
+            "git": {
+              "age_in_days": 0,
+              "last_update": 1559671020,
+              "user_count": 1
+            }
+          }
+        },
+        {
+          "name": "git_log_sample.rs",
+          "data": {
+            "loc": {
+              "blanks": 0,
+              "code": 377,
+              "comments": 3,
+              "language": "Rust",
+              "lines": 380
+            }
+          }
+        },
+        {
+          "name": "git_logger.rs",
+          "data": {
+            "git": {
+              "age_in_days": 0,
+              "last_update": 1559671020,
+              "user_count": 1
+            },
+            "loc": {
+              "blanks": 78,
+              "code": 507,
+              "comments": 18,
+              "language": "Rust",
+              "lines": 603
+            }
+          }
+        },
+        {
+          "name": "lib.rs",
+          "data": {
+            "loc": {
+              "blanks": 12,
+              "code": 58,
+              "comments": 1,
+              "language": "Rust",
+              "lines": 71
+            },
+            "git": {
+              "age_in_days": 0,
+              "last_update": 1559671020,
+              "user_count": 1
+            }
+          }
+        },
+        {
+          "name": "loc.rs",
+          "data": {
+            "git": {
+              "age_in_days": 15,
+              "last_update": 1558362194,
+              "user_count": 1
+            },
+            "loc": {
+              "blanks": 9,
+              "code": 61,
+              "comments": 7,
+              "language": "Rust",
+              "lines": 77
+            }
+          }
+        },
+        {
+          "name": "main.rs",
+          "data": {
+            "loc": {
+              "blanks": 8,
+              "code": 45,
+              "comments": 4,
+              "language": "Rust",
+              "lines": 57
+            },
+            "git": {
+              "age_in_days": 0,
+              "last_update": 1559671020,
+              "user_count": 1
+            }
+          }
+        },
+        {
+          "name": "TODO.md",
+          "data": {
+            "loc": {
+              "blanks": 0,
+              "code": 39,
+              "comments": 0,
+              "language": "Markdown",
+              "lines": 39
+            },
+            "git": {
+              "age_in_days": 0,
+              "last_update": 1559672361,
+              "user_count": 1
+            }
+          }
+        },
+        {
+          "name": "toxicity_indicator_calculator.rs",
+          "data": {
+            "git": {
+              "age_in_days": 15,
+              "last_update": 1558362194,
+              "user_count": 1
+            },
+            "loc": {
+              "blanks": 2,
+              "code": 9,
+              "comments": 1,
+              "language": "Rust",
+              "lines": 12
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "test_shared",
+      "children": [
+        {
+          "name": "Cargo.toml",
+          "data": {
+            "git": {
+              "age_in_days": 0,
+              "last_update": 1559671020,
+              "user_count": 1
+            },
+            "loc": {
+              "blanks": 1,
+              "code": 15,
+              "comments": 0,
+              "language": "TOML",
+              "lines": 16
+            }
+          }
+        },
+        {
+          "name": "src",
+          "children": [
+            {
+              "name": "lib.rs",
+              "data": {
+                "loc": {
+                  "blanks": 13,
+                  "code": 60,
+                  "comments": 1,
+                  "language": "Rust",
+                  "lines": 74
+                },
+                "git": {
+                  "age_in_days": 0,
+                  "last_update": 1559671020,
+                  "user_count": 1
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tests",
+      "children": [
+        {
+          "name": "data",
+          "children": [
+            {
+              "name": "git",
+              "children": [
+                {
+                  "name": "git_sample.zip",
+                  "data": {
+                    "git": {
+                      "age_in_days": 6,
+                      "last_update": 1559125911,
+                      "user_count": 1
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "name": "simple",
+              "children": [
+                {
+                  "name": "child",
+                  "children": [
+                    {
+                      "name": "a.txt",
+                      "data": {
+                        "loc": {
+                          "blanks": 0,
+                          "code": 2,
+                          "comments": 0,
+                          "language": "Plain Text",
+                          "lines": 2
+                        },
+                        "git": {
+                          "age_in_days": 35,
+                          "last_update": 1556623563,
+                          "user_count": 1
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "parent.clj",
+                  "data": {
+                    "git": {
+                      "age_in_days": 56,
+                      "last_update": 1554826216,
+                      "user_count": 1
+                    },
+                    "loc": {
+                      "blanks": 1,
+                      "code": 3,
+                      "comments": 0,
+                      "language": "Clojure",
+                      "lines": 4
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "expected",
+          "children": [
+            {
+              "name": "git",
+              "children": [
+                {
+                  "name": "git_sample.json",
+                  "data": {
+                    "loc": {
+                      "blanks": 0,
+                      "code": 174,
+                      "comments": 0,
+                      "language": "JSON",
+                      "lines": 174
+                    },
+                    "git": {
+                      "age_in_days": 5,
+                      "last_update": 1559239760,
+                      "user_count": 1
+                    }
+                  }
+                },
+                {
+                  "name": "git_sample_by_filename.json",
+                  "data": {
+                    "git": {
+                      "age_in_days": 5,
+                      "last_update": 1559160532,
+                      "user_count": 1
+                    },
+                    "loc": {
+                      "blanks": 0,
+                      "code": 137,
+                      "comments": 0,
+                      "language": "JSON",
+                      "lines": 137
+                    }
+                  }
+                },
+                {
+                  "name": "git_sample_with_merges.json",
+                  "data": {
+                    "git": {
+                      "age_in_days": 5,
+                      "last_update": 1559239760,
+                      "user_count": 1
+                    },
+                    "loc": {
+                      "blanks": 0,
+                      "code": 196,
+                      "comments": 0,
+                      "language": "JSON",
+                      "lines": 196
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "name": "integration_tests",
+              "children": [
+                {
+                  "name": "git_flare_test.json",
+                  "data": {
+                    "git": {
+                      "age_in_days": 0,
+                      "last_update": 1559671020,
+                      "user_count": 1
+                    },
+                    "loc": {
+                      "blanks": 0,
+                      "code": 35,
+                      "comments": 0,
+                      "language": "JSON",
+                      "lines": 35
+                    }
+                  }
+                },
+                {
+                  "name": "loc_flare_test.json",
+                  "data": {
+                    "loc": {
+                      "blanks": 0,
+                      "code": 34,
+                      "comments": 0,
+                      "language": "JSON",
+                      "lines": 34
+                    },
+                    "git": {
+                      "age_in_days": 0,
+                      "last_update": 1559671020,
+                      "user_count": 1
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "name": "simple_files.json",
+              "data": {
+                "git": {
+                  "age_in_days": 25,
+                  "last_update": 1557473148,
+                  "user_count": 1
+                },
+                "loc": {
+                  "blanks": 0,
+                  "code": 16,
+                  "comments": 0,
+                  "language": "JSON",
+                  "lines": 16
+                }
+              }
+            },
+            {
+              "name": "simple_files_with_counts.json",
+              "data": {
+                "loc": {
+                  "blanks": 0,
+                  "code": 28,
+                  "comments": 0,
+                  "language": "JSON",
+                  "lines": 28
+                },
+                "git": {
+                  "age_in_days": 15,
+                  "last_update": 1558362194,
+                  "user_count": 1
+                }
+              }
+            },
+            {
+              "name": "simple_files_with_data.json",
+              "data": {
+                "loc": {
+                  "blanks": 0,
+                  "code": 24,
+                  "comments": 0,
+                  "language": "JSON",
+                  "lines": 24
+                },
+                "git": {
+                  "age_in_days": 28,
+                  "last_update": 1557218029,
+                  "user_count": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "integration_tests.rs",
+          "data": {
+            "loc": {
+              "blanks": 14,
+              "code": 35,
+              "comments": 0,
+              "language": "Rust",
+              "lines": 49
+            },
+            "git": {
+              "age_in_days": 0,
+              "last_update": 1559671020,
+              "user_count": 1
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

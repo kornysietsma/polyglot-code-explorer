@@ -1,0 +1,89 @@
+
+.App-header {
+  text-align: center;
+}
+
+.App-header h1 {
+  font-size: 2.0rem;
+}
+
+/* Should only include top-level layout stuff here -
+  move these bits to component CSS files if they get to be non-trivial
+*/
+.Viz {
+  background-color: #010e35;
+}
+
+.Viz > svg {
+  width: 100%;
+  height: 100%;
+}
+.Controller {
+  background-color: #010e35;
+}
+.Inspector {
+  background-color: #010e35;
+  font-size: 0.75em;
+}
+
+.cell {
+  stroke: white;
+  stroke-width: 1px;
+}
+
+/* Layout stuff */
+
+.App-header { grid-area: header; }
+.Viz { grid-area: main; }
+.Controller { grid-area: controls; }
+.Inspector { grid-area: inspect; }
+
+/* The goal is to have a 1024x768 chart in the middle.
+  If you have room, the inspect and control panels
+  will be left and right,
+  If not they will be below, on the left and right.
+  If you don't have 1024px then it'll be a single column,
+  scaled.
+
+  My laptop has 1920 pixels width,
+  removing 1024 for the graph gives 896 or 2x448 pixel panels.
+*/
+
+.App {
+    display: grid;
+    grid-template-areas: "header header header"
+                         "controls main inspect";
+    grid-template-columns: 448px 1024px 448px;
+    grid-template-rows: auto
+                        1fr;
+    min-height: 100vh;
+    justify-content: center;
+}
+
+@media screen and (max-width: 1919px) {
+    .App {
+      grid-template-areas: "header header header"
+                           "main main main"
+                           "controls . inspect";
+      grid-template-columns: 448px 128px 448px;
+      grid-template-rows: auto
+                          1fr
+                          auto
+                          auto;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .App {
+        grid-template-areas: "header"
+                             "main"
+                             "controls"
+                             "inspect";
+        grid-template-columns: 100%;
+        grid-template-rows: auto
+                            auto
+                            auto
+                            auto;
+    }
+}
+
