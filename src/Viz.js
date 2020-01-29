@@ -32,6 +32,72 @@ function pruneWeightlessNodes(hierarchy) {
   }
 }
 
+// use getIn for objects as well as immutable objects
+function nestedGet(object, path) {
+  // if (Immutable.isImmutable(object)) {
+  // return Immutable.getIn(object, path);
+  // }
+  let index = 0;
+  const { length } = path;
+  let o = object;
+
+  while (o != null && index < length) {
+    // eslint-disable-next-line no-plusplus
+    o = o[path[index++]];
+  }
+  return index && index === length ? o : undefined;
+}
+
+function locDataFn(d) {
+  return nestedGet(d, ["data", "data", "loc", "code"]);
+}
+function buildScaledNodeColourFn(
+  dataFn,
+  parentColour,
+  defaultColour,
+  colourScale
+) {
+  return d => {
+    if (d.children) {
+      return parentColour;
+    }
+    const value = dataFn(d);
+
+    return value === undefined ? defaultColour : colourScale(value);
+  };
+}
+
+function buildLocFillFn() {
+  const parentFillColour = d3.rgb("#202020");
+  const neutralColour = d3.rgb("green");
+  const maxLoc = 1000;
+  const colourScale = c => d3.interpolateRdYlGn(1.0 - c); // see https://github.com/d3/d3-scale-chromatic/blob/master/README.md
+  // const goodestColour = colourScale(0);
+  // const baddestColour = colourScale(1);
+  const goodBadScale = d3.scaleSequential(colourScale).clamp(true);
+
+  return buildScaledNodeColourFn(
+    locDataFn,
+    parentFillColour,
+    neutralColour,
+    goodBadScale.copy().domain([0, maxLoc])
+  );
+}
+
+function computeCirclingPolygon(points, radius) {
+  const increment = (2 * Math.PI) / points;
+  const circlingPolygon = [];
+
+  for (let a = 0, i = 0; i < points; i++, a += increment) {
+    circlingPolygon.push([
+      radius + radius * Math.cos(a),
+      radius + radius * Math.sin(a)
+    ]);
+  }
+
+  return circlingPolygon;
+}
+
 const update = (d3Container, data, state) => {
   const { config } = state;
   // console.log("Viz.update", data, config);
@@ -62,12 +128,9 @@ const draw = (d3Container, data, state) => {
 
   pruneWeightlessNodes(rootNode);
 
-  const theMapper = vtm.voronoiTreemap().clip([
-    [0, 0],
-    [0, h],
-    [w, h],
-    [w, 0]
-  ]);
+  const clipShape = computeCirclingPolygon(32, w / 2);
+
+  const theMapper = vtm.voronoiTreemap().clip(clipShape);
 
   console.log("calculating voronoi treemap");
   theMapper(rootNode);
@@ -76,7 +139,10 @@ const draw = (d3Container, data, state) => {
 
   const allNodes = rootNode.descendants();
 
-  svg.selectAll("path")
+  const locFillFn = buildLocFillFn();
+
+  svg
+    .selectAll("path")
     .data(allNodes)
     .enter()
     .append("path")
@@ -84,9 +150,7 @@ const draw = (d3Container, data, state) => {
     .attr("d", d => {
       return `${d3.line()(d.polygon)}z`;
     })
-    .style("fill", _d => {
-      return "green";
-    });
+    .style("fill", locFillFn);
 };
 
 // see https://stackoverflow.com/questions/53446020/how-to-compare-oldvalues-and-newvalues-on-react-hooks-useeffect

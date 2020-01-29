@@ -55,7 +55,7 @@
                          "controls main inspect";
     grid-template-columns: 448px 1024px 448px;
     grid-template-rows: auto
-                        1fr;
+                        1024px;
     min-height: 100vh;
     justify-content: center;
 }
@@ -67,7 +67,7 @@
                            "controls . inspect";
       grid-template-columns: 448px 128px 448px;
       grid-template-rows: auto
-                          1fr
+                          1024px
                           auto
                           auto;
     }
