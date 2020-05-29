@@ -10,13 +10,15 @@ const Controller = props => {
   const onSubmit = evt => {
     console.log("submit!");
     evt.preventDefault();
+    /* old example of manipulating data outside the config
     const newShape = {
       color: "pink",
       width: 24
     };
     console.log("new shape", newShape);
     data.current.push(newShape);
-    dispatch({ type: "addShape" });
+    */
+    dispatch({ type: "addExpensive" });
   };
 
   // const onChange = (evt) => {
@@ -26,36 +28,36 @@ const Controller = props => {
   return (
     <aside className="Controller">
       <form onSubmit={onSubmit}>
-        <button type="submit">Add!</button>
+        <button type="submit">Add 1 to Expensive!</button>
       </form>
       <div>
         {/* should be a label but not ready to mess around with ids yet */}
-        Scale
+        Cheap
         <input
-          name="scale"
+          name="cheap"
           type="range"
-          value={state.config.scale}
+          value={state.config.cheapThing}
           min="1"
           max="500"
           onChange={evt =>
             dispatch({
-              type: "setScale",
+              type: "setCheap",
               payload: Number.parseInt(evt.target.value, 10)
             })
           }
         />
       </div>
       <div>
-        Strength
+        Expensive
         <input
-          name="strength"
+          name="expensive"
           type="range"
-          value={state.expensiveConfig.strength}
+          value={state.expensiveConfig.expensiveThing}
           min="0"
           max="100"
           onChange={evt =>
             dispatch({
-              type: "setStrength",
+              type: "setExpensive",
               payload: Number.parseInt(evt.target.value, 10)
             })
           }

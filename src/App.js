@@ -9,11 +9,10 @@ import rawData from "./data/flare.json";
 function init(initialData) {
   return {
     config: {
-      scale: 100 // percent to make life easier
+      cheapThing: 5
     },
     expensiveConfig: {
-      shapeCount: initialData.length,
-      strength: 13 // actually negative
+      expensiveThing: 5
     }
   };
 }
@@ -22,24 +21,27 @@ function reducer(state, action) {
   console.log("dispatched:", action);
   const {
     expensiveConfig,
-    expensiveConfig: { shapeCount }
+    expensiveConfig: { expensiveThing }
   } = state;
   console.log("old state", state);
   switch (action.type) {
-    case "addShape": {
+    case "addExpensive": {
       const newState = {
         ...state,
-        expensiveConfig: { ...expensiveConfig, shapeCount: shapeCount + 1 }
+        expensiveConfig: {
+          ...expensiveConfig,
+          expensiveThing: expensiveThing + 1
+        }
       };
       console.log("new state:", newState);
       return newState;
     }
-    case "setScale":
-      return { ...state, config: { scale: action.payload } };
-    case "setStrength":
+    case "setCheap":
+      return { ...state, config: { cheapThing: action.payload } };
+    case "setExpensive":
       return {
         ...state,
-        expensiveConfig: { ...expensiveConfig, strength: action.payload }
+        expensiveConfig: { ...expensiveConfig, expensiveThing: action.payload }
       };
     default:
       throw new Error();

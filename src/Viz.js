@@ -2,25 +2,33 @@
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
 
-const refreshSelection = (svg, data, config) => {
-  const circles = svg.selectAll("circle").data(data.current);
+const refreshSelection = (svg, data, state) => {
+  const { config, expensiveConfig } = state;
 
-  const newCircles = circles.enter().append("svg:circle");
+  console.log("refreshing");
 
-  circles
-    .merge(newCircles)
-    .attr("r", d => `${(d.width * config.scale) / 200}px`)
-    .style("fill", d => (d.color ? d.color : "purple"));
+  const locFillFn = buildLocFillFn();
+  const depthFillFn = buildDepthFn();
 
-  circles.exit().remove();
+  const fillFn = expensiveConfig.expensiveThing % 2 === 0 ? locFillFn : depthFillFn;
+  const strokeFn = (d) => {
+    return d.depth < config.cheapThing ? config.cheapThing - d.depth : 1;
+  }
 
-  return circles; // for further effects
+  svg
+    .selectAll(".cell")
+    .attr("d", d => {
+      return `${d3.line()(d.data.layout.polygon)}z`;
+    })
+    .style("fill", fillFn)
+    .style("stroke-width", strokeFn);
 };
 
 function flareWeightLoc(d) {
-  if (d.data === undefined) return 0;
-  if (d.data.loc === undefined) return 0;
-  return d.data.loc.code;
+  return d.value;
+  // if (d.data === undefined) return 0;
+  // if (d.data.loc === undefined) return 0;
+  // return d.data.loc.code;
 }
 
 function pruneWeightlessNodes(hierarchy) {
@@ -49,7 +57,8 @@ function nestedGet(object, path) {
 }
 
 function locDataFn(d) {
-  return nestedGet(d, ["data", "data", "loc", "code"]);
+  return d.data.value;
+  // return nestedGet(d, ["data", "data", "loc", "code"]);
 }
 function depthDataFn(d) {
   return d.depth;
@@ -127,7 +136,7 @@ const update = (d3Container, data, state) => {
   }
   const vizEl = d3Container.current;
   const svg = d3.select(vizEl);
-  refreshSelection(svg, data, config);
+  refreshSelection(svg, data, state);
 };
 
 const draw = (d3Container, data, state) => {
@@ -147,9 +156,9 @@ const draw = (d3Container, data, state) => {
   const rootNode = d3.hierarchy(data.current).sum(flareWeightLoc);
   console.log("hierarchy built");
 
-  pruneWeightlessNodes(rootNode);
+  // pruneWeightlessNodes(rootNode);
 
-  const clipShape = computeCirclingPolygon(32, w / 2);
+  // const clipShape = computeCirclingPolygon(32, w / 2);
 
   // const theMapper = vtm.voronoiTreemap().clip(clipShape);
 
@@ -163,18 +172,31 @@ const draw = (d3Container, data, state) => {
   const locFillFn = buildLocFillFn();
   const depthFillFn = buildDepthFn();
 
-  svg
-    .selectAll("path")
-    .data(allNodes)
+  const fillFn = expensiveConfig.expensiveThing % 2 === 0 ? locFillFn : depthFillFn;
+  const strokeFn = (d) => {
+    return d.depth < config.cheapThing ? config.cheapThing - d.depth : 1;
+  }
+
+  const nodes = svg
+    .datum(rootNode)
+    .selectAll(".cell")
+    .data(allNodes, node => node.path); // need paths! preprocess step...
+
+  const newNodes = nodes
     .enter()
     .append("path")
-    .classed("cell", true)
+    .classed("cell", true);
+
+  nodes
+    .merge(newNodes)
     .attr("d", d => {
-      console.log(d);
-      return `${d3.line()(d.data.polygon)}z`;
+      // console.log(d);
+      return `${d3.line()(d.data.layout.polygon)}z`;
     })
-    .style("fill", depthFillFn)
-    .style("stroke-width", d => (d.depth < 3 ? 3 - d.depth : 1));
+    .style("fill", fillFn)
+    .style("stroke-width", strokeFn);
+
+  nodes.exit().remove();
 };
 
 // see https://stackoverflow.com/questions/53446020/how-to-compare-oldvalues-and-newvalues-on-react-hooks-useeffect
@@ -203,10 +225,10 @@ const Viz = props => {
       prevState === undefined ||
       prevState.expensiveConfig !== expensiveConfig
     ) {
-      console.log("expensive config change");
+      console.log("expensive config change - rebuild all");
       draw(d3Container, data, state);
     } else {
-      console.log("cheap config change");
+      console.log("cheap config change - just redraw");
       update(d3Container, data, state);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
