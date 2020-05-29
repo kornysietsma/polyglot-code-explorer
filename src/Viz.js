@@ -1,7 +1,6 @@
 /* eslint-disable react/prop-types */
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
-import * as vtm from "d3-voronoi-treemap";
 
 const refreshSelection = (svg, data, config) => {
   const circles = svg.selectAll("circle").data(data.current);
@@ -34,6 +33,7 @@ function pruneWeightlessNodes(hierarchy) {
 
 // use getIn for objects as well as immutable objects
 function nestedGet(object, path) {
+  // re-enable this if using immutable.js
   // if (Immutable.isImmutable(object)) {
   // return Immutable.getIn(object, path);
   // }
@@ -51,6 +51,10 @@ function nestedGet(object, path) {
 function locDataFn(d) {
   return nestedGet(d, ["data", "data", "loc", "code"]);
 }
+function depthDataFn(d) {
+  return d.depth;
+}
+
 function buildScaledNodeColourFn(
   dataFn,
   parentColour,
@@ -81,6 +85,23 @@ function buildLocFillFn() {
     parentFillColour,
     neutralColour,
     goodBadScale.copy().domain([0, maxLoc])
+  );
+}
+
+function buildDepthFn() {
+  const parentFillColour = d3.rgb("#202020");
+  const neutralColour = d3.rgb("green");
+  const maxDepth = 10;
+  const colourScale = c => d3.interpolateRdYlGn(1.0 - c); // see https://github.com/d3/d3-scale-chromatic/blob/master/README.md
+  // const goodestColour = colourScale(0);
+  // const baddestColour = colourScale(1);
+  const goodBadScale = d3.scaleSequential(colourScale).clamp(true);
+
+  return buildScaledNodeColourFn(
+    depthDataFn,
+    parentFillColour,
+    neutralColour,
+    goodBadScale.copy().domain([0, maxDepth])
   );
 }
 
@@ -130,16 +151,17 @@ const draw = (d3Container, data, state) => {
 
   const clipShape = computeCirclingPolygon(32, w / 2);
 
-  const theMapper = vtm.voronoiTreemap().clip(clipShape);
+  // const theMapper = vtm.voronoiTreemap().clip(clipShape);
 
-  console.log("calculating voronoi treemap");
-  theMapper(rootNode);
+  // console.log("calculating voronoi treemap");
+  // theMapper(rootNode);
 
   console.log("drawing");
 
   const allNodes = rootNode.descendants();
 
   const locFillFn = buildLocFillFn();
+  const depthFillFn = buildDepthFn();
 
   svg
     .selectAll("path")
@@ -148,9 +170,11 @@ const draw = (d3Container, data, state) => {
     .append("path")
     .classed("cell", true)
     .attr("d", d => {
-      return `${d3.line()(d.polygon)}z`;
+      console.log(d);
+      return `${d3.line()(d.data.polygon)}z`;
     })
-    .style("fill", locFillFn);
+    .style("fill", depthFillFn)
+    .style("stroke-width", d => (d.depth < 3 ? 3 - d.depth : 1));
 };
 
 // see https://stackoverflow.com/questions/53446020/how-to-compare-oldvalues-and-newvalues-on-react-hooks-useeffect
