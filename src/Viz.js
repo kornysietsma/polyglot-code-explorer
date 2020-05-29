@@ -51,22 +51,18 @@ function depthDataFn(d) {
 
 function buildScaledNodeColourFn(
   dataFn,
-  parentColour,
+  parentFn,
   defaultColour,
   colourScale
 ) {
   return d => {
-    if (d.children) {
-      return parentColour;
-    }
-    const value = dataFn(d);
+    const value = d.children ? parentFn(d) : dataFn(d);
 
     return value === undefined ? defaultColour : colourScale(value);
   };
 }
 
 function buildLocFillFn() {
-  const parentFillColour = d3.rgb("#202020");
   const neutralColour = d3.rgb("green");
   const maxLoc = 1000;
   const colourScale = c => d3.interpolateRdYlGn(1.0 - c); // see https://github.com/d3/d3-scale-chromatic/blob/master/README.md
@@ -76,7 +72,7 @@ function buildLocFillFn() {
 
   return buildScaledNodeColourFn(
     locDataFn,
-    parentFillColour,
+    locDataFn,
     neutralColour,
     goodBadScale.copy().domain([0, maxLoc])
   );
@@ -93,7 +89,7 @@ function buildDepthFn() {
 
   return buildScaledNodeColourFn(
     depthDataFn,
-    parentFillColour,
+    depthDataFn,
     neutralColour,
     goodBadScale.copy().domain([0, maxDepth])
   );
@@ -126,7 +122,7 @@ const draw = (d3Container, data, state) => {
 
   console.log("drawing");
 
-  const allNodes = rootNode.descendants();
+  const allNodes = rootNode.descendants().filter(d => d.depth <= expensiveConfig.depth);
 
   const locFillFn = buildLocFillFn();
   const depthFillFn = buildDepthFn();

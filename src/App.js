@@ -12,6 +12,7 @@ function init(initialData) {
       cheapThing: 5
     },
     expensiveConfig: {
+      depth: 10,
       expensiveThing: 5
     }
   };
@@ -42,6 +43,11 @@ function reducer(state, action) {
       return {
         ...state,
         expensiveConfig: { ...expensiveConfig, expensiveThing: action.payload }
+      };
+    case "setDepth":
+      return {
+        ...state,
+        expensiveConfig: { ...expensiveConfig, depth: action.payload }
       };
     default:
       throw new Error();

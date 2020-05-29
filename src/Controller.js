@@ -63,6 +63,22 @@ const Controller = props => {
           }
         />
       </div>
+      <div>
+        Depth
+        <input
+          name="depth"
+          type="range"
+          value={state.expensiveConfig.depth}
+          min="1"
+          max="20"
+          onChange={evt =>
+            dispatch({
+              type: "setDepth",
+              payload: Number.parseInt(evt.target.value, 10)
+            })
+          }
+        />
+      </div>
     </aside>
   );
 };

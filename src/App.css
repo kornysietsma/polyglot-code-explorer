@@ -47,15 +47,19 @@
 
   My laptop has 1920 pixels width,
   removing 1024 for the graph gives 896 or 2x448 pixel panels.
+
+  Note padding on the bottom just so the main area isn't always bottom-aligned
 */
 
 .App {
     display: grid;
     grid-template-areas: "header header header"
-                         "controls main inspect";
+                         "controls main inspect"
+                         "padding padding padding";
     grid-template-columns: 448px 1024px 448px;
     grid-template-rows: auto
-                        1024px;
+                        1024px
+                        auto;
     min-height: 100vh;
     justify-content: center;
 }
