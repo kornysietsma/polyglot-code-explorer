@@ -10,10 +10,11 @@ const refreshSelection = (svg, data, state) => {
   const locFillFn = buildLocFillFn();
   const depthFillFn = buildDepthFn();
 
-  const fillFn = expensiveConfig.expensiveThing % 2 === 0 ? locFillFn : depthFillFn;
-  const strokeFn = (d) => {
+  const fillFn =
+    expensiveConfig.expensiveThing % 2 === 0 ? locFillFn : depthFillFn;
+  const strokeFn = d => {
     return d.depth < config.cheapThing ? config.cheapThing - d.depth : 1;
-  }
+  };
 
   svg
     .selectAll(".cell")
@@ -23,21 +24,6 @@ const refreshSelection = (svg, data, state) => {
     .style("fill", fillFn)
     .style("stroke-width", strokeFn);
 };
-
-function flareWeightLoc(d) {
-  return d.value;
-  // if (d.data === undefined) return 0;
-  // if (d.data.loc === undefined) return 0;
-  // return d.data.loc.code;
-}
-
-function pruneWeightlessNodes(hierarchy) {
-  if (hierarchy.children !== undefined) {
-    // eslint-disable-next-line no-param-reassign
-    hierarchy.children = hierarchy.children.filter(node => node.value > 0);
-    hierarchy.children.forEach(child => pruneWeightlessNodes(child));
-  }
-}
 
 // use getIn for objects as well as immutable objects
 function nestedGet(object, path) {
@@ -58,7 +44,6 @@ function nestedGet(object, path) {
 
 function locDataFn(d) {
   return d.data.value;
-  // return nestedGet(d, ["data", "data", "loc", "code"]);
 }
 function depthDataFn(d) {
   return d.depth;
@@ -114,23 +99,7 @@ function buildDepthFn() {
   );
 }
 
-function computeCirclingPolygon(points, radius) {
-  const increment = (2 * Math.PI) / points;
-  const circlingPolygon = [];
-
-  for (let a = 0, i = 0; i < points; i++, a += increment) {
-    circlingPolygon.push([
-      radius + radius * Math.cos(a),
-      radius + radius * Math.sin(a)
-    ]);
-  }
-
-  return circlingPolygon;
-}
-
 const update = (d3Container, data, state) => {
-  const { config } = state;
-  // console.log("Viz.update", data, config);
   if (!d3Container.current) {
     throw Error("No current container");
   }
@@ -141,29 +110,19 @@ const update = (d3Container, data, state) => {
 
 const draw = (d3Container, data, state) => {
   const { config, expensiveConfig } = state;
-  // console.log("Viz.draw", data, config, expensiveConfig);
 
   if (!d3Container.current) {
     console.log("in draw but d3container not yet current");
     return;
   }
   const vizEl = d3Container.current;
-  console.log(vizEl);
+  // console.log(vizEl);
   const w = vizEl.clientWidth;
   const h = vizEl.clientHeight;
   const svg = d3.select(vizEl);
   console.log("svg w,h:", w, h);
-  const rootNode = d3.hierarchy(data.current).sum(flareWeightLoc);
+  const rootNode = d3.hierarchy(data.current).sum(d => d.value);
   console.log("hierarchy built");
-
-  // pruneWeightlessNodes(rootNode);
-
-  // const clipShape = computeCirclingPolygon(32, w / 2);
-
-  // const theMapper = vtm.voronoiTreemap().clip(clipShape);
-
-  // console.log("calculating voronoi treemap");
-  // theMapper(rootNode);
 
   console.log("drawing");
 
@@ -172,15 +131,16 @@ const draw = (d3Container, data, state) => {
   const locFillFn = buildLocFillFn();
   const depthFillFn = buildDepthFn();
 
-  const fillFn = expensiveConfig.expensiveThing % 2 === 0 ? locFillFn : depthFillFn;
-  const strokeFn = (d) => {
+  const fillFn =
+    expensiveConfig.expensiveThing % 2 === 0 ? locFillFn : depthFillFn;
+  const strokeFn = d => {
     return d.depth < config.cheapThing ? config.cheapThing - d.depth : 1;
-  }
+  };
 
   const nodes = svg
     .datum(rootNode)
     .selectAll(".cell")
-    .data(allNodes, node => node.path); // need paths! preprocess step...
+    .data(allNodes, node => node.path);
 
   const newNodes = nodes
     .enter()
@@ -190,7 +150,6 @@ const draw = (d3Container, data, state) => {
   nodes
     .merge(newNodes)
     .attr("d", d => {
-      // console.log(d);
       return `${d3.line()(d.data.layout.polygon)}z`;
     })
     .style("fill", fillFn)
