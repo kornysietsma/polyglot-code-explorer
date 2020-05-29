@@ -2,29 +2,6 @@
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
 
-const refreshSelection = (svg, data, state) => {
-  const { config, expensiveConfig } = state;
-
-  console.log("refreshing");
-
-  const locFillFn = buildLocFillFn();
-  const depthFillFn = buildDepthFn();
-
-  const fillFn =
-    expensiveConfig.expensiveThing % 2 === 0 ? locFillFn : depthFillFn;
-  const strokeFn = d => {
-    return d.depth < config.cheapThing ? config.cheapThing - d.depth : 1;
-  };
-
-  svg
-    .selectAll(".cell")
-    .attr("d", d => {
-      return `${d3.line()(d.data.layout.polygon)}z`;
-    })
-    .style("fill", fillFn)
-    .style("stroke-width", strokeFn);
-};
-
 // use getIn for objects as well as immutable objects
 function nestedGet(object, path) {
   // re-enable this if using immutable.js
@@ -49,12 +26,7 @@ function depthDataFn(d) {
   return d.depth;
 }
 
-function buildScaledNodeColourFn(
-  dataFn,
-  parentFn,
-  defaultColour,
-  colourScale
-) {
+function buildScaledNodeColourFn(dataFn, parentFn, defaultColour, colourScale) {
   return d => {
     const value = d.children ? parentFn(d) : dataFn(d);
 
@@ -79,7 +51,6 @@ function buildLocFillFn() {
 }
 
 function buildDepthFn() {
-  const parentFillColour = d3.rgb("#202020");
   const neutralColour = d3.rgb("green");
   const maxDepth = 10;
   const colourScale = c => d3.interpolateRdYlGn(1.0 - c); // see https://github.com/d3/d3-scale-chromatic/blob/master/README.md
@@ -95,13 +66,36 @@ function buildDepthFn() {
   );
 }
 
+const redrawPolygons = (svgSelection, data, state) => {
+  const { config, expensiveConfig } = state;
+
+  console.log("refreshing");
+
+  const locFillFn = buildLocFillFn();
+  const depthFillFn = buildDepthFn();
+
+  const fillFn =
+    expensiveConfig.expensiveThing % 2 === 0 ? locFillFn : depthFillFn;
+  const strokeFn = d => {
+    return d.depth < config.cheapThing ? config.cheapThing - d.depth : 1;
+  };
+
+  return svgSelection
+    .attr("d", d => {
+      return `${d3.line()(d.data.layout.polygon)}z`;
+    })
+    .style("fill", fillFn)
+    .style("stroke-width", strokeFn)
+    .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
+};
+
 const update = (d3Container, data, state) => {
   if (!d3Container.current) {
     throw Error("No current container");
   }
   const vizEl = d3Container.current;
   const svg = d3.select(vizEl);
-  refreshSelection(svg, data, state);
+  redrawPolygons(svg.selectAll(".cell"), data, state);
 };
 
 const draw = (d3Container, data, state) => {
@@ -115,14 +109,16 @@ const draw = (d3Container, data, state) => {
   // console.log(vizEl);
   const w = vizEl.clientWidth;
   const h = vizEl.clientHeight;
-  const svg = d3.select(vizEl);
-  console.log("svg w,h:", w, h);
+  const svg = d3.select(vizEl).attr("viewBox", [0, 0, w, h]);
+  const group = svg.selectAll(".topGroup");
   const rootNode = d3.hierarchy(data.current).sum(d => d.value);
   console.log("hierarchy built");
 
   console.log("drawing");
 
-  const allNodes = rootNode.descendants().filter(d => d.depth <= expensiveConfig.depth);
+  const allNodes = rootNode
+    .descendants()
+    .filter(d => d.depth <= expensiveConfig.depth);
 
   const locFillFn = buildLocFillFn();
   const depthFillFn = buildDepthFn();
@@ -133,7 +129,7 @@ const draw = (d3Container, data, state) => {
     return d.depth < config.cheapThing ? config.cheapThing - d.depth : 1;
   };
 
-  const nodes = svg
+  const nodes = group
     .datum(rootNode)
     .selectAll(".cell")
     .data(allNodes, node => node.path);
@@ -143,15 +139,27 @@ const draw = (d3Container, data, state) => {
     .append("path")
     .classed("cell", true);
 
-  nodes
-    .merge(newNodes)
-    .attr("d", d => {
-      return `${d3.line()(d.data.layout.polygon)}z`;
-    })
-    .style("fill", fillFn)
-    .style("stroke-width", strokeFn);
+  redrawPolygons(nodes.merge(newNodes), data, state)
+    .append("svg:title")
+    .text(n => n.data.path);
 
   nodes.exit().remove();
+
+  // zooming - see https://observablehq.com/@d3/zoomable-map-tiles?collection=@d3/d3-zoom
+  const zoomed = () => {
+    group.attr("transform", d3.event.transform);
+  };
+
+  svg.call(
+    d3
+      .zoom()
+      .extent([
+        [0, 0],
+        [w, h]
+      ])
+      .scaleExtent([0.5, 8])
+      .on("zoom", zoomed)
+  );
 };
 
 // see https://stackoverflow.com/questions/53446020/how-to-compare-oldvalues-and-newvalues-on-react-hooks-useeffect
@@ -191,7 +199,9 @@ const Viz = props => {
 
   return (
     <aside className="Viz">
-      <svg ref={d3Container} />
+      <svg ref={d3Container}>
+        <g className="topGroup" />
+      </svg>
     </aside>
   );
 };
