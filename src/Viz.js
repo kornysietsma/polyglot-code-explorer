@@ -98,7 +98,7 @@ const update = (d3Container, data, state) => {
   redrawPolygons(svg.selectAll(".cell"), data, state);
 };
 
-const draw = (d3Container, data, state) => {
+const draw = (d3Container, data, state, dispatch) => {
   const { config, expensiveConfig } = state;
 
   if (!d3Container.current) {
@@ -140,6 +140,10 @@ const draw = (d3Container, data, state) => {
     .classed("cell", true);
 
   redrawPolygons(nodes.merge(newNodes), data, state)
+    .on("click", (node, i, nodes) => {
+      console.log("onClicked", node, i, nodes[i]);
+      dispatch({ type: "selectNode", payload: node.data });
+    })
     .append("svg:title")
     .text(n => n.data.path);
 
@@ -176,6 +180,7 @@ const Viz = props => {
   const {
     data,
     state,
+    dispatch,
     state: { config, expensiveConfig }
   } = props;
 
@@ -189,10 +194,12 @@ const Viz = props => {
       prevState.expensiveConfig !== expensiveConfig
     ) {
       console.log("expensive config change - rebuild all");
-      draw(d3Container, data, state);
-    } else {
+      draw(d3Container, data, state, dispatch);
+    } else if (prevState.config !== config) {
       console.log("cheap config change - just redraw");
       update(d3Container, data, state);
+    } else {
+      console.log("no change in visible config - not doing nothing");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, state]);

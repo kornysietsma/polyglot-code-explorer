@@ -14,6 +14,9 @@ function init(initialData) {
     expensiveConfig: {
       depth: 10,
       expensiveThing: 5
+    },
+    nonD3Config: {
+      selectedNode: null
     }
   };
 }
@@ -22,7 +25,9 @@ function reducer(state, action) {
   console.log("dispatched:", action);
   const {
     expensiveConfig,
-    expensiveConfig: { expensiveThing }
+    expensiveConfig: { expensiveThing },
+    config,
+    nonD3Config
   } = state;
   console.log("old state", state);
   switch (action.type) {
@@ -38,7 +43,7 @@ function reducer(state, action) {
       return newState;
     }
     case "setCheap":
-      return { ...state, config: { cheapThing: action.payload } };
+      return { ...state, config: { ...config, cheapThing: action.payload } };
     case "setExpensive":
       return {
         ...state,
@@ -48,6 +53,11 @@ function reducer(state, action) {
       return {
         ...state,
         expensiveConfig: { ...expensiveConfig, depth: action.payload }
+      };
+    case "selectNode":
+      return {
+        ...state,
+        nonD3Config: { ...nonD3Config, selectedNode: action.payload }
       };
     default:
       throw new Error();
@@ -65,9 +75,9 @@ function App() {
       <header className="App-header">
         <h1>LATI Code Visualizer</h1>
       </header>
-      <Viz data={data} state={vizState} />
+      <Viz data={data} state={vizState} dispatch={dispatch} />
       <Controller data={data} state={vizState} dispatch={dispatch} />
-      <Inspector />
+      <Inspector state={vizState} dispatch={dispatch}/>
     </div>
   );
 }
