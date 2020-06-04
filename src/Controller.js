@@ -1,23 +1,19 @@
 /* eslint-disable react/prop-types */
 // as prop-types seem painful to implement without going full typescript
-import React from "react";
+import React, { useState, useRef } from "react";
+import _uniqueId from "lodash/uniqueId";
+
 
 const Controller = props => {
   console.log("creating Controller");
   // console.log(props);
   const { data, state, dispatch } = props;
+  // ID logic from https://stackoverflow.com/questions/29420835/how-to-generate-unique-ids-for-form-labels-in-react
+  const { current: vizId } = useRef(_uniqueId("controller-"));
 
   const onSubmit = evt => {
     console.log("submit!");
     evt.preventDefault();
-    /* old example of manipulating data outside the config
-    const newShape = {
-      color: "pink",
-      width: 24
-    };
-    console.log("new shape", newShape);
-    data.current.push(newShape);
-    */
     dispatch({ type: "addExpensive" });
   };
 
@@ -27,6 +23,25 @@ const Controller = props => {
 
   return (
     <aside className="Controller">
+      <label htmlFor={vizId}>
+        Visualization:
+        <select
+          id={vizId}
+          value={state.config.visualization}
+          onChange={evt =>
+            dispatch({ type: "setVisualization", payload: evt.target.value })
+          }
+        >
+          <option value="loc">Lines of Code</option>
+          <option value="depth">Nesting depth</option>
+          <option value="toxicity">Toxicity</option>
+        </select>
+      </label>
+      {state.config.visualization === "toxicity" ? (
+        <p>Toxicity not yet implemented</p>
+      ) : (
+        ""
+      )}
       <form onSubmit={onSubmit}>
         <button type="submit">Add 1 to Expensive!</button>
       </form>

@@ -2,6 +2,24 @@
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
 
+function buildScaledNodeColourFn(dataFn, parentFn, defaultColour, colourScale) {
+  return d => {
+    const value = d.children ? parentFn(d) : dataFn(d);
+
+    return value === undefined ? defaultColour : colourScale(value);
+  };
+}
+
+// This is for config that _could_ go in the state, if it needs to change,
+// but for now it is actually not changing and simpler to put it here.
+const constantConfig = {
+  goodBadScale: d3
+    .scaleSequential(c => d3.interpolateRdYlGn(1.0 - c))
+    .clamp(true),
+  lowHighScale: d3.scaleSequential(d3.interpolateMagma).clamp(true),
+  neutralColour: d3.rgb("green")
+};
+
 // use getIn for objects as well as immutable objects
 function nestedGet(object, path) {
   // re-enable this if using immutable.js
@@ -24,14 +42,6 @@ function locDataFn(d) {
 }
 function depthDataFn(d) {
   return d.depth;
-}
-
-function buildScaledNodeColourFn(dataFn, parentFn, defaultColour, colourScale) {
-  return d => {
-    const value = d.children ? parentFn(d) : dataFn(d);
-
-    return value === undefined ? defaultColour : colourScale(value);
-  };
 }
 
 function buildLocFillFn() {
@@ -66,16 +76,34 @@ function buildDepthFn() {
   );
 }
 
+function buildFillFunctions(config, stats) {
+  return {
+    locFillFn: buildScaledNodeColourFn(
+      locDataFn,
+        () => undefined,
+      constantConfig.neutralColour,
+      constantConfig.goodBadScale.copy().domain([0, stats.maxLoc])
+    ),
+    depthFillFn: buildScaledNodeColourFn(
+      depthDataFn,
+      depthDataFn,
+      constantConfig.neutralColour,
+      constantConfig.lowHighScale.copy().domain([0, stats.maxDepth])
+    )
+  };
+}
+
 const redrawPolygons = (svgSelection, data, state) => {
-  const { config, expensiveConfig } = state;
+  const { config, stats } = state;
 
   console.log("refreshing");
 
-  const locFillFn = buildLocFillFn();
-  const depthFillFn = buildDepthFn();
+  const {locFillFn, depthFillFn} = buildFillFunctions(config, stats);
 
-  const fillFn =
-    expensiveConfig.expensiveThing % 2 === 0 ? locFillFn : depthFillFn;
+  // const locFillFn = buildLocFillFn();
+  // const depthFillFn = buildDepthFn();
+
+  const fillFn = config.visualization === "loc" ? locFillFn : depthFillFn;
   const strokeFn = d => {
     return d.depth < config.cheapThing ? config.cheapThing - d.depth : 1;
   };
@@ -111,23 +139,13 @@ const draw = (d3Container, data, state, dispatch) => {
   const h = vizEl.clientHeight;
   const svg = d3.select(vizEl).attr("viewBox", [0, 0, w, h]);
   const group = svg.selectAll(".topGroup");
-  const rootNode = d3.hierarchy(data.current).sum(d => d.value);
-  console.log("hierarchy built");
+  const rootNode = d3.hierarchy(data.current); //.sum(d => d.value);
 
   console.log("drawing");
 
   const allNodes = rootNode
     .descendants()
     .filter(d => d.depth <= expensiveConfig.depth);
-
-  const locFillFn = buildLocFillFn();
-  const depthFillFn = buildDepthFn();
-
-  const fillFn =
-    expensiveConfig.expensiveThing % 2 === 0 ? locFillFn : depthFillFn;
-  const strokeFn = d => {
-    return d.depth < config.cheapThing ? config.cheapThing - d.depth : 1;
-  };
 
   const nodes = group
     .datum(rootNode)
@@ -140,8 +158,8 @@ const draw = (d3Container, data, state, dispatch) => {
     .classed("cell", true);
 
   redrawPolygons(nodes.merge(newNodes), data, state)
-    .on("click", (node, i, nodes) => {
-      console.log("onClicked", node, i, nodes[i]);
+    .on("click", (node, i, nodeList) => {
+      console.log("onClicked", node, i, nodeList[i]);
       dispatch({ type: "selectNode", payload: node.data });
     })
     .append("svg:title")
