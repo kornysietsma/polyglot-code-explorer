@@ -1,8 +1,10 @@
 import React from "react";
+import _ from "lodash";
 
 const NodeInspector = props => {
   const { node } = props;
   console.error("node data:", node);
+  const codeAge = _.get(node, ["data", "git", "age_in_days"], undefined);
   return (
     <div>
       <p>{node.name}</p>
@@ -20,6 +22,7 @@ const NodeInspector = props => {
       ) : (
         ""
       )}
+        {codeAge ? (<p>Code age: {codeAge} days</p>) : ""}
     </div>
   );
 };

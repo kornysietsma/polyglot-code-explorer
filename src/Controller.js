@@ -45,6 +45,7 @@ const Controller = props => {
             <option value="loc">Lines of Code</option>
             <option value="depth">Nesting depth</option>
             <option value="indentation">Indentation</option>
+              <option value="age">Code age</option>
           </select>
         </label>
       </div>

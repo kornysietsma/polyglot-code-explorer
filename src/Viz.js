@@ -5,6 +5,7 @@ import _ from "lodash";
 
 function buildScaledNodeColourFn(dataFn, parentFn, defaultColour, colourScale) {
   return d => {
+    if (d.data.layout.algorithm === "circlePack") return "#111";
     const value = d.children ? parentFn(d) : dataFn(d);
 
     return value === undefined ? defaultColour : colourScale(value);
@@ -18,7 +19,8 @@ const constantConfig = {
     .scaleSequential(c => d3.interpolateRdYlGn(1.0 - c))
     .clamp(true),
   lowHighScale: d3.scaleSequential(d3.interpolateMagma).clamp(true),
-  neutralColour: d3.rgb("green")
+  neutralColour: d3.rgb("green"),
+  badColour: d3.rgb("red")
 };
 
 // use getIn for objects as well as immutable objects
@@ -78,13 +80,27 @@ function buildDepthFn() {
 }
 
 function indentationNodeFn(config) {
-  return (d) => {
-    return _.get(d, ['data','data','indentation', config.indentation.metric], undefined);
+  return d => {
+    return _.get(
+      d,
+      ["data", "data", "indentation", config.indentation.metric],
+      undefined
+    );
   };
 }
 
 function indentationParentFn(config) {
-  return (d) => undefined;
+  return d => undefined;
+}
+
+function ageNodeFn(config) {
+  return d => {
+    return _.get(d, ["data", "data", "git", "age_in_days"], undefined); // no data means ancient files
+  };
+}
+
+function ageParentFn(config) {
+  return d => 0; // TODO: show parents more usefully
 }
 
 function buildFillFunctions(config, stats) {
@@ -102,12 +118,18 @@ function buildFillFunctions(config, stats) {
       constantConfig.lowHighScale.copy().domain([0, stats.maxDepth])
     ),
     indentation: buildScaledNodeColourFn(
-        indentationNodeFn(config),
-        indentationParentFn(config),
-        constantConfig.neutralColour,
+      indentationNodeFn(config),
+      indentationParentFn(config),
+      constantConfig.neutralColour,
       constantConfig.goodBadScale
         .copy()
         .domain([0, config.indentation.maxIndentationScale])
+    ),
+    age: buildScaledNodeColourFn(
+      ageNodeFn(config),
+      ageParentFn(config),
+      constantConfig.badColour, // no git data means bad things
+      constantConfig.goodBadScale.copy().domain([0, config.codeAge.maxAge])
     )
   };
 }
@@ -124,7 +146,8 @@ const redrawPolygons = (svgSelection, data, state) => {
 
   const fillFn = fillFunctions[config.visualization];
   const strokeFn = d => {
-    return d.depth < 5 ? 5 - d.depth : 1;
+    if (d.data.layout.algorithm === "circlePack") return 0;
+    return d.depth < 4 ? 4 - d.depth : 1;
   };
 
   return svgSelection
@@ -156,7 +179,15 @@ const draw = (d3Container, data, state, dispatch) => {
   // console.log(vizEl);
   const w = vizEl.clientWidth;
   const h = vizEl.clientHeight;
-  const svg = d3.select(vizEl).attr("viewBox", [0, 0, w, h]);
+  const { layout } = data.current;
+  const svg = d3
+    .select(vizEl)
+    .attr("viewBox", [
+      -layout.width / 2,
+      -layout.height / 2,
+      layout.width,
+      layout.height
+    ]);
   const group = svg.selectAll(".topGroup");
   const rootNode = d3.hierarchy(data.current); // .sum(d => d.value);
 

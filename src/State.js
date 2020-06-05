@@ -37,6 +37,9 @@ function initialiseGlobalState(initialData) {
         metric: "p99",
         summarizeBy: "worst",
         maxIndentationScale: 50
+      },
+      codeAge: {
+        maxAge: 365 * 2
       }
     },
     expensiveConfig: {
