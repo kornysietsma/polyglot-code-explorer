@@ -105,7 +105,7 @@ const redrawPolygons = (svgSelection, data, state) => {
 
   const fillFn = config.visualization === "loc" ? locFillFn : depthFillFn;
   const strokeFn = d => {
-    return d.depth < config.cheapThing ? config.cheapThing - d.depth : 1;
+    return d.depth < 5 ? 5 - d.depth : 1;
   };
 
   return svgSelection
