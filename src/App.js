@@ -3,10 +3,12 @@ import "./App.css";
 import Controller from "./Controller";
 import Inspector from "./Inspector";
 import Viz from "./Viz";
-import rawData from "./data/flare.json";
 import { initialiseGlobalState, globalDispatchReducer } from "./State";
 
-function App() {
+const App = props => {
+  // eslint-disable-next-line react/prop-types
+    console.log('in app');
+  const { rawData } = props;
   const [vizState, dispatch] = useReducer(
     globalDispatchReducer,
     rawData,
@@ -26,6 +28,6 @@ function App() {
       <Inspector state={vizState} dispatch={dispatch} />
     </div>
   );
-}
+};
 
 export default App;

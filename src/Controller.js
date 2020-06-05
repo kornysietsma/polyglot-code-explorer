@@ -27,7 +27,7 @@ const Controller = props => {
             }
           >
             {[...Array(state.stats.maxDepth + 1).keys()].map(d => (
-              <option value={d}>{d}</option>
+              <option key={d} value={d}>{d}</option>
             ))}
           </select>
         </label>

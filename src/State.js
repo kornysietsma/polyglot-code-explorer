@@ -35,7 +35,7 @@ function initialiseGlobalState(initialData) {
       visualization: "loc"
     },
     expensiveConfig: {
-      depth: maxDepth
+      depth: Math.min(5, maxDepth)
     },
     nonD3Config: {
       selectedNode: null

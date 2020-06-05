@@ -40,6 +40,32 @@ On a UI triggered change:
 * The Viz `useEffect` is triggered
 * The previous and current state contents are compared - if the change is to expensive state, the full D3 simulation is re-built.  If it is to cheap state only, just the bubbles are redrawn.
 
+## Running with a particular data file
+
+Initially I had data files in `src/data/flare.jso` loaded with
+
+```js
+import rawData from "./data/flare.json";
+```
+
+This works, but it means react needs to constantly scan this file for changes, and auto-reloads when it changes
+also I couldn't easily test with other files without a lot of fun copying over the top and having git complain.
+
+Now, instead it looks for a file in `public/data/default.json` and loads it via an `xmlhttprequest` in `index.js`
+
+If you want a different file, set `REACT_APP_LATI_DATA` with the file prefix (ignoring the `.json` part) - create-react-app
+will pass variables starting `REACT_APP_` to the app, so `index.js` can read it and load the right file.
+
+For example:
+
+```shell script
+REACT_APP_LATI_DATA=big yarn start
+```
+
+or if you don't want to re-open the browser:
+```shell script
+REACT_APP_LATI_DATA=big BROWSER=none yarn start
+```
 
 
 ---- original create-react-app stuff below ----
