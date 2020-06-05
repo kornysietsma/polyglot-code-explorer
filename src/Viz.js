@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
+import _ from "lodash";
 
 function buildScaledNodeColourFn(dataFn, parentFn, defaultColour, colourScale) {
   return d => {
@@ -76,19 +77,37 @@ function buildDepthFn() {
   );
 }
 
+function indentationNodeFn(config) {
+  return (d) => {
+    return _.get(d, ['data','data','indentation', config.indentation.metric], undefined);
+  };
+}
+
+function indentationParentFn(config) {
+  return (d) => undefined;
+}
+
 function buildFillFunctions(config, stats) {
   return {
-    locFillFn: buildScaledNodeColourFn(
+    loc: buildScaledNodeColourFn(
       locDataFn,
-        () => undefined,
+      () => undefined,
       constantConfig.neutralColour,
       constantConfig.goodBadScale.copy().domain([0, stats.maxLoc])
     ),
-    depthFillFn: buildScaledNodeColourFn(
+    depth: buildScaledNodeColourFn(
       depthDataFn,
       depthDataFn,
       constantConfig.neutralColour,
       constantConfig.lowHighScale.copy().domain([0, stats.maxDepth])
+    ),
+    indentation: buildScaledNodeColourFn(
+        indentationNodeFn(config),
+        indentationParentFn(config),
+        constantConfig.neutralColour,
+      constantConfig.goodBadScale
+        .copy()
+        .domain([0, config.indentation.maxIndentationScale])
     )
   };
 }
@@ -98,12 +117,12 @@ const redrawPolygons = (svgSelection, data, state) => {
 
   console.log("refreshing");
 
-  const {locFillFn, depthFillFn} = buildFillFunctions(config, stats);
+  const fillFunctions = buildFillFunctions(config, stats);
 
   // const locFillFn = buildLocFillFn();
   // const depthFillFn = buildDepthFn();
 
-  const fillFn = config.visualization === "loc" ? locFillFn : depthFillFn;
+  const fillFn = fillFunctions[config.visualization];
   const strokeFn = d => {
     return d.depth < 5 ? 5 - d.depth : 1;
   };
@@ -139,7 +158,7 @@ const draw = (d3Container, data, state, dispatch) => {
   const h = vizEl.clientHeight;
   const svg = d3.select(vizEl).attr("viewBox", [0, 0, w, h]);
   const group = svg.selectAll(".topGroup");
-  const rootNode = d3.hierarchy(data.current); //.sum(d => d.value);
+  const rootNode = d3.hierarchy(data.current); // .sum(d => d.value);
 
   console.log("drawing");
 

@@ -32,7 +32,12 @@ function initialiseGlobalState(initialData) {
   const { maxDepth, maxLoc } = findDataStats(initialData);
   return {
     config: {
-      visualization: "loc"
+      visualization: "loc",
+      indentation: {
+        metric: "p99",
+        summarizeBy: "worst",
+        maxIndentationScale: 50
+      }
     },
     expensiveConfig: {
       depth: Math.min(5, maxDepth)
