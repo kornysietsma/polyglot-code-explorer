@@ -40,24 +40,26 @@ function initialiseGlobalState(initialData) {
       },
       codeAge: {
         maxAge: 365 * 2
-      }
+      },
+      colours: {
+        defaultStroke: "#111111",
+        selectedStroke: "#aaa500"
+      },
+      selectedNode: null
     },
     expensiveConfig: {
       depth: Math.min(5, maxDepth)
     },
-    nonD3Config: {
-      selectedNode: null
-    },
     stats: {
       maxDepth,
-      maxLoc
+      maxLoc: Math.min(maxLoc, 2000)
     }
   };
 }
 
 function globalDispatchReducer(state, action) {
   console.log("dispatched:", action);
-  const { expensiveConfig, config, nonD3Config } = state;
+  const { expensiveConfig, config } = state;
   console.log("old state", state);
   switch (action.type) {
     case "setVisualization":
@@ -70,7 +72,7 @@ function globalDispatchReducer(state, action) {
     case "selectNode":
       return {
         ...state,
-        nonD3Config: { ...nonD3Config, selectedNode: action.payload }
+        config: { ...config, selectedNode: action.payload }
       };
     default:
       throw new Error();

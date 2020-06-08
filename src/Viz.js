@@ -145,7 +145,7 @@ const redrawPolygons = (svgSelection, data, state) => {
   // const depthFillFn = buildDepthFn();
 
   const fillFn = fillFunctions[config.visualization];
-  const strokeFn = d => {
+  const strokeWidthFn = d => {
     if (d.data.layout.algorithm === "circlePack") return 0;
     return d.depth < 4 ? 4 - d.depth : 1;
   };
@@ -155,9 +155,42 @@ const redrawPolygons = (svgSelection, data, state) => {
       return `${d3.line()(d.data.layout.polygon)}z`;
     })
     .style("fill", fillFn)
-    .style("stroke-width", strokeFn)
+    .style("stroke", config.colours.defaultStroke)
+    .style("stroke-width", strokeWidthFn)
     .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
 };
+
+const redrawSelection = (svgSelection, data, state) => {
+  const { config, stats } = state;
+
+  console.log("refreshing selection");
+
+  const strokeWidthFn = d => {
+    if (d.data.layout.algorithm === "circlePack") return 0;
+    return d.depth < 4 ? 4 - d.depth : 1;
+  };
+
+  return svgSelection
+    .attr("d", d => {
+      return `${d3.line()(d.data.layout.polygon)}z`;
+    })
+    .style("stroke-width", strokeWidthFn)
+    .style("stroke", config.colours.selectedStroke)
+    .style("fill", "none")
+    .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
+};
+
+function findSelectionPath(data, state) {
+  if (!state.config.selectedNode) return [];
+  let node = state.config.selectedNode;
+  const results = [];
+  while (node.parent) {
+    results.push(node);
+    node = node.parent;
+  }
+  results.push(node);
+  return results.reverse();
+}
 
 const update = (d3Container, data, state) => {
   if (!d3Container.current) {
@@ -166,6 +199,23 @@ const update = (d3Container, data, state) => {
   const vizEl = d3Container.current;
   const svg = d3.select(vizEl);
   redrawPolygons(svg.selectAll(".cell"), data, state);
+
+  // TODO: DRY this up - or should selecting just be expensive config?
+  const selectionPath = findSelectionPath(data, state);
+  const group = svg.selectAll(".topGroup");
+  const selectionNodes = group
+    .selectAll(".selected")
+    .data(selectionPath, node => node.path);
+
+  const newSelectionNodes = selectionNodes
+    .enter()
+    .append("path")
+    .classed("selected", true);
+
+  redrawSelection(selectionNodes.merge(newSelectionNodes), data, state);
+  selectionNodes.exit().remove();
+
+  // redrawSelection(svg.selectAll(".selected"), data, state);
 };
 
 const draw = (d3Container, data, state, dispatch) => {
@@ -210,12 +260,26 @@ const draw = (d3Container, data, state, dispatch) => {
   redrawPolygons(nodes.merge(newNodes), data, state)
     .on("click", (node, i, nodeList) => {
       console.log("onClicked", node, i, nodeList[i]);
-      dispatch({ type: "selectNode", payload: node.data });
+      dispatch({ type: "selectNode", payload: node });
     })
     .append("svg:title")
     .text(n => n.data.path);
 
   nodes.exit().remove();
+
+  const selectionPath = findSelectionPath(data, state);
+  const selectionNodes = group
+    .selectAll(".selected")
+    .data(selectionPath, node => node.path);
+
+  const newSelectionNodes = selectionNodes
+    .enter()
+    .append("path")
+    .classed("selected", true);
+
+  redrawSelection(selectionNodes.merge(newSelectionNodes), data, state);
+
+  selectionNodes.exit().remove();
 
   // zooming - see https://observablehq.com/@d3/zoomable-map-tiles?collection=@d3/d3-zoom
   const zoomed = () => {
