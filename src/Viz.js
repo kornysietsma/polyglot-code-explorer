@@ -24,23 +24,6 @@ const constantConfig = {
   badColour: d3.rgb("red")
 };
 
-// use getIn for objects as well as immutable objects
-function nestedGet(object, path) {
-  // re-enable this if using immutable.js
-  // if (Immutable.isImmutable(object)) {
-  // return Immutable.getIn(object, path);
-  // }
-  let index = 0;
-  const { length } = path;
-  let o = object;
-
-  while (o != null && index < length) {
-    // eslint-disable-next-line no-plusplus
-    o = o[path[index++]];
-  }
-  return index && index === length ? o : undefined;
-}
-
 function locDataFn(d) {
   return d.data.value;
 }
@@ -115,33 +98,50 @@ function buildLanguageFn(languages) {
   };
 }
 
+function buildGoodBadUglyFn(dataFn, parentFn, config, visualization) {
+  const { good, bad, ugly } = config[visualization];
+  const {
+    goodColour,
+    badColour,
+    uglyColour,
+    neutralColour,
+    circlePackBackground
+  } = config.colours;
+
+  const goodBadUglyScale = d3
+    .scaleLinear()
+    .domain([good, bad, ugly])
+    .range([goodColour, badColour, uglyColour])
+    .interpolate(d3.interpolateHcl)
+    .clamp(true);
+  return d => {
+    if (d.data.layout.algorithm === "circlePack") return circlePackBackground;
+    const value = d.children ? parentFn(d) : dataFn(d);
+
+    return value === undefined ? neutralColour : goodBadUglyScale(value);
+  };
+}
+
 function buildFillFunctions(config, stats, languages) {
   return {
-    loc: buildScaledNodeColourFn(
-      locDataFn,
-      () => undefined,
-      constantConfig.neutralColour,
-      constantConfig.goodBadScale.copy().domain([0, stats.maxLoc])
-    ),
+    loc: buildGoodBadUglyFn(locDataFn, () => undefined, config, "loc"),
     depth: buildScaledNodeColourFn(
       depthDataFn,
       depthDataFn,
       constantConfig.neutralColour,
       constantConfig.lowHighScale.copy().domain([0, stats.maxDepth])
     ),
-    indentation: buildScaledNodeColourFn(
+    indentation: buildGoodBadUglyFn(
       indentationNodeFn(config),
       indentationParentFn(config),
-      constantConfig.neutralColour,
-      constantConfig.goodBadScale
-        .copy()
-        .domain([0, config.indentation.maxIndentationScale])
+      config,
+      "indentation"
     ),
-    age: buildScaledNodeColourFn(
+    age: buildGoodBadUglyFn(
       ageNodeFn(config),
       ageParentFn(config),
-      constantConfig.badColour, // no git data means bad things
-      constantConfig.goodBadScale.copy().domain([0, config.codeAge.maxAge])
+      config,
+      "age"
     ),
     language: buildLanguageFn(languages)
   };
@@ -321,7 +321,7 @@ function usePrevious(value) {
 }
 
 const Viz = props => {
-  console.log('viz', props);
+  console.log("viz", props);
   const d3Container = useRef(null);
   const {
     data,
@@ -330,7 +330,7 @@ const Viz = props => {
     state: { config, expensiveConfig, stats }
   } = props;
 
-  const {languages, files} = data.current;
+  const { languages, files } = data.current;
 
   // TODO: should usePrevious include 'files' ? remove it and let's see.
   const prevState = usePrevious({ config, expensiveConfig });

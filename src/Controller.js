@@ -1,12 +1,14 @@
 /* eslint-disable react/prop-types */
 // as prop-types seem painful to implement without going full typescript
 import React, { useState, useRef } from "react";
+import GoodBadUglyKey from "./GoodBadUglyKey";
 import _uniqueId from "lodash/uniqueId";
 
 const Controller = props => {
   console.log("creating Controller");
   // console.log(props);
   const { data, state, dispatch } = props;
+  const {config} = state;
   // ID logic from https://stackoverflow.com/questions/29420835/how-to-generate-unique-ids-for-form-labels-in-react
   const { current: vizId } = useRef(_uniqueId("controller-"));
   const { current: depthId } = useRef(_uniqueId("controller-"));
@@ -40,6 +42,12 @@ const Controller = props => {
             </table>
           </div>
         );
+      case "loc":
+        return <GoodBadUglyKey title={"Lines of Code"} visualization={visualization} config={config}/>;
+      case "indentation":
+        return <GoodBadUglyKey title={"Indentation"} visualization={visualization} config={config}/>;
+      case "age":
+        return <GoodBadUglyKey title={"Age of code"} visualization={visualization} config={config}/>;
       default:
         return "";
     }

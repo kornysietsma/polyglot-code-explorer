@@ -5,7 +5,7 @@ import styles from "./NodeInspector.module.css";
 const NodeInspector = props => {
   const { node } = props;
   // console.error("node data:", node);
-  const codeAge = _.get(
+  const age = _.get(
     node,
     ["data", "data", "git", "age_in_days"],
     undefined
@@ -32,7 +32,7 @@ const NodeInspector = props => {
       ) : (
         ""
       )}
-      {codeAge ? <p>Code age: {codeAge} days</p> : ""}
+      {age ? <p>Code age: {age} days</p> : ""}
     </div>
   );
 };

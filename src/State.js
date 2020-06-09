@@ -33,17 +33,33 @@ function initialiseGlobalState(initialData) {
   return {
     config: {
       visualization: "language",
+      loc: {
+        bad: 1000,
+        good: 0,
+        ugly: 10000,
+      },
       indentation: {
-        metric: "p99",
+        metric: "p90",
         summarizeBy: "worst",
+        bad: 40,
+        good: 0,
+        ugly: 80,
         maxIndentationScale: 50
       },
-      codeAge: {
+      age: {
+        bad: 365,
+        good: 0,
+        ugly: 365*4,
         maxAge: 365 * 2
       },
       colours: {
         defaultStroke: "#111111",
-        selectedStroke: "#aaa500"
+        selectedStroke: "#aaa500",
+        goodColour: "blue",
+        badColour: "red",
+        uglyColour: "yellow",
+        neutralColour: "#808080",
+        circlePackBackground: "#111111"
       },
       selectedNode: null
     },
