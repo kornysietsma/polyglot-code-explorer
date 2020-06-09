@@ -1,5 +1,6 @@
 import React from "react";
 import _ from "lodash";
+import styles from "./NodeInspector.module.css";
 
 const NodeInspector = props => {
   const { node } = props;
@@ -11,7 +12,8 @@ const NodeInspector = props => {
   );
   return (
     <div>
-      <ul>
+        <p>Path:</p>
+      <ul className={styles.pathlist}>
         {node.data.path.split("/").map(pathbit => (
           <li>{pathbit}</li>
         ))}

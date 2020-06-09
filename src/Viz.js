@@ -2,6 +2,7 @@
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import _ from "lodash";
+import { nodeLoc } from "./nodeData";
 
 function buildScaledNodeColourFn(dataFn, parentFn, defaultColour, colourScale) {
   return d => {
@@ -103,7 +104,18 @@ function ageParentFn(config) {
   return d => 0; // TODO: show parents more usefully
 }
 
-function buildFillFunctions(config, stats) {
+function buildLanguageFn(languages) {
+  const { languageMap } = languages;
+  return d => {
+    const loc = nodeLoc(d);
+    if (!loc) {
+      return "none";
+    }
+    return languageMap[loc.language].colour;
+  };
+}
+
+function buildFillFunctions(config, stats, languages) {
   return {
     loc: buildScaledNodeColourFn(
       locDataFn,
@@ -130,16 +142,17 @@ function buildFillFunctions(config, stats) {
       ageParentFn(config),
       constantConfig.badColour, // no git data means bad things
       constantConfig.goodBadScale.copy().domain([0, config.codeAge.maxAge])
-    )
+    ),
+    language: buildLanguageFn(languages)
   };
 }
 
-const redrawPolygons = (svgSelection, data, state) => {
+const redrawPolygons = (svgSelection, files, languages, state) => {
   const { config, stats } = state;
 
   console.log("refreshing");
 
-  const fillFunctions = buildFillFunctions(config, stats);
+  const fillFunctions = buildFillFunctions(config, stats, languages);
 
   // const locFillFn = buildLocFillFn();
   // const depthFillFn = buildDepthFn();
@@ -160,7 +173,7 @@ const redrawPolygons = (svgSelection, data, state) => {
     .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
 };
 
-const redrawSelection = (svgSelection, data, state) => {
+const redrawSelection = (svgSelection, files, state) => {
   const { config, stats } = state;
 
   console.log("refreshing selection");
@@ -192,16 +205,16 @@ function findSelectionPath(data, state) {
   return results.reverse();
 }
 
-const update = (d3Container, data, state) => {
+const update = (d3Container, files, languages, state) => {
   if (!d3Container.current) {
     throw Error("No current container");
   }
   const vizEl = d3Container.current;
   const svg = d3.select(vizEl);
-  redrawPolygons(svg.selectAll(".cell"), data, state);
+  redrawPolygons(svg.selectAll(".cell"), files, languages, state);
 
   // TODO: DRY this up - or should selecting just be expensive config?
-  const selectionPath = findSelectionPath(data, state);
+  const selectionPath = findSelectionPath(files, state);
   const group = svg.selectAll(".topGroup");
   const selectionNodes = group
     .selectAll(".selected")
@@ -212,13 +225,13 @@ const update = (d3Container, data, state) => {
     .append("path")
     .classed("selected", true);
 
-  redrawSelection(selectionNodes.merge(newSelectionNodes), data, state);
+  redrawSelection(selectionNodes.merge(newSelectionNodes), files, state);
   selectionNodes.exit().remove();
 
   // redrawSelection(svg.selectAll(".selected"), data, state);
 };
 
-const draw = (d3Container, data, state, dispatch) => {
+const draw = (d3Container, files, languages, state, dispatch) => {
   const { config, expensiveConfig } = state;
 
   if (!d3Container.current) {
@@ -229,7 +242,7 @@ const draw = (d3Container, data, state, dispatch) => {
   // console.log(vizEl);
   const w = vizEl.clientWidth;
   const h = vizEl.clientHeight;
-  const { layout } = data.current;
+  const { layout } = files;
   const svg = d3
     .select(vizEl)
     .attr("viewBox", [
@@ -239,7 +252,7 @@ const draw = (d3Container, data, state, dispatch) => {
       layout.height
     ]);
   const group = svg.selectAll(".topGroup");
-  const rootNode = d3.hierarchy(data.current); // .sum(d => d.value);
+  const rootNode = d3.hierarchy(files); // .sum(d => d.value);
 
   console.log("drawing");
 
@@ -257,7 +270,7 @@ const draw = (d3Container, data, state, dispatch) => {
     .append("path")
     .classed("cell", true);
 
-  redrawPolygons(nodes.merge(newNodes), data, state)
+  redrawPolygons(nodes.merge(newNodes), files, languages, state)
     .on("click", (node, i, nodeList) => {
       console.log("onClicked", node, i, nodeList[i]);
       dispatch({ type: "selectNode", payload: node });
@@ -267,7 +280,7 @@ const draw = (d3Container, data, state, dispatch) => {
 
   nodes.exit().remove();
 
-  const selectionPath = findSelectionPath(data, state);
+  const selectionPath = findSelectionPath(files, state);
   const selectionNodes = group
     .selectAll(".selected")
     .data(selectionPath, node => node.path);
@@ -277,7 +290,7 @@ const draw = (d3Container, data, state, dispatch) => {
     .append("path")
     .classed("selected", true);
 
-  redrawSelection(selectionNodes.merge(newSelectionNodes), data, state);
+  redrawSelection(selectionNodes.merge(newSelectionNodes), files, state);
 
   selectionNodes.exit().remove();
 
@@ -308,15 +321,19 @@ function usePrevious(value) {
 }
 
 const Viz = props => {
+  console.log('viz', props);
   const d3Container = useRef(null);
   const {
     data,
     state,
     dispatch,
-    state: { config, expensiveConfig }
+    state: { config, expensiveConfig, stats }
   } = props;
 
-  const prevState = usePrevious({ data, config, expensiveConfig });
+  const {languages, files} = data.current;
+
+  // TODO: should usePrevious include 'files' ? remove it and let's see.
+  const prevState = usePrevious({ config, expensiveConfig });
 
   console.log("creating Viz");
 
@@ -326,15 +343,15 @@ const Viz = props => {
       prevState.expensiveConfig !== expensiveConfig
     ) {
       console.log("expensive config change - rebuild all");
-      draw(d3Container, data, state, dispatch);
+      draw(d3Container, files, languages, state, dispatch);
     } else if (prevState.config !== config) {
       console.log("cheap config change - just redraw");
-      update(d3Container, data, state);
+      update(d3Container, files, languages, state);
     } else {
       console.log("no change in visible config - not doing nothing");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, state]);
+  }, [files, state]);
 
   return (
     <aside className="Viz">

@@ -32,7 +32,7 @@ function initialiseGlobalState(initialData) {
   const { maxDepth, maxLoc } = findDataStats(initialData);
   return {
     config: {
-      visualization: "loc",
+      visualization: "language",
       indentation: {
         metric: "p99",
         summarizeBy: "worst",
@@ -48,7 +48,7 @@ function initialiseGlobalState(initialData) {
       selectedNode: null
     },
     expensiveConfig: {
-      depth: Math.min(5, maxDepth)
+      depth: Math.min(8, maxDepth)
     },
     stats: {
       maxDepth,

@@ -10,6 +10,40 @@ const Controller = props => {
   // ID logic from https://stackoverflow.com/questions/29420835/how-to-generate-unique-ids-for-form-labels-in-react
   const { current: vizId } = useRef(_uniqueId("controller-"));
   const { current: depthId } = useRef(_uniqueId("controller-"));
+  const { languageKey, otherColour } = data.current.languages;
+
+  function renderVizDetails(visualization) {
+    switch (visualization) {
+      case "language":
+        return (
+          <div>
+            <p>Languages:</p>
+            <table>
+              {languageKey.map(({ language, colour }) => {
+                return (
+                  <tr>
+                    <td>{language}</td>
+                    <td
+                      className="colourSample"
+                      style={{ backgroundColor: colour, width: "4em" }}
+                    />
+                  </tr>
+                );
+              })}
+              <tr>
+                <td>Other languages</td>
+                <td
+                  className="colourSample"
+                  style={{ backgroundColor: otherColour, width: "4em" }}
+                />
+              </tr>
+            </table>
+          </div>
+        );
+      default:
+        return "";
+    }
+  }
 
   return (
     <aside className="Controller">
@@ -27,7 +61,9 @@ const Controller = props => {
             }
           >
             {[...Array(state.stats.maxDepth + 1).keys()].map(d => (
-              <option key={d} value={d}>{d}</option>
+              <option key={d} value={d}>
+                {d}
+              </option>
             ))}
           </select>
         </label>
@@ -42,18 +78,15 @@ const Controller = props => {
               dispatch({ type: "setVisualization", payload: evt.target.value })
             }
           >
+            <option value="language">Language</option>
             <option value="loc">Lines of Code</option>
             <option value="depth">Nesting depth</option>
             <option value="indentation">Indentation</option>
-              <option value="age">Code age</option>
+            <option value="age">Code age</option>
           </select>
         </label>
       </div>
-      {state.config.visualization === "indentation" ? (
-        <p>Indentation detailed config not yet implemented</p>
-      ) : (
-        ""
-      )}
+      {renderVizDetails(state.config.visualization, languageKey)}
       {/*
       <div>
         Depth
