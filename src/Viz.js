@@ -6,7 +6,8 @@ import {
   nodeDepth,
   nodeIndentationFn,
   nodeCumulativeLinesOfCode,
-  nodeLocData
+  nodeLocData,
+  isHierarchyNode
 } from "./nodeData";
 
 function buildLanguageFn(languages) {
@@ -59,7 +60,12 @@ function buildDepthColourFn(depthFn, config, stats) {
 
 function buildFillFunctions(config, stats, languages) {
   return {
-    loc: buildGoodBadUglyFn(nodeCumulativeLinesOfCode, () => undefined, config, "loc"),
+    loc: buildGoodBadUglyFn(
+      nodeCumulativeLinesOfCode,
+      () => undefined,
+      config,
+      "loc"
+    ),
     depth: buildDepthColourFn(nodeDepth, config, stats),
     indentation: buildGoodBadUglyFn(
       nodeIndentationFn(config),
@@ -183,9 +189,12 @@ const draw = (d3Container, files, languages, state, dispatch) => {
 
   console.log("drawing");
 
+  // note we filter out nodes that are parents who will be hidden by their children, for speed
+  // so only show parent nodes at the clipping level.
   const allNodes = rootNode
     .descendants()
-    .filter(d => d.depth <= expensiveConfig.depth);
+    .filter(d => d.depth <= expensiveConfig.depth)
+    .filter(d => d.children === undefined || d.depth === expensiveConfig.depth);
 
   const nodes = group
     .datum(rootNode)
