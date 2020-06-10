@@ -5,11 +5,11 @@ import Controller from "./Controller";
 import Inspector from "./Inspector";
 import Viz from "./Viz";
 import { globalDispatchReducer, initialiseGlobalState } from "./State";
-import { nodeLoc } from "./nodeData";
+import { nodeLocData } from "./nodeData";
 
 /* eslint-disable no-param-reassign */
 function addLanguagesFromNode(counts, node) {
-  const loc = nodeLoc(node);
+  const loc = nodeLocData(node);
   if (loc) {
     const { language, code } = loc;
     if (!counts[language]) {
@@ -35,7 +35,8 @@ function countLanguagesIn(data) {
     ([l1, k1], [l2, k2]) => k2.loc - k1.loc
   );
   console.log("sorted:", sortedMap);
-  const colours = d3.schemeSet3;
+  // const colours = d3.schemeSet3;
+  const colours = d3.schemeTableau10;
   const otherColour = "#303030";
   const languageMap = {};
   const languageKey = [];

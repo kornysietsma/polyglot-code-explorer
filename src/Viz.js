@@ -1,96 +1,18 @@
 /* eslint-disable react/prop-types */
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
-import _ from "lodash";
-import { nodeLoc } from "./nodeData";
-
-function buildScaledNodeColourFn(dataFn, parentFn, defaultColour, colourScale) {
-  return d => {
-    if (d.data.layout.algorithm === "circlePack") return "#111";
-    const value = d.children ? parentFn(d) : dataFn(d);
-
-    return value === undefined ? defaultColour : colourScale(value);
-  };
-}
-
-// This is for config that _could_ go in the state, if it needs to change,
-// but for now it is actually not changing and simpler to put it here.
-const constantConfig = {
-  goodBadScale: d3
-    .scaleSequential(c => d3.interpolateRdYlGn(1.0 - c))
-    .clamp(true),
-  lowHighScale: d3.scaleSequential(d3.interpolateMagma).clamp(true),
-  neutralColour: d3.rgb("green"),
-  badColour: d3.rgb("red")
-};
-
-function locDataFn(d) {
-  return d.data.value;
-}
-function depthDataFn(d) {
-  return d.depth;
-}
-
-function buildLocFillFn() {
-  const neutralColour = d3.rgb("green");
-  const maxLoc = 1000;
-  const colourScale = c => d3.interpolateRdYlGn(1.0 - c); // see https://github.com/d3/d3-scale-chromatic/blob/master/README.md
-  // const goodestColour = colourScale(0);
-  // const baddestColour = colourScale(1);
-  const goodBadScale = d3.scaleSequential(colourScale).clamp(true);
-
-  return buildScaledNodeColourFn(
-    locDataFn,
-    locDataFn,
-    neutralColour,
-    goodBadScale.copy().domain([0, maxLoc])
-  );
-}
-
-function buildDepthFn() {
-  const neutralColour = d3.rgb("green");
-  const maxDepth = 10;
-  const colourScale = c => d3.interpolateRdYlGn(1.0 - c); // see https://github.com/d3/d3-scale-chromatic/blob/master/README.md
-  // const goodestColour = colourScale(0);
-  // const baddestColour = colourScale(1);
-  const goodBadScale = d3.scaleSequential(colourScale).clamp(true);
-
-  return buildScaledNodeColourFn(
-    depthDataFn,
-    depthDataFn,
-    neutralColour,
-    goodBadScale.copy().domain([0, maxDepth])
-  );
-}
-
-function indentationNodeFn(config) {
-  return d => {
-    return _.get(
-      d,
-      ["data", "data", "indentation", config.indentation.metric],
-      undefined
-    );
-  };
-}
-
-function indentationParentFn(config) {
-  return d => undefined;
-}
-
-function ageNodeFn(config) {
-  return d => {
-    return _.get(d, ["data", "data", "git", "age_in_days"], undefined); // no data means ancient files
-  };
-}
-
-function ageParentFn(config) {
-  return d => 0; // TODO: show parents more usefully
-}
+import {
+  nodeAge,
+  nodeDepth,
+  nodeIndentationFn,
+  nodeCumulativeLinesOfCode,
+  nodeLocData
+} from "./nodeData";
 
 function buildLanguageFn(languages) {
   const { languageMap } = languages;
   return d => {
-    const loc = nodeLoc(d);
+    const loc = nodeLocData(d);
     if (!loc) {
       return "none";
     }
@@ -122,24 +44,32 @@ function buildGoodBadUglyFn(dataFn, parentFn, config, visualization) {
   };
 }
 
+function buildDepthColourFn(depthFn, config, stats) {
+  const { neutralColour, circlePackBackground } = config.colours;
+  const scale = d3
+    .scaleSequential(d3.interpolatePlasma)
+    .domain([0, stats.maxDepth])
+    .clamp(true);
+  return d => {
+    if (d.data.layout.algorithm === "circlePack") return circlePackBackground;
+    const value = depthFn(d);
+    return value === undefined ? neutralColour : scale(value);
+  };
+}
+
 function buildFillFunctions(config, stats, languages) {
   return {
-    loc: buildGoodBadUglyFn(locDataFn, () => undefined, config, "loc"),
-    depth: buildScaledNodeColourFn(
-      depthDataFn,
-      depthDataFn,
-      constantConfig.neutralColour,
-      constantConfig.lowHighScale.copy().domain([0, stats.maxDepth])
-    ),
+    loc: buildGoodBadUglyFn(nodeCumulativeLinesOfCode, () => undefined, config, "loc"),
+    depth: buildDepthColourFn(nodeDepth, config, stats),
     indentation: buildGoodBadUglyFn(
-      indentationNodeFn(config),
-      indentationParentFn(config),
+      nodeIndentationFn(config),
+      () => undefined, // TODO: better parenting
       config,
       "indentation"
     ),
     age: buildGoodBadUglyFn(
-      ageNodeFn(config),
-      ageParentFn(config),
+      nodeAge,
+      () => 0, // TODO: better parent handling
       config,
       "age"
     ),
@@ -153,9 +83,6 @@ const redrawPolygons = (svgSelection, files, languages, state) => {
   console.log("refreshing");
 
   const fillFunctions = buildFillFunctions(config, stats, languages);
-
-  // const locFillFn = buildLocFillFn();
-  // const depthFillFn = buildDepthFn();
 
   const fillFn = fillFunctions[config.visualization];
   const strokeWidthFn = d => {

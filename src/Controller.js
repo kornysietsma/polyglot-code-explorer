@@ -2,13 +2,14 @@
 // as prop-types seem painful to implement without going full typescript
 import React, { useState, useRef } from "react";
 import GoodBadUglyKey from "./GoodBadUglyKey";
+import DepthKey from "./DepthKey";
 import _uniqueId from "lodash/uniqueId";
 
 const Controller = props => {
   console.log("creating Controller");
   // console.log(props);
   const { data, state, dispatch } = props;
-  const {config} = state;
+  const {config, stats} = state;
   // ID logic from https://stackoverflow.com/questions/29420835/how-to-generate-unique-ids-for-form-labels-in-react
   const { current: vizId } = useRef(_uniqueId("controller-"));
   const { current: depthId } = useRef(_uniqueId("controller-"));
@@ -48,6 +49,8 @@ const Controller = props => {
         return <GoodBadUglyKey title={"Indentation"} visualization={visualization} config={config}/>;
       case "age":
         return <GoodBadUglyKey title={"Age of code"} visualization={visualization} config={config}/>;
+      case "depth":
+        return <DepthKey config={config} stats={stats}/>;
       default:
         return "";
     }
