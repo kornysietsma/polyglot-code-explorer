@@ -1,32 +1,28 @@
+/* eslint-disable react/prop-types */
 import React from "react";
-import _ from "lodash";
-import styles from "./NodeInspector.module.css";
+import PathInspector from "./PathInspector";
+import {nodeAge, nodeIndentation, nodeIndentationData, nodeLocData} from "./nodeData";
+import DirectoryNodeInspector from "./DirectoryNodeInspector";
 
 const NodeInspector = props => {
-  const { node } = props;
-  // console.error("node data:", node);
-  const age = _.get(
-    node,
-    ["data", "data", "git", "age_in_days"],
-    undefined
-  );
+  const { node, dispatch } = props;
+  const age = nodeAge(node);
+  const locData = nodeLocData(node);
+  const indentationData = nodeIndentationData(node);
   return (
     <div>
-        <p>Path:</p>
-      <ul className={styles.pathlist}>
-        {node.data.path.split("/").map(pathbit => (
-          <li>{pathbit}</li>
-        ))}
-      </ul>
-      <p>Lines of code: {node.data.value}</p>
-      {node.data.data && node.data.data.indentation ? (
+        <h3>{node.data.name}</h3>
+        <PathInspector node={node}  dispatch={dispatch} />
+        <p>File type: {locData.language}</p>
+      <p>Lines of code: {locData.code}</p>
+      {indentationData ? (
         <p>
           Indentation:
           <ul>
-            <li>median: {node.data.data.indentation.median}</li>
-            <li>p75: {node.data.data.indentation.p75}</li>
-            <li>p90: {node.data.data.indentation.p90}</li>
-            <li>p99: {node.data.data.indentation.p99}</li>
+            <li>median: {indentationData.median}</li>
+            <li>p75: {indentationData.p75}</li>
+            <li>p90: {indentationData.p90}</li>
+            <li>p99: {indentationData.p99}</li>
           </ul>
         </p>
       ) : (

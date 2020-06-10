@@ -54,7 +54,7 @@ function initialiseGlobalState(initialData) {
       },
       colours: {
         defaultStroke: "#111111",
-        selectedStroke: "#aaa500",
+        selectedStroke: "#fffa00",
         goodColour: "blue",
         badColour: "red",
         uglyColour: "yellow",

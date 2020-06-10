@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 import React from "react";
 import * as d3 from "d3";
+import ColourKey from "./ColourKey";
 
 const GoodBadUglyKey = props => {
   const { title, visualization, config } = props;
@@ -19,30 +20,13 @@ const GoodBadUglyKey = props => {
   const key = [];
   for (let ix = 0.0; ix < 1.0; ix += 0.1) {
     const metric = goodBad(ix);
-    key.push([metric, goodBadUglyScale(metric)]);
+    key.push([Math.round(metric), goodBadUglyScale(metric)]);
   }
   for (let ix = 0.1; ix <= 1.0; ix += 0.1) {
     const metric = badUgly(ix);
-    key.push([metric, goodBadUglyScale(metric)]);
+    key.push([Math.round(metric), goodBadUglyScale(metric)]);
   }
-  return (
-    <div>
-      <p>{title}</p>
-      <table>
-        {key.map(([value, colour]) => {
-          return (
-            <tr>
-              <td>{Math.round(value)}</td>
-              <td
-                className="colourSample"
-                style={{ backgroundColor: colour, width: "4em" }}
-              />
-            </tr>
-          );
-        })}
-      </table>
-    </div>
-  );
+  return <ColourKey title={title} keyData={key} />;
 };
 
 export default GoodBadUglyKey;

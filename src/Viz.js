@@ -10,12 +10,12 @@ import {
   isHierarchyNode
 } from "./nodeData";
 
-function buildLanguageFn(languages) {
+function buildLanguageFn(languages, config) {
   const { languageMap } = languages;
   return d => {
     const loc = nodeLocData(d);
     if (!loc) {
-      return "none";
+      return config.colours.neutralColour;
     }
     return languageMap[loc.language].colour;
   };
@@ -79,7 +79,7 @@ function buildFillFunctions(config, stats, languages) {
       config,
       "age"
     ),
-    language: buildLanguageFn(languages)
+    language: buildLanguageFn(languages, config)
   };
 }
 

@@ -4,6 +4,7 @@ import _ from "lodash";
 - a data node, the data from the raw JSON file, which is roughly
 {
   data: metadata like lines of code
+  children: optional list of children (only for directories)
   layout: pre-generated layout data
   name: filename/folder name
   path: full path from root
@@ -13,6 +14,7 @@ import _ from "lodash";
   - a hierarchy node, from d3 hierarchy magic, which has:
   {
     data: the dataNode above
+    children: optional list of children (only for directories) but each child is a hierarchy node
     depth: depth from the rood
     height: height from leaves?
     parent: parent hierarchy node
@@ -25,6 +27,11 @@ import _ from "lodash";
 
 export function isHierarchyNode(node) {
   return node.parent !== undefined; // parent is defined but null for the root node
+}
+
+export function isDirectory(node) {
+  // both kinds of nodes have or don't have children!
+  return node.children !== undefined && node.children !== null;
 }
 
 export function dataNode(node) {
@@ -58,6 +65,12 @@ export function nodeAge(node) {
   if (!data || !data.git) return undefined;
 
   return data.git.age_in_days;
+}
+
+export function nodeIndentationData(node) {
+  const { data } = dataNode(node);
+  if (!data || !data.indentation) return undefined;
+  return data.indentation;
 }
 
 export function nodeIndentation(node, metric) {
