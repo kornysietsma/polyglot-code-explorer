@@ -86,8 +86,6 @@ function buildFillFunctions(config, stats, languages) {
 const redrawPolygons = (svgSelection, files, languages, state) => {
   const { config, stats } = state;
 
-  console.log("refreshing");
-
   const fillFunctions = buildFillFunctions(config, stats, languages);
 
   const fillFn = fillFunctions[config.visualization];
@@ -108,8 +106,6 @@ const redrawPolygons = (svgSelection, files, languages, state) => {
 
 const redrawSelection = (svgSelection, files, state) => {
   const { config, stats } = state;
-
-  console.log("refreshing selection");
 
   const strokeWidthFn = d => {
     if (d.data.layout.algorithm === "circlePack") return 0;
@@ -168,7 +164,7 @@ const draw = (d3Container, files, languages, state, dispatch) => {
   const { config, expensiveConfig } = state;
 
   if (!d3Container.current) {
-    console.log("in draw but d3container not yet current");
+    console.warn("in draw but d3container not yet current");
     return;
   }
   const vizEl = d3Container.current;
@@ -186,8 +182,6 @@ const draw = (d3Container, files, languages, state, dispatch) => {
     ]);
   const group = svg.selectAll(".topGroup");
   const rootNode = d3.hierarchy(files); // .sum(d => d.value);
-
-  console.log("drawing");
 
   // note we filter out nodes that are parents who will be hidden by their children, for speed
   // so only show parent nodes at the clipping level.
@@ -208,7 +202,7 @@ const draw = (d3Container, files, languages, state, dispatch) => {
 
   redrawPolygons(nodes.merge(newNodes), files, languages, state)
     .on("click", (node, i, nodeList) => {
-      console.log("onClicked", node, i, nodeList[i]);
+      // console.log("onClicked", node, i, nodeList[i]);
       dispatch({ type: "selectNode", payload: node });
     })
     .append("svg:title")
@@ -257,7 +251,6 @@ function usePrevious(value) {
 }
 
 const Viz = props => {
-  console.log("viz", props);
   const d3Container = useRef(null);
   const {
     data,
@@ -270,8 +263,6 @@ const Viz = props => {
 
   // TODO: should usePrevious include 'files' ? remove it and let's see.
   const prevState = usePrevious({ config, expensiveConfig });
-
-  console.log("creating Viz");
 
   useEffect(() => {
     if (

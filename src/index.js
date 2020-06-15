@@ -17,14 +17,10 @@ xhttp.onreadystatechange = function() {
       <App rawData={data} />,
       document.getElementById("root")
     );
-  } else {
-      console.log('response bits', this.readyState, this.status);
   }
 };
 
 const dataFile = process.env.REACT_APP_LATI_DATA || 'default';
-
-console.log(`trying to load ${dataFile}`);
 
 xhttp.open("GET", `${process.env.PUBLIC_URL}/data/${dataFile}.json`, true);
 xhttp.send();

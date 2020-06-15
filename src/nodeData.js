@@ -60,12 +60,34 @@ export function nodeDepth(d) {
   return d.depth;
 }
 
-export function nodeAge(node) {
+export function nodeGitData(node) {
   const { data } = dataNode(node);
-  if (!data || !data.git) return undefined;
 
-  return data.git.age_in_days;
+  if (!data || !data.git) return undefined;
+  return data.git;
 }
+
+export function nodeAge(node) {
+  const git = nodeGitData(node);
+  if (!git) return undefined;
+
+  return git.age_in_days;
+}
+
+export function nodeRemoteUrl(node) {
+  const git = nodeGitData(node);
+  if (!git) return undefined;
+
+  return git.remote_url;
+}
+
+export function nodeRemoteHead(node) {
+  const git = nodeGitData(node);
+  if (!git) return undefined;
+
+  return git.head;
+}
+
 
 export function nodeIndentationData(node) {
   const { data } = dataNode(node);

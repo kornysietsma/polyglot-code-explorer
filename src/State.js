@@ -1,3 +1,5 @@
+import _ from "lodash";
+
 function findNodeStats(node, nodeDepth, maxDepthSoFar, maxLocSoFar) {
   let myLoc = node.children ? 0 : node.value; // only counting lines of actual files!
   if (myLoc < maxLocSoFar) myLoc = maxLocSoFar;
@@ -28,29 +30,63 @@ function findDataStats(initialData) {
   return findNodeStats(initialData, 0, 0, 0);
 }
 
+function setIndentationMetric(state, metric) {
+  const result = _.cloneDeep(state);
+  switch (metric) {
+    case "sum":
+      _.set(result, ["config", "indentation"], {
+        metric: "sum",
+        bad: 10000,
+        good: 0,
+        ugly: 100000,
+        precision: 0
+      });
+      break;
+    case "p99":
+      _.set(result, ["config", "indentation"], {
+        metric: "p99",
+        bad: 30,
+        good: 0,
+        ugly: 80,
+        precision: 0
+      });
+      break;
+    case "stddev":
+      _.set(result, ["config", "indentation"], {
+        metric: "stddev",
+        bad: 10,
+        good: 3,
+        ugly: 20,
+        precision: 2
+      });
+      break;
+    default:
+      throw Error(`Invalid metric: ${metric}`);
+  }
+  return result;
+}
+
+
 function initialiseGlobalState(initialData) {
   const { maxDepth, maxLoc } = findDataStats(initialData);
-  return {
+  let defaults = {
     config: {
       visualization: "language",
       loc: {
         bad: 1000,
         good: 0,
         ugly: 10000,
+        precision: 0 // number of float digits to show
       },
       indentation: {
-        metric: "p90",
-        summarizeBy: "worst",
-        bad: 40,
-        good: 0,
-        ugly: 80,
-        maxIndentationScale: 50
+        note: "overridden later!"
       },
       age: {
         bad: 365,
         good: 0,
-        ugly: 365*4,
-        maxAge: 365 * 2
+        ugly: 365 * 4,
+        maxAge: 365 * 2,
+        precision: 0
       },
       colours: {
         defaultStroke: "#111111",
@@ -71,15 +107,20 @@ function initialiseGlobalState(initialData) {
       maxLoc: Math.min(maxLoc, 2000)
     }
   };
+  defaults = setIndentationMetric(defaults, "sum");
+  return defaults;
 }
 
 function globalDispatchReducer(state, action) {
-  console.log("dispatched:", action);
   const { expensiveConfig, config } = state;
-  console.log("old state", state);
   switch (action.type) {
     case "setVisualization":
       return { ...state, config: { ...config, visualization: action.payload } };
+    case "setIndentationMetric": {
+      const result = _.cloneDeep(state);
+      _.set(result, ["config", "indentation", "metric"], action.payload);
+      return setIndentationMetric(state, action.payload);
+    }
     case "setDepth":
       return {
         ...state,

@@ -29,13 +29,10 @@ function addLanguagesFromNode(counts, node) {
 function countLanguagesIn(data) {
   const counts = {};
   addLanguagesFromNode(counts, data);
-  console.log(counts);
   const countsPairs = [...Object.keys(counts)].map(k => [k, counts[k]]);
   const sortedMap = [...countsPairs].sort(
     ([l1, k1], [l2, k2]) => k2.loc - k1.loc
   );
-  console.log("sorted:", sortedMap);
-  // const colours = d3.schemeSet3;
   const colours = d3.schemeTableau10;
   const otherColour = "#303030";
   const languageMap = {};
@@ -47,14 +44,11 @@ function countLanguagesIn(data) {
       languageKey.push({ ...val, language: key, colour });
     }
   });
-  console.log(languageMap);
-  console.log(languageKey);
   return { languageKey, languageMap, otherColour };
 }
 
 const App = props => {
   // eslint-disable-next-line react/prop-types
-  console.log("in app");
   const { rawData } = props;
   const languages = countLanguagesIn(rawData);
   const [vizState, dispatch] = useReducer(
@@ -63,8 +57,6 @@ const App = props => {
     initialiseGlobalState
   );
   const data = useRef({languages, files: rawData});
-
-  console.log("app constructor with state:", vizState);
 
   return (
     <div className="App">

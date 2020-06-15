@@ -6,7 +6,7 @@ import ColourKey from "./ColourKey";
 const GoodBadUglyKey = props => {
   const { title, visualization, config } = props;
   // TODO: dry this up:
-  const { good, bad, ugly } = config[visualization];
+  const { good, bad, ugly, precision } = config[visualization];
   const { goodColour, badColour, uglyColour } = config.colours;
   const goodBadUglyScale = d3
     .scaleLinear()
@@ -19,11 +19,21 @@ const GoodBadUglyKey = props => {
   const badUgly = d3.interpolateNumber(bad, ugly);
   const key = [];
   for (let ix = 0.0; ix < 1.0; ix += 0.1) {
-    const metric = goodBad(ix);
-    key.push([Math.round(metric), goodBadUglyScale(metric)]);
+    let metric = goodBad(ix);
+    if (precision === 0) {
+      metric = Math.round(metric);
+    } else {
+      metric = metric.toPrecision(precision);
+    }
+    key.push([metric, goodBadUglyScale(metric)]);
   }
   for (let ix = 0.1; ix <= 1.0; ix += 0.1) {
-    const metric = badUgly(ix);
+    let metric = badUgly(ix);
+    if (precision === 0) {
+      metric = Math.round(metric);
+    } else {
+      metric = metric.toPrecision(precision);
+    }
     key.push([Math.round(metric), goodBadUglyScale(metric)]);
   }
   return <ColourKey title={title} keyData={key} />;

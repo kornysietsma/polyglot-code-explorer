@@ -5,7 +5,7 @@ import DirectoryNodeInspector from "./DirectoryNodeInspector";
 import { isDirectory } from "./nodeData";
 
 const Inspector = props => {
-  console.log("inspector props", props);
+  // console.log("inspector props", props);
   const { state, dispatch } = props;
   const { selectedNode } = state.config;
   const hasSelection = selectedNode != null;
