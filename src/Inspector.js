@@ -11,9 +11,17 @@ const Inspector = props => {
   const hasSelection = selectedNode != null;
   const showDirectory = hasSelection && isDirectory(selectedNode);
   const nodeInspector = showDirectory ? (
-    <DirectoryNodeInspector node={selectedNode} dispatch={dispatch} />
+    <DirectoryNodeInspector
+      node={selectedNode}
+      state={state}
+      dispatch={dispatch}
+    />
   ) : (
-    <NodeInspector node={selectedNode} dispatch={dispatch} />
+    <NodeInspector
+      node={selectedNode}
+      state={state}
+      dispatch={dispatch}
+    />
   );
   return (
     <aside className="Inspector">

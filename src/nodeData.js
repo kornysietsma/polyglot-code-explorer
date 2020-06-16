@@ -88,7 +88,6 @@ export function nodeRemoteHead(node) {
   return git.head;
 }
 
-
 export function nodeIndentationData(node) {
   const { data } = dataNode(node);
   if (!data || !data.indentation) return undefined;
@@ -106,4 +105,16 @@ export function nodeIndentationFn(config) {
   return d => {
     return nodeIndentation(d, config.indentation.metric);
   };
+}
+
+// Date range based data, mostly git details
+
+export function nodeNumberOfChangers(node, earliest, latest) {
+  const git = nodeGitData(node);
+  if (!git) return undefined;
+  const { details } = git;
+  if (!details) return undefined;
+  const changers = _.uniq(details.flatMap(d => d.users));
+  console.log("changers:", changers);
+  return changers.length;
 }

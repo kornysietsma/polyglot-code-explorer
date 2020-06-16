@@ -5,24 +5,63 @@ import _uniqueId from "lodash/uniqueId";
 import GoodBadUglyKey from "./GoodBadUglyKey";
 import DepthKey from "./DepthKey";
 import ColourKey from "./ColourKey";
+import { numberOfChangersScale } from "./ColourScales";
+
+function buildNumberOfChangersKey(state) {
+  const {
+    config,
+    config: { numberOfChangers }
+  } = state;
+  const scale = numberOfChangersScale(config);
+
+  const key = [
+    ["None", numberOfChangers.noChangersColour],
+    ["One", numberOfChangers.oneChangerColour]
+  ];
+  for (
+    let i = numberOfChangers.fewChangersMin;
+    i < numberOfChangers.fewChangersMax;
+    i += 1
+  ) {
+    key.push([i, scale(i)]);
+  }
+  const scaleIncrement =
+    (numberOfChangers.manyChangersMax - numberOfChangers.fewChangersMax) / 10;
+  for (
+    let n = numberOfChangers.fewChangersMax;
+    n <= numberOfChangers.manyChangersMax;
+    n += scaleIncrement
+  ) {
+    key.push([Math.floor(n), scale(n)]);
+  }
+  return key;
+}
 
 const Controller = props => {
   const { data, state, dispatch } = props;
+  const {
+    metadata: { languages }
+  } = data.current;
   const { config, stats } = state;
   // ID logic from https://stackoverflow.com/questions/29420835/how-to-generate-unique-ids-for-form-labels-in-react
   const { current: vizId } = useRef(_uniqueId("controller-"));
   const { current: depthId } = useRef(_uniqueId("controller-"));
   const { current: indentMetricId } = useRef(_uniqueId("controller-"));
-  const { languageKey, otherColour } = data.current.languages;
+  const { languageKey, otherColour } = languages;
   const displayedLanguageKey = [
     ...languageKey.map(k => [k.language, k.colour]),
     ["Other languages", otherColour]
   ];
+  const numberOfChangersKey = buildNumberOfChangersKey(state);
 
   function renderVizDetails(visualization) {
     switch (visualization) {
       case "language":
         return <ColourKey title="Languages" keyData={displayedLanguageKey} />;
+      case "numberOfChangers":
+        return (
+          <ColourKey title="Number of changers" keyData={numberOfChangersKey} />
+        );
       case "loc":
         return (
           <GoodBadUglyKey
@@ -92,6 +131,7 @@ const Controller = props => {
             <option value="depth">Nesting depth</option>
             <option value="indentation">Indentation</option>
             <option value="age">Code age</option>
+            <option value="numberOfChangers">Number of changers</option>
           </select>
         </label>
       </div>

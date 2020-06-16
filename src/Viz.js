@@ -3,12 +3,13 @@ import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import {
   nodeAge,
+  nodeCumulativeLinesOfCode,
   nodeDepth,
   nodeIndentationFn,
-  nodeCumulativeLinesOfCode,
   nodeLocData,
-  isHierarchyNode
+  nodeNumberOfChangers
 } from "./nodeData";
+import { numberOfChangersScale } from "./ColourScales";
 
 function buildLanguageFn(languages, config) {
   const { languageMap } = languages;
@@ -45,6 +46,24 @@ function buildGoodBadUglyFn(dataFn, parentFn, config, visualization) {
   };
 }
 
+function buildNumberOfChangersFn(config, expensiveConfig) {
+  const { neutralColour, circlePackBackground } = config.colours;
+
+  const scale = numberOfChangersScale(config);
+  return d => {
+    if (d.data.layout.algorithm === "circlePack") return circlePackBackground;
+    if (d.children) return neutralColour; // no changers yet for dirs
+
+    const value = nodeNumberOfChangers(
+      d,
+      expensiveConfig.dateRange.earliest,
+      expensiveConfig.dateRange.latest
+    );
+
+    return value === undefined ? neutralColour : scale(value);
+  };
+}
+
 function buildDepthColourFn(depthFn, config, stats) {
   const { neutralColour, circlePackBackground } = config.colours;
   const scale = d3
@@ -58,7 +77,7 @@ function buildDepthColourFn(depthFn, config, stats) {
   };
 }
 
-function buildFillFunctions(config, stats, languages) {
+function buildFillFunctions(config, expensiveConfig, stats, languages) {
   return {
     loc: buildGoodBadUglyFn(
       nodeCumulativeLinesOfCode,
@@ -79,14 +98,20 @@ function buildFillFunctions(config, stats, languages) {
       config,
       "age"
     ),
-    language: buildLanguageFn(languages, config)
+    language: buildLanguageFn(languages, config),
+    numberOfChangers: buildNumberOfChangersFn(config, expensiveConfig)
   };
 }
 
 const redrawPolygons = (svgSelection, files, languages, state) => {
-  const { config, stats } = state;
+  const { config, expensiveConfig, stats } = state;
 
-  const fillFunctions = buildFillFunctions(config, stats, languages);
+  const fillFunctions = buildFillFunctions(
+    config,
+    expensiveConfig,
+    stats,
+    languages
+  );
 
   const fillFn = fillFunctions[config.visualization];
   const strokeWidthFn = d => {
@@ -259,7 +284,10 @@ const Viz = props => {
     state: { config, expensiveConfig, stats }
   } = props;
 
-  const { languages, files } = data.current;
+  const {
+    metadata: { languages },
+    files
+  } = data.current;
 
   // TODO: should usePrevious include 'files' ? remove it and let's see.
   const prevState = usePrevious({ config, expensiveConfig });

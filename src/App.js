@@ -1,11 +1,12 @@
 import React, { useReducer, useRef } from "react";
+import _ from "lodash";
 import "./App.css";
 import * as d3 from "d3";
 import Controller from "./Controller";
 import Inspector from "./Inspector";
 import Viz from "./Viz";
 import { globalDispatchReducer, initialiseGlobalState } from "./State";
-import { nodeLocData } from "./nodeData";
+import { nodeGitData, nodeLinesOfCode, nodeLocData } from "./nodeData";
 
 /* eslint-disable no-param-reassign */
 function addLanguagesFromNode(counts, node) {
@@ -47,16 +48,70 @@ function countLanguagesIn(data) {
   return { languageKey, languageMap, otherColour };
 }
 
+function gatherNodeStats(node, statsSoFar, depth) {
+  let stats = _.cloneDeep(statsSoFar);
+  if (stats.maxDepth < depth) {
+    stats.maxDepth = depth;
+  }
+  const loc = nodeLinesOfCode(node);
+  if (loc && loc > stats.maxLoc) {
+    stats.maxLoc = loc;
+  }
+  const gitData = nodeGitData(node);
+  if (gitData && gitData.details && gitData.details.length > 0) {
+    const days = gitData.details.map(d => d.commit_day);
+    if (gitData.lastUpdate) {
+      days.push(gitData.lastUpdate);
+    }
+    if (gitData.creationDate) {
+      days.push(gitData.creationDate);
+    }
+    days.sort();
+    const earliest = days[0];
+    const latest = days[days.length - 1];
+    if (stats.earliestCommit === undefined || earliest < stats.earliestCommit) {
+      stats.earliestCommit = earliest;
+    }
+    if (stats.latestCommit === undefined || latest > stats.latestCommit) {
+      stats.latestCommit = latest;
+    }
+  }
+  if (node.children !== undefined) {
+    stats = node.children.reduce((memo, child) => {
+      return gatherNodeStats(child, memo, depth + 1);
+    }, stats);
+  }
+  return stats;
+}
+
+function gatherGlobalStats(data) {
+  const statsSoFar = {
+    earliestCommit: undefined,
+    latestCommit: undefined,
+    maxDepth: 0,
+    maxLoc: 0
+  };
+  return gatherNodeStats(data, statsSoFar, 0);
+}
+
 const App = props => {
   // eslint-disable-next-line react/prop-types
   const { rawData } = props;
+  console.log("postprocessing languages");
   const languages = countLanguagesIn(rawData);
+  console.log("postprocessing global stats");
+  const stats = gatherGlobalStats(rawData);
+  console.log("postprocessing complete");
+  const metadata = {
+    languages,
+    stats
+  };
   const [vizState, dispatch] = useReducer(
     globalDispatchReducer,
-    rawData,
+    { rawData, metadata },
     initialiseGlobalState
   );
-  const data = useRef({languages, files: rawData});
+  const data = useRef({ metadata, files: rawData });
 
   return (
     <div className="App">

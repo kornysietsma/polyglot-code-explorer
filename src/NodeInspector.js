@@ -7,6 +7,7 @@ import {
   nodeIndentation,
   nodeIndentationData,
   nodeLocData,
+  nodeNumberOfChangers,
   nodeRemoteHead,
   nodeRemoteUrl
 } from "./nodeData";
@@ -63,13 +64,18 @@ function humanizeDays(days) {
 }
 
 const NodeInspector = props => {
-  const { node, dispatch } = props;
+  const { node, dispatch, state } = props;
   const age = nodeAge(node);
   const humanAge = humanizeDays(age);
   const ageText = `file last changed ${age} days ago (${humanAge})`;
   const locData = nodeLocData(node);
   const indentationData = nodeIndentationData(node);
   const gitUrl = findGitUrl(node);
+  const changers = nodeNumberOfChangers(
+    node,
+    state.expensiveConfig.dateRange.earliest,
+    state.expensiveConfig.dateRange.latest
+  );
   return (
     <div>
       {gitUrl ? (
@@ -99,6 +105,7 @@ const NodeInspector = props => {
         ""
       )}
       {age ? <p>{ageText}</p> : ""}
+      {changers ? <p>Unique changers: {changers}</p> : ""}
     </div>
   );
 };

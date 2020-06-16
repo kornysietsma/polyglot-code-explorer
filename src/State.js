@@ -1,35 +1,5 @@
 import _ from "lodash";
 
-function findNodeStats(node, nodeDepth, maxDepthSoFar, maxLocSoFar) {
-  let myLoc = node.children ? 0 : node.value; // only counting lines of actual files!
-  if (myLoc < maxLocSoFar) myLoc = maxLocSoFar;
-  let myDepth = nodeDepth > maxDepthSoFar ? nodeDepth : maxDepthSoFar;
-  if (node.children) {
-    const childStats = node.children.reduce(
-      (memo, child) => {
-        let { loc, depth } = memo;
-        const { maxDepth, maxLoc } = findNodeStats(
-          child,
-          nodeDepth + 1,
-          depth,
-          loc
-        );
-        if (maxDepth > depth) depth = maxDepth;
-        if (maxLoc > loc) loc = maxLoc;
-        return { loc, depth };
-      },
-      { loc: myLoc, depth: myDepth }
-    );
-    myLoc = childStats.loc;
-    myDepth = childStats.depth;
-  }
-  return { maxDepth: myDepth, maxLoc: myLoc };
-}
-
-function findDataStats(initialData) {
-  return findNodeStats(initialData, 0, 0, 0);
-}
-
 function setIndentationMetric(state, metric) {
   const result = _.cloneDeep(state);
   switch (metric) {
@@ -66,9 +36,13 @@ function setIndentationMetric(state, metric) {
   return result;
 }
 
-
 function initialiseGlobalState(initialData) {
-  const { maxDepth, maxLoc } = findDataStats(initialData);
+  const {
+    metadata: {
+      stats: { maxDepth, maxLoc, earliestCommit, latestCommit }
+    }
+  } = initialData;
+
   let defaults = {
     config: {
       visualization: "language",
@@ -88,6 +62,18 @@ function initialiseGlobalState(initialData) {
         maxAge: 365 * 2,
         precision: 0
       },
+      numberOfChangers: {
+        // more of a colour thing than a scale really
+        noChangersColour: "cyan",
+        oneChangerColour: "brown",
+        fewChangersMinColour: "green",
+        fewChangersMaxColour: "blue",
+        fewChangersMin: 2,
+        fewChangersMax: 8, // this is a candidate to configure!
+        manyChangersColour: "yellow",
+        manyChangersMax: 30, // starting to feel like a crowd
+        precision: 0
+      },
       colours: {
         defaultStroke: "#111111",
         selectedStroke: "#fffa00",
@@ -100,7 +86,11 @@ function initialiseGlobalState(initialData) {
       selectedNode: null
     },
     expensiveConfig: {
-      depth: Math.min(8, maxDepth)
+      depth: Math.min(8, maxDepth),
+      dateRange: {
+        earliest: earliestCommit,
+        latest: latestCommit
+      }
     },
     stats: {
       maxDepth,
