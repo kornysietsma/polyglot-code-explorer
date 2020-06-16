@@ -1,4 +1,5 @@
 import _ from "lodash";
+import moment from "moment";
 
 function setIndentationMetric(state, metric) {
   const result = _.cloneDeep(state);
@@ -42,6 +43,13 @@ function initialiseGlobalState(initialData) {
       stats: { maxDepth, maxLoc, earliestCommit, latestCommit }
     }
   } = initialData;
+
+  const oneYearAgo = moment
+    .unix(latestCommit)
+    .subtract(1, "year")
+    .unix();
+
+  const earliest = oneYearAgo < earliestCommit ? earliestCommit : oneYearAgo;
 
   let defaults = {
     config: {
@@ -88,7 +96,7 @@ function initialiseGlobalState(initialData) {
     expensiveConfig: {
       depth: Math.min(8, maxDepth),
       dateRange: {
-        earliest: earliestCommit,
+        earliest,
         latest: latestCommit
       }
     },

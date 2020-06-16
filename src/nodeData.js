@@ -114,7 +114,10 @@ export function nodeNumberOfChangers(node, earliest, latest) {
   if (!git) return undefined;
   const { details } = git;
   if (!details) return undefined;
-  const changers = _.uniq(details.flatMap(d => d.users));
-  console.log("changers:", changers);
+  const changers = _.uniq(
+    details
+      .filter(d => d.commit_day >= earliest && d.commit_day <= latest)
+      .flatMap(d => d.users)
+  );
   return changers.length;
 }

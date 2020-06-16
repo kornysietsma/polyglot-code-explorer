@@ -2,6 +2,7 @@
 // as prop-types seem painful to implement without going full typescript
 import React, { useState, useRef } from "react";
 import _uniqueId from "lodash/uniqueId";
+import moment from "moment";
 import GoodBadUglyKey from "./GoodBadUglyKey";
 import DepthKey from "./DepthKey";
 import ColourKey from "./ColourKey";
@@ -32,7 +33,7 @@ function buildNumberOfChangersKey(state) {
     n <= numberOfChangers.manyChangersMax;
     n += scaleIncrement
   ) {
-    key.push([Math.floor(n), scale(n)]);
+    key.push([Math.round(n), scale(n)]);
   }
   return key;
 }
@@ -42,7 +43,7 @@ const Controller = props => {
   const {
     metadata: { languages }
   } = data.current;
-  const { config, stats } = state;
+  const { config, expensiveConfig, stats } = state;
   // ID logic from https://stackoverflow.com/questions/29420835/how-to-generate-unique-ids-for-form-labels-in-react
   const { current: vizId } = useRef(_uniqueId("controller-"));
   const { current: depthId } = useRef(_uniqueId("controller-"));
@@ -54,13 +55,24 @@ const Controller = props => {
   ];
   const numberOfChangersKey = buildNumberOfChangersKey(state);
 
+  const earliestDate = moment.unix(expensiveConfig.dateRange.earliest).format('DD-MMM-YYYY');
+  const latestDate = moment.unix(expensiveConfig.dateRange.latest).format('DD-MMM-YYYY');
+
   function renderVizDetails(visualization) {
     switch (visualization) {
       case "language":
         return <ColourKey title="Languages" keyData={displayedLanguageKey} />;
       case "numberOfChangers":
         return (
-          <ColourKey title="Number of changers" keyData={numberOfChangersKey} />
+          <div>
+            <p>
+              From: {earliestDate} to {latestDate}
+            </p>
+            <ColourKey
+              title="Number of changers"
+              keyData={numberOfChangersKey}
+            />
+          </div>
         );
       case "loc":
         return (
