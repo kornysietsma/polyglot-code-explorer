@@ -109,15 +109,40 @@ export function nodeIndentationFn(config) {
 
 // Date range based data, mostly git details
 
-export function nodeNumberOfChangers(node, earliest, latest) {
+function nodeChangeDetails(node, earliest, latest) {
   const git = nodeGitData(node);
   if (!git) return undefined;
   const { details } = git;
   if (!details) return undefined;
-  const changers = _.uniq(
-    details
-      .filter(d => d.commit_day >= earliest && d.commit_day <= latest)
-      .flatMap(d => d.users)
+  return details.filter(
+    d => d.commit_day >= earliest && d.commit_day <= latest
   );
+}
+
+export function nodeTopChangers(node, earliest, latest, maxPeople) {
+  const details = nodeChangeDetails(node, earliest, latest);
+  if (!details) return undefined;
+  const changerStats = new Map();
+  details.forEach(({ users, commits }) => {
+    users.forEach(user => {
+      if (!changerStats.has(user)) {
+        changerStats.set(user, commits);
+      } else {
+        changerStats.set(user, changerStats.get(user) + commits);
+      }
+    });
+  });
+
+  return [...changerStats.entries()]
+    .sort(([au, ac], [bu, bc]) => {
+      return bc - ac;
+    })
+    .slice(0, maxPeople);
+}
+
+export function nodeNumberOfChangers(node, earliest, latest) {
+  const details = nodeChangeDetails(node, earliest, latest);
+  if (!details) return undefined;
+  const changers = _.uniq(details.flatMap(d => d.users));
   return changers.length;
 }

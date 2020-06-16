@@ -102,9 +102,11 @@ const App = props => {
   console.log("postprocessing global stats");
   const stats = gatherGlobalStats(rawData);
   console.log("postprocessing complete");
+  const { users } = rawData.data.git_meta;
   const metadata = {
     languages,
-    stats
+    stats,
+    users
   };
   const [vizState, dispatch] = useReducer(
     globalDispatchReducer,
@@ -120,7 +122,7 @@ const App = props => {
       </header>
       <Viz data={data} state={vizState} dispatch={dispatch} />
       <Controller data={data} state={vizState} dispatch={dispatch} />
-      <Inspector state={vizState} dispatch={dispatch} />
+      <Inspector metadata={metadata} state={vizState} dispatch={dispatch} />
     </div>
   );
 };

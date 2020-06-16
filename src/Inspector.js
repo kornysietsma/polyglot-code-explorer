@@ -6,7 +6,7 @@ import { isDirectory } from "./nodeData";
 
 const Inspector = props => {
   // console.log("inspector props", props);
-  const { state, dispatch } = props;
+  const { state, dispatch, metadata } = props;
   const { selectedNode } = state.config;
   const hasSelection = selectedNode != null;
   const showDirectory = hasSelection && isDirectory(selectedNode);
@@ -20,6 +20,7 @@ const Inspector = props => {
     <NodeInspector
       node={selectedNode}
       state={state}
+      metadata={metadata}
       dispatch={dispatch}
     />
   );

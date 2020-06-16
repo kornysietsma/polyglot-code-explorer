@@ -44,12 +44,12 @@ function initialiseGlobalState(initialData) {
     }
   } = initialData;
 
-  const oneYearAgo = moment
+  const twoYearsAgo = moment
     .unix(latestCommit)
-    .subtract(1, "year")
+    .subtract(2, "year")
     .unix();
 
-  const earliest = oneYearAgo < earliestCommit ? earliestCommit : oneYearAgo;
+  const earliest = twoYearsAgo < earliestCommit ? earliestCommit : twoYearsAgo;
 
   let defaults = {
     config: {

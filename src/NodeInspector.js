@@ -9,7 +9,8 @@ import {
   nodeLocData,
   nodeNumberOfChangers,
   nodeRemoteHead,
-  nodeRemoteUrl
+  nodeRemoteUrl,
+  nodeTopChangers
 } from "./nodeData";
 
 function findGitUrl(node) {
@@ -64,18 +65,61 @@ function humanizeDays(days) {
 }
 
 const NodeInspector = props => {
-  const { node, dispatch, state } = props;
+  const { node, dispatch, state, metadata } = props;
   const age = nodeAge(node);
   const humanAge = humanizeDays(age);
   const ageText = `file last changed ${age} days ago (${humanAge})`;
   const locData = nodeLocData(node);
   const indentationData = nodeIndentationData(node);
   const gitUrl = findGitUrl(node);
-  const changers = nodeNumberOfChangers(
+  const changerCount = nodeNumberOfChangers(
     node,
     state.expensiveConfig.dateRange.earliest,
     state.expensiveConfig.dateRange.latest
   );
+  const topChangers = nodeTopChangers(
+    node,
+    state.expensiveConfig.dateRange.earliest,
+    state.expensiveConfig.dateRange.latest,
+    10
+  );
+  const userName = userId => {
+    const { user } = metadata.users[userId];
+    if (user.name) {
+      if (user.email) {
+        return `${user.name} / ${user.email}`;
+      }
+      return user.name;
+    }
+    return user.email;
+  };
+  const topChangerTable =
+    topChangers && topChangers.length > 0 ? (
+      <div>
+        <p>Top changers:</p>
+        <table>
+          <thead>
+            <td>User</td>
+            <td>Change count</td>
+          </thead>
+          <tbody>
+            {topChangers.map(([user, count]) => {
+              const userData = metadata.users[user];
+              return (
+                <tr>
+                  <td>
+                    {userName(user)}
+                  </td>
+                  <td>{count}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      ""
+    );
   return (
     <div>
       {gitUrl ? (
@@ -105,7 +149,8 @@ const NodeInspector = props => {
         ""
       )}
       {age ? <p>{ageText}</p> : ""}
-      {changers ? <p>Unique changers: {changers}</p> : ""}
+      {changerCount ? <p>Unique changers: {changerCount}</p> : ""}
+      {topChangerTable}
     </div>
   );
 };
