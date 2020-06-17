@@ -38,8 +38,6 @@ function setIndentationMetric(state, metric) {
 }
 
 function setChurnMetric(state, metric) {
-  const { maxLines, maxCommits, maxDays } = state.stats.churn;
-
   const result = _.cloneDeep(state);
   switch (metric) {
     case "lines":
