@@ -37,10 +37,54 @@ function setIndentationMetric(state, metric) {
   return result;
 }
 
+function setChurnMetric(state, metric) {
+  const { maxLines, maxCommits, maxDays } = state.stats.churn;
+
+  const result = _.cloneDeep(state);
+  switch (metric) {
+    case "lines":
+      _.set(result, ["config", "churn"], {
+        metric,
+        bad: 10,
+        good: 0,
+        ugly: 100,
+        precision: 2
+      });
+      break;
+    case "days":
+      _.set(result, ["config", "churn"], {
+        metric,
+        bad: 0.1,
+        good: 0,
+        ugly: 0.5,
+        precision: 4
+      });
+      break;
+    case "commits":
+      _.set(result, ["config", "churn"], {
+        metric,
+        bad: 0.1,
+        good: 0,
+        ugly: 1,
+        precision: 4
+      });
+      break;
+    default:
+      throw Error(`Invalid metric: ${metric}`);
+  }
+  return result;
+}
+
 function initialiseGlobalState(initialData) {
   const {
     metadata: {
-      stats: { maxDepth, maxLoc, earliestCommit, latestCommit }
+      stats: {
+        maxDepth,
+        maxLoc,
+        earliestCommit,
+        latestCommit,
+        churn: { maxLines, maxCommits, maxDays }
+      }
     }
   } = initialData;
 
@@ -80,7 +124,11 @@ function initialiseGlobalState(initialData) {
         fewChangersMax: 8, // this is a candidate to configure!
         manyChangersColour: "yellow",
         manyChangersMax: 30, // starting to feel like a crowd
-        precision: 0
+        precision: 0,
+        topChangersCount: 5 // show this many changers in NodeInspector
+      },
+      churn: {
+        note: "overridden later!"
       },
       colours: {
         defaultStroke: "#111111",
@@ -102,10 +150,12 @@ function initialiseGlobalState(initialData) {
     },
     stats: {
       maxDepth,
-      maxLoc: Math.min(maxLoc, 2000)
+      maxLoc: Math.min(maxLoc, 2000),
+      churn: { maxLines, maxCommits, maxDays } // duplicate so we can get it later!
     }
   };
   defaults = setIndentationMetric(defaults, "sum");
+  defaults = setChurnMetric(defaults, "days");
   return defaults;
 }
 
@@ -129,8 +179,13 @@ function globalDispatchReducer(state, action) {
         ...state,
         config: { ...config, selectedNode: action.payload }
       };
+    case "setChurnMetric": {
+      const result = _.cloneDeep(state);
+      _.set(result, ["config", "churn", "metric"], action.payload);
+      return setChurnMetric(state, action.payload);
+    }
     default:
-      throw new Error();
+      throw new Error(`Invalid dispatch type ${action.type}`);
   }
 }
 

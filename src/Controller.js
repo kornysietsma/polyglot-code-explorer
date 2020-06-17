@@ -1,12 +1,13 @@
 /* eslint-disable react/prop-types */
 // as prop-types seem painful to implement without going full typescript
+/* eslint-disable jsx-a11y/no-onchange */
 import React, { useState, useRef } from "react";
 import _uniqueId from "lodash/uniqueId";
-import moment from "moment";
 import GoodBadUglyKey from "./GoodBadUglyKey";
 import DepthKey from "./DepthKey";
 import ColourKey from "./ColourKey";
 import { numberOfChangersScale } from "./ColourScales";
+import { humanizeDate } from "./datetimes";
 
 function buildNumberOfChangersKey(state) {
   const {
@@ -48,6 +49,7 @@ const Controller = props => {
   const { current: vizId } = useRef(_uniqueId("controller-"));
   const { current: depthId } = useRef(_uniqueId("controller-"));
   const { current: indentMetricId } = useRef(_uniqueId("controller-"));
+  const { current: churnMetricId } = useRef(_uniqueId("controller-"));
   const { languageKey, otherColour } = languages;
   const displayedLanguageKey = [
     ...languageKey.map(k => [k.language, k.colour]),
@@ -55,8 +57,8 @@ const Controller = props => {
   ];
   const numberOfChangersKey = buildNumberOfChangersKey(state);
 
-  const earliestDate = moment.unix(expensiveConfig.dateRange.earliest).format('DD-MMM-YYYY');
-  const latestDate = moment.unix(expensiveConfig.dateRange.latest).format('DD-MMM-YYYY');
+  const earliestDate = humanizeDate(expensiveConfig.dateRange.earliest);
+  const latestDate = humanizeDate(expensiveConfig.dateRange.latest);
 
   function renderVizDetails(visualization) {
     switch (visualization) {
@@ -100,6 +102,19 @@ const Controller = props => {
         );
       case "depth":
         return <DepthKey config={config} stats={stats} />;
+      case "churn":
+        return (
+          <div>
+            <p>
+              From: {earliestDate} to {latestDate}
+            </p>
+            <GoodBadUglyKey
+              title="Churn"
+              visualization={visualization}
+              config={config}
+            />
+          </div>
+        );
       default:
         return "";
     }
@@ -144,6 +159,7 @@ const Controller = props => {
             <option value="indentation">Indentation</option>
             <option value="age">Code age</option>
             <option value="numberOfChangers">Number of changers</option>
+            <option value="churn">Churn</option>
           </select>
         </label>
       </div>
@@ -170,25 +186,30 @@ const Controller = props => {
       ) : (
         ""
       )}
+      {state.config.visualization === "churn" ? (
+        <div>
+          <label htmlFor={churnMetricId}>
+            Churn metric:
+            <select
+              id={churnMetricId}
+              value={state.config.churn.metric}
+              onChange={evt =>
+                dispatch({
+                  type: "setChurnMetric",
+                  payload: evt.target.value
+                })
+              }
+            >
+              <option value="days">Days containing a change</option>
+              <option value="commits">Commits per day</option>
+              <option value="lines">Lines per day</option>
+            </select>
+          </label>
+        </div>
+      ) : (
+        ""
+      )}
       {renderVizDetails(state.config.visualization, languageKey)}
-      {/*
-      <div>
-        Depth
-        <input
-          name="depth"
-          type="range"
-          value={state.expensiveConfig.depth}
-          min="1"
-          max="20"
-          onChange={evt =>
-            dispatch({
-              type: "setDepth",
-              payload: Number.parseInt(evt.target.value, 10)
-            })
-          }
-        />
-      </div>
-      */}
     </aside>
   );
 };

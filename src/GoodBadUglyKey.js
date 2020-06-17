@@ -23,7 +23,7 @@ const GoodBadUglyKey = props => {
     if (precision === 0) {
       metric = Math.round(metric);
     } else {
-      metric = metric.toPrecision(precision);
+      metric = metric.toFixed(precision);
     }
     key.push([metric, goodBadUglyScale(metric)]);
   }
@@ -32,9 +32,9 @@ const GoodBadUglyKey = props => {
     if (precision === 0) {
       metric = Math.round(metric);
     } else {
-      metric = metric.toPrecision(precision);
+      metric = metric.toFixed(precision);
     }
-    key.push([Math.round(metric), goodBadUglyScale(metric)]);
+    key.push([metric, goodBadUglyScale(metric)]);
   }
   return <ColourKey title={title} keyData={key} />;
 };

@@ -7,7 +7,8 @@ import {
   nodeDepth,
   nodeIndentationFn,
   nodeLocData,
-  nodeNumberOfChangers
+  nodeNumberOfChangers,
+  nodeChurnFn
 } from "./nodeData";
 import { numberOfChangersScale } from "./ColourScales";
 
@@ -22,8 +23,7 @@ function buildLanguageFn(languages, config) {
   };
 }
 
-function buildGoodBadUglyFn(dataFn, parentFn, config, visualization) {
-  const { good, bad, ugly } = config[visualization];
+function buildGoodBadUglyFnDetailed(dataFn, parentFn, config, good, bad, ugly) {
   const {
     goodColour,
     badColour,
@@ -44,6 +44,25 @@ function buildGoodBadUglyFn(dataFn, parentFn, config, visualization) {
 
     return value === undefined ? neutralColour : goodBadUglyScale(value);
   };
+}
+
+function buildGoodBadUglyFn(dataFn, parentFn, config, visualization) {
+  const { good, bad, ugly } = config[visualization];
+  return buildGoodBadUglyFnDetailed(dataFn, parentFn, config, good, bad, ugly);
+}
+
+function buildChurnFn(config, expensiveConfig) {
+  const churnDataFn = nodeChurnFn(config, expensiveConfig);
+  const { good, bad, ugly } = config.churn;
+
+  return buildGoodBadUglyFnDetailed(
+    churnDataFn,
+    () => undefined, // TODO: better parenting
+    config,
+    good,
+    bad,
+    ugly
+  );
 }
 
 function buildNumberOfChangersFn(config, expensiveConfig) {
@@ -99,7 +118,8 @@ function buildFillFunctions(config, expensiveConfig, stats, languages) {
       "age"
     ),
     language: buildLanguageFn(languages, config),
-    numberOfChangers: buildNumberOfChangersFn(config, expensiveConfig)
+    numberOfChangers: buildNumberOfChangersFn(config, expensiveConfig),
+    churn: buildChurnFn(config, expensiveConfig)
   };
 }
 

@@ -114,6 +114,7 @@ function nodeChangeDetails(node, earliest, latest) {
   if (!git) return undefined;
   const { details } = git;
   if (!details) return undefined;
+  if (earliest === undefined && latest === undefined) return details;
   return details.filter(
     d => d.commit_day >= earliest && d.commit_day <= latest
   );
@@ -145,4 +146,64 @@ export function nodeNumberOfChangers(node, earliest, latest) {
   if (!details) return undefined;
   const changers = _.uniq(details.flatMap(d => d.users));
   return changers.length;
+}
+
+export function nodeChurnData(node, earliest, latest) {
+  const details = nodeChangeDetails(node, earliest, latest);
+  if (!details) return undefined;
+  let totalLines = 0;
+  let totalCommits = 0;
+  const totalDays = details.length;
+  details.forEach(d => {
+    const changeSize = d.lines_added + d.lines_deleted;
+    totalCommits += d.commits;
+    totalLines += changeSize;
+  });
+  const duration = (latest - earliest) / (24 * 60 * 60);
+
+  return {
+    totalLines,
+    totalCommits,
+    totalDays,
+    fractionalLines: totalLines / duration,
+    fractionalCommits: totalCommits / duration,
+    fractionalDays: totalDays / duration
+  };
+}
+
+export function nodeChurnFn(config, expensiveConfig) {
+  switch (config.churn.metric) {
+    case "lines":
+      return d => {
+        const data = nodeChurnData(
+          d,
+          expensiveConfig.dateRange.earliest,
+          expensiveConfig.dateRange.latest
+        );
+        if (!data) return undefined;
+        return data.fractionalLines;
+      };
+    case "days":
+      return d => {
+        const data = nodeChurnData(
+          d,
+          expensiveConfig.dateRange.earliest,
+          expensiveConfig.dateRange.latest
+        );
+        if (!data) return undefined;
+        return data.fractionalDays;
+      };
+    case "commits":
+      return d => {
+        const data = nodeChurnData(
+          d,
+          expensiveConfig.dateRange.earliest,
+          expensiveConfig.dateRange.latest
+        );
+        if (!data) return undefined;
+        return data.fractionalCommits;
+      };
+    default:
+      throw Error(`Invalid churn metric ${config.churn.metric}`);
+  }
 }

@@ -1,12 +1,20 @@
+/* eslint-disable react/prop-types */
+// as prop-types seem painful to implement without going full typescript
 import React, { useReducer, useRef } from "react";
 import _ from "lodash";
+import moment from "moment";
 import "./App.css";
 import * as d3 from "d3";
 import Controller from "./Controller";
 import Inspector from "./Inspector";
 import Viz from "./Viz";
 import { globalDispatchReducer, initialiseGlobalState } from "./State";
-import { nodeGitData, nodeLinesOfCode, nodeLocData } from "./nodeData";
+import {
+  nodeGitData,
+  nodeLinesOfCode,
+  nodeLocData,
+  nodeChurnData
+} from "./nodeData";
 
 /* eslint-disable no-param-reassign */
 function addLanguagesFromNode(counts, node) {
@@ -48,7 +56,7 @@ function countLanguagesIn(data) {
   return { languageKey, languageMap, otherColour };
 }
 
-function gatherNodeStats(node, statsSoFar, depth) {
+function gatherUndatedNodeStats(node, statsSoFar, depth) {
   let stats = _.cloneDeep(statsSoFar);
   if (stats.maxDepth < depth) {
     stats.maxDepth = depth;
@@ -78,7 +86,26 @@ function gatherNodeStats(node, statsSoFar, depth) {
   }
   if (node.children !== undefined) {
     stats = node.children.reduce((memo, child) => {
-      return gatherNodeStats(child, memo, depth + 1);
+      return gatherUndatedNodeStats(child, memo, depth + 1);
+    }, stats);
+  }
+  return stats;
+}
+
+function gatherDatedNodeStats(node, statsSoFar) {
+  let stats = _.cloneDeep(statsSoFar);
+  const { earliestSelected, latestSelected } = stats;
+  const churnData = nodeChurnData(node, earliestSelected, latestSelected);
+  if (churnData) {
+    const { totalLines, totalCommits, totalDays } = churnData;
+    if (stats.churn.maxLines < totalLines) stats.churn.maxLines = totalLines;
+    if (stats.churn.maxCommits < totalCommits)
+      stats.churn.maxCommits = totalCommits;
+    if (stats.churn.maxDays < totalDays) stats.churn.maxDays = totalDays;
+  }
+  if (node.children !== undefined) {
+    stats = node.children.reduce((memo, child) => {
+      return gatherDatedNodeStats(child, memo);
     }, stats);
   }
   return stats;
@@ -88,10 +115,28 @@ function gatherGlobalStats(data) {
   const statsSoFar = {
     earliestCommit: undefined,
     latestCommit: undefined,
+    earliestSelected: undefined,
+    latestSelected: undefined,
     maxDepth: 0,
-    maxLoc: 0
+    maxLoc: 0,
+    churn: {
+      maxLines: 0,
+      maxCommits: 0,
+      maxDays: 0
+    }
   };
-  return gatherNodeStats(data, statsSoFar, 0);
+  const globalStats = gatherUndatedNodeStats(data, statsSoFar, 0);
+  const { earliestCommit, latestCommit } = globalStats;
+
+  const twoYearsAgo = moment
+    .unix(latestCommit)
+    .subtract(2, "year")
+    .unix();
+
+  globalStats.earliestSelected =
+    twoYearsAgo < earliestCommit ? earliestCommit : twoYearsAgo;
+  globalStats.latestSelected = latestCommit;
+  return gatherDatedNodeStats(data, globalStats);
 }
 
 const App = props => {

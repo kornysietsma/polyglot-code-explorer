@@ -10,8 +10,10 @@ import {
   nodeNumberOfChangers,
   nodeRemoteHead,
   nodeRemoteUrl,
-  nodeTopChangers
+  nodeTopChangers,
+  nodeChurnData
 } from "./nodeData";
+import { humanizeDate } from "./datetimes";
 
 function findGitUrl(node) {
   let suffix = node.data.name;
@@ -64,6 +66,47 @@ function humanizeDays(days) {
   return [yearText, weekText, dayText].filter(t => t !== undefined).join(", ");
 }
 
+function churnReport(churnData) {
+  if (!churnData) return "";
+  const {
+    totalLines,
+    totalCommits,
+    totalDays,
+    fractionalLines,
+    fractionalCommits,
+    fractionalDays
+  } = churnData;
+  return (
+    <div>
+      <h5>Code churn</h5>
+      <table>
+        <thead>
+          <th>Metric</th>
+          <th>Total</th>
+          <th>Per day</th>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Days with a change</td>
+            <td>{totalDays}</td>
+            <td>{fractionalDays.toFixed(4)}</td>
+          </tr>
+          <tr>
+            <td>Commits</td>
+            <td>{totalCommits}</td>
+            <td>{fractionalCommits.toFixed(4)}</td>
+          </tr>
+          <tr>
+            <td>Lines</td>
+            <td>{totalLines}</td>
+            <td>{fractionalLines.toFixed(2)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 const NodeInspector = props => {
   const { node, dispatch, state, metadata } = props;
   const age = nodeAge(node);
@@ -72,17 +115,10 @@ const NodeInspector = props => {
   const locData = nodeLocData(node);
   const indentationData = nodeIndentationData(node);
   const gitUrl = findGitUrl(node);
-  const changerCount = nodeNumberOfChangers(
-    node,
-    state.expensiveConfig.dateRange.earliest,
-    state.expensiveConfig.dateRange.latest
-  );
-  const topChangers = nodeTopChangers(
-    node,
-    state.expensiveConfig.dateRange.earliest,
-    state.expensiveConfig.dateRange.latest,
-    10
-  );
+  const { earliest, latest } = state.expensiveConfig.dateRange;
+  const { topChangersCount } = state.config.numberOfChangers;
+  const changerCount = nodeNumberOfChangers(node, earliest, latest);
+  const topChangers = nodeTopChangers(node, earliest, latest, topChangersCount);
   const userName = userId => {
     const { user } = metadata.users[userId];
     if (user.name) {
@@ -96,7 +132,7 @@ const NodeInspector = props => {
   const topChangerTable =
     topChangers && topChangers.length > 0 ? (
       <div>
-        <p>Top changers:</p>
+        <h5>Top {topChangersCount} changers:</h5>
         <table>
           <thead>
             <td>User</td>
@@ -104,12 +140,9 @@ const NodeInspector = props => {
           </thead>
           <tbody>
             {topChangers.map(([user, count]) => {
-              const userData = metadata.users[user];
               return (
                 <tr>
-                  <td>
-                    {userName(user)}
-                  </td>
+                  <td>{userName(user)}</td>
                   <td>{count}</td>
                 </tr>
               );
@@ -120,6 +153,9 @@ const NodeInspector = props => {
     ) : (
       ""
     );
+
+  const churnData = nodeChurnData(node, earliest, latest);
+
   return (
     <div>
       {gitUrl ? (
@@ -149,8 +185,12 @@ const NodeInspector = props => {
         ""
       )}
       {age ? <p>{ageText}</p> : ""}
-      {changerCount ? <p>Unique changers: {changerCount}</p> : ""}
+      <h4>
+        Based on date range {humanizeDate(earliest)} to {humanizeDate(latest)}
+      </h4>
+      {changerCount ? <h5>Unique changers: {changerCount}</h5> : ""}
       {topChangerTable}
+      {churnReport(churnData)}
     </div>
   );
 };
