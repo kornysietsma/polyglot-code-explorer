@@ -118,7 +118,7 @@ const App = props => {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>LATI Code Visualizer</h1>
+        <h1>Polyglot Code Explorer</h1>
       </header>
       <Viz data={data} state={vizState} dispatch={dispatch} />
       <Controller data={data} state={vizState} dispatch={dispatch} />
