@@ -182,6 +182,14 @@ function globalDispatchReducer(state, action) {
       _.set(result, ["config", "churn", "metric"], action.payload);
       return setChurnMetric(state, action.payload);
     }
+    case "setDateRange": {
+      console.log("Setting dates", action.payload);
+      const [early, late] = action.payload;
+      const result = _.cloneDeep(state);
+      result.expensiveConfig.dateRange.earliest = early;
+      result.expensiveConfig.dateRange.latest = late;
+      return result;
+    }
     default:
       throw new Error(`Invalid dispatch type ${action.type}`);
   }

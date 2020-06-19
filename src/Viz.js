@@ -1,16 +1,17 @@
 /* eslint-disable react/prop-types */
-import React, { useEffect, useRef } from "react";
+import React, {useEffect, useRef} from "react";
 import * as d3 from "d3";
 import {
   nodeAge,
+  nodeChurnFn,
   nodeCumulativeLinesOfCode,
   nodeDepth,
   nodeIndentationFn,
   nodeLocData,
-  nodeNumberOfChangers,
-  nodeChurnFn
+  nodeNumberOfChangers
 } from "./nodeData";
-import { numberOfChangersScale } from "./ColourScales";
+import {numberOfChangersScale} from "./ColourScales";
+import {dateToUnix, unixToDate} from "./datetimes";
 
 function buildLanguageFn(languages, config) {
   const { languageMap } = languages;
@@ -286,6 +287,115 @@ const draw = (d3Container, files, languages, state, dispatch) => {
   );
 };
 
+function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
+  const { config, expensiveConfig } = state;
+  const { dateRange: {earliest, latest}} = expensiveConfig;
+
+  console.log("draw timescale dates", earliest, latest);
+
+  const margin = { left: 5, right: 5, bottom: 20, top: 10 };
+  const height = 100;
+
+  if (!d3TimescaleContainer.current) {
+    console.warn("in drawTimescale but d3TimescaleContainer not yet current");
+    return;
+  }
+  const vizEl = d3TimescaleContainer.current;
+  // console.log(vizEl);
+  const width = vizEl.clientWidth;
+  const svg = d3
+    .select(vizEl)
+    .attr("viewBox", [0, 0, width, height])
+    .style("height", `${height}px`);
+
+  const valueFn = d => d.commits; // abstracted so we can pick a differnt one
+
+  // we might simplify these, from an overly generic example
+  const area = (x, y) =>
+    d3
+      .area()
+      // .defined(d => !isNaN(valueFn(d)))
+      .x(d => x(d.day))
+      .y0(y(0))
+      .y1(d => {
+        // console.log("y of", d, valueFn(d), y(valueFn(d)));
+        return y(valueFn(d));
+      });
+
+  const yMax = d3.max(timescaleData, valueFn);
+
+  const xScale = d3
+    .scaleUtc()
+    .domain(d3.extent(timescaleData, d => d.day))
+    .range([margin.left, width - margin.right, width]);
+  const yScale = d3
+    .scaleLinear()
+    .domain([0, yMax])
+    .range([height - margin.bottom, margin.top]);
+
+  const xAxis = (g, x, h) =>
+    g.attr("transform", `translate(0,${h - margin.bottom})`).call(
+      d3
+        .axisBottom(x)
+        .ticks(width / 80)
+        .tickSizeOuter(0)
+    );
+
+  const brush = d3
+    .brushX()
+    .extent([
+      [margin.left, 0.5],
+      [width - margin.right, height - margin.bottom + 0.5]
+    ])
+    .on("brush", () => {
+      console.log("brush ignored");
+    })
+    .on("end", () => {
+      if (d3.event.selection) {
+        console.log("Updating date range?");
+        const [startDate, endDate] = d3.event.selection.map(x => xScale.invert(x)).map(dateToUnix);
+        if (startDate !== expensiveConfig.dateRange.earliest || endDate !== expensiveConfig.dateRange.latest) {
+          console.log("Date change", startDate, endDate, expensiveConfig.dateRange);
+        dispatch({type: "setDateRange", payload: [startDate, endDate]});
+        }
+      }
+    });
+
+  const selection = [
+    xScale(unixToDate(earliest)),
+    xScale(unixToDate(latest))
+  ];
+
+  // update or draw x axis - using join as an experiment so we don't keep appending new axes on redraw
+  svg
+    .selectAll("g.x-axis")
+    .data([null])
+    .join(enter =>
+      enter
+        .append("g")
+        .classed("x-axis", true)
+        .call(xAxis, xScale, height)
+    );
+
+  svg
+    .selectAll("path.foo")
+    .data([timescaleData])
+    .join(enter => enter.append("path").classed("foo", true))
+    .attr("fill", "steelblue")
+    .attr("d", area(xScale, yScale));
+
+  svg
+    .selectAll("g.brush")
+    .data([null])
+    .join(enter =>
+      enter
+        .append("g")
+        .classed("brush", true)
+        .call(brush)
+    )
+    .call(brush.move, selection);
+}
+
 // see https://stackoverflow.com/questions/53446020/how-to-compare-oldvalues-and-newvalues-on-react-hooks-useeffect
 function usePrevious(value) {
   const ref = useRef();
@@ -297,6 +407,7 @@ function usePrevious(value) {
 
 const Viz = props => {
   const d3Container = useRef(null);
+  const d3TimescaleContainer = useRef(null);
   const {
     data,
     state,
@@ -305,11 +416,10 @@ const Viz = props => {
   } = props;
 
   const {
-    metadata: { languages },
+    metadata: { languages, timescaleData },
     files
   } = data.current;
 
-  // TODO: should usePrevious include 'files' ? remove it and let's see.
   const prevState = usePrevious({ config, expensiveConfig });
 
   useEffect(() => {
@@ -319,6 +429,7 @@ const Viz = props => {
     ) {
       console.log("expensive config change - rebuild all");
       draw(d3Container, files, languages, state, dispatch);
+      drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch);
     } else if (prevState.config !== config) {
       console.log("cheap config change - just redraw");
       update(d3Container, files, languages, state);
@@ -333,6 +444,7 @@ const Viz = props => {
       <svg ref={d3Container}>
         <g className="topGroup" />
       </svg>
+      <svg ref={d3TimescaleContainer} />
     </aside>
   );
 };
