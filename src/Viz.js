@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import React, {useEffect, useRef} from "react";
+import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import {
   nodeAge,
@@ -10,8 +10,8 @@ import {
   nodeLocData,
   nodeNumberOfChangers
 } from "./nodeData";
-import {numberOfChangersScale} from "./ColourScales";
-import {dateToUnix, unixToDate} from "./datetimes";
+import { numberOfChangersScale } from "./ColourScales";
+import { dateToUnix, unixToDate } from "./datetimes";
 
 function buildLanguageFn(languages, config) {
   const { languageMap } = languages;
@@ -76,8 +76,8 @@ function buildNumberOfChangersFn(config, expensiveConfig) {
 
     const value = nodeNumberOfChangers(
       d,
-      expensiveConfig.dateRange.earliest,
-      expensiveConfig.dateRange.latest
+      config.dateRange.earliest,
+      config.dateRange.latest
     );
 
     return value === undefined ? neutralColour : scale(value);
@@ -289,7 +289,9 @@ const draw = (d3Container, files, languages, state, dispatch) => {
 
 function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
   const { config, expensiveConfig } = state;
-  const { dateRange: {earliest, latest}} = expensiveConfig;
+  const {
+    dateRange: { earliest, latest }
+  } = config;
 
   console.log("draw timescale dates", earliest, latest);
 
@@ -353,18 +355,17 @@ function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
     .on("end", () => {
       if (d3.event.selection) {
         console.log("Updating date range?");
-        const [startDate, endDate] = d3.event.selection.map(x => xScale.invert(x)).map(dateToUnix);
-        if (startDate !== expensiveConfig.dateRange.earliest || endDate !== expensiveConfig.dateRange.latest) {
-          console.log("Date change", startDate, endDate, expensiveConfig.dateRange);
-        dispatch({type: "setDateRange", payload: [startDate, endDate]});
+        const [startDate, endDate] = d3.event.selection
+          .map(x => xScale.invert(x))
+          .map(dateToUnix);
+        if (startDate !== earliest || endDate !== latest) {
+          // console.log("Date change", startDate, endDate, earliest, latest);
+          dispatch({ type: "setDateRange", payload: [startDate, endDate] });
         }
       }
     });
 
-  const selection = [
-    xScale(unixToDate(earliest)),
-    xScale(unixToDate(latest))
-  ];
+  const selection = [xScale(unixToDate(earliest)), xScale(unixToDate(latest))];
 
   // update or draw x axis - using join as an experiment so we don't keep appending new axes on redraw
   svg

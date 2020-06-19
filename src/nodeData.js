@@ -177,8 +177,8 @@ export function nodeChurnFn(config, expensiveConfig) {
       return d => {
         const data = nodeChurnData(
           d,
-          expensiveConfig.dateRange.earliest,
-          expensiveConfig.dateRange.latest
+          config.dateRange.earliest,
+          config.dateRange.latest
         );
         if (!data) return undefined;
         return data.fractionalLines;
@@ -187,8 +187,8 @@ export function nodeChurnFn(config, expensiveConfig) {
       return d => {
         const data = nodeChurnData(
           d,
-          expensiveConfig.dateRange.earliest,
-          expensiveConfig.dateRange.latest
+          config.dateRange.earliest,
+          config.dateRange.latest
         );
         if (!data) return undefined;
         return data.fractionalDays;
@@ -197,8 +197,8 @@ export function nodeChurnFn(config, expensiveConfig) {
       return d => {
         const data = nodeChurnData(
           d,
-          expensiveConfig.dateRange.earliest,
-          expensiveConfig.dateRange.latest
+          config.dateRange.earliest,
+          config.dateRange.latest
         );
         if (!data) return undefined;
         return data.fractionalCommits;

@@ -57,8 +57,8 @@ const Controller = props => {
   ];
   const numberOfChangersKey = buildNumberOfChangersKey(state);
 
-  const earliestDate = humanizeDate(expensiveConfig.dateRange.earliest);
-  const latestDate = humanizeDate(expensiveConfig.dateRange.latest);
+  const earliestDate = humanizeDate(config.dateRange.earliest);
+  const latestDate = humanizeDate(config.dateRange.latest);
 
   function renderVizDetails(visualization) {
     switch (visualization) {

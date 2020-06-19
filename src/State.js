@@ -137,14 +137,14 @@ function initialiseGlobalState(initialData) {
         neutralColour: "#808080",
         circlePackBackground: "#111111"
       },
-      selectedNode: null
-    },
-    expensiveConfig: {
-      depth: Math.min(8, maxDepth),
       dateRange: {
         earliest,
         latest: latestCommit
-      }
+      },
+      selectedNode: null
+    },
+    expensiveConfig: {
+      depth: Math.min(8, maxDepth)
     },
     stats: {
       maxDepth,
@@ -186,8 +186,8 @@ function globalDispatchReducer(state, action) {
       console.log("Setting dates", action.payload);
       const [early, late] = action.payload;
       const result = _.cloneDeep(state);
-      result.expensiveConfig.dateRange.earliest = early;
-      result.expensiveConfig.dateRange.latest = late;
+      result.config.dateRange.earliest = early;
+      result.config.dateRange.latest = late;
       return result;
     }
     default:

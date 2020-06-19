@@ -115,7 +115,7 @@ const NodeInspector = props => {
   const locData = nodeLocData(node);
   const indentationData = nodeIndentationData(node);
   const gitUrl = findGitUrl(node);
-  const { earliest, latest } = state.expensiveConfig.dateRange;
+  const { earliest, latest } = state.config.dateRange;
   const { topChangersCount } = state.config.numberOfChangers;
   const changerCount = nodeNumberOfChangers(node, earliest, latest);
   const topChangers = nodeTopChangers(node, earliest, latest, topChangersCount);
