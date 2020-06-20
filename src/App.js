@@ -1,12 +1,16 @@
 /* eslint-disable react/prop-types */
 // as prop-types seem painful to implement without going full typescript
-import React, {useReducer, useRef} from "react";
+import React, { useReducer, useRef } from "react";
 import "./App.css";
 import Controller from "./Controller";
 import Inspector from "./Inspector";
 import Viz from "./Viz";
-import {globalDispatchReducer, initialiseGlobalState} from "./State";
-import {countLanguagesIn, gatherTimescaleData, gatherGlobalStats} from "./preprocess";
+import { globalDispatchReducer, initialiseGlobalState } from "./State";
+import {
+  countLanguagesIn,
+  gatherTimescaleData,
+  gatherGlobalStats
+} from "./preprocess";
 
 const App = props => {
   // eslint-disable-next-line react/prop-types
@@ -16,7 +20,7 @@ const App = props => {
   console.log("postprocessing global stats");
   const stats = gatherGlobalStats(rawData);
   console.log("building date scale data");
-  const timescaleData = gatherTimescaleData(rawData,"week");
+  const timescaleData = gatherTimescaleData(rawData, "week");
   console.log("postprocessing complete");
   const { users } = rawData.data.git_meta;
   const metadata = {
