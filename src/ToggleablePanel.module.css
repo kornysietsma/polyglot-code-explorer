@@ -1,0 +1,27 @@
+.panel_shown {
+    border-style: solid;
+    border-width: 1px;
+    border-color: #505050;
+    padding: 2px;
+    margin: 2px;
+}
+.panel_shown h4 {
+    margin-top: 0px;
+    margin-bottom: 0px;
+}
+.panel_hidden {
+    border-style: dotted;
+    border-width: 1px;
+    border-color: #505050;
+    padding: 2px;
+    margin: 2px;
+}
+.panel_hidden h4 {
+    margin-top: 0px;
+    margin-bottom: 0px;
+}
+.panel_hidden_borderless {}
+.panel_hidden_borderless h4 {
+    margin-top: 0px;
+    margin-bottom: 0px;
+}

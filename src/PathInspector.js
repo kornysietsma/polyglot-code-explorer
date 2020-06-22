@@ -21,7 +21,8 @@ const PathInspector = props => {
       <ul className={styles.pathlist}>
         {parents.map(parent => (
           <li key={parent.data.path}>
-            <button type="button"
+            <button
+              type="button"
               onClick={() =>
                 dispatch({
                   type: "selectNode",

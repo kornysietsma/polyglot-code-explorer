@@ -16,6 +16,7 @@ import {
   nodeCreationDate
 } from "./nodeData";
 import { humanizeDate } from "./datetimes";
+import ToggleablePanel from "./ToggleablePanel";
 
 function findGitUrl(node) {
   let suffix = node.data.name;
@@ -79,8 +80,7 @@ function churnReport(churnData) {
     fractionalDays
   } = churnData;
   return (
-    <div>
-      <h5>Code churn</h5>
+    <ToggleablePanel title="Code Churn" showInitially>
       <table>
         <thead>
           <th>Metric</th>
@@ -105,7 +105,26 @@ function churnReport(churnData) {
           </tr>
         </tbody>
       </table>
-    </div>
+      <ToggleablePanel
+        title=""
+        showInitially={false}
+        showText="help"
+        borderlessIfHidden
+      >
+        <p>
+          Code Churn shows how often the code has changed in the selected date
+          range
+        </p>
+        <p>
+          We show the number of days that had any changes, the total number of
+          changes, and the total lines changed (added + deleted)
+        </p>
+        <p>
+          These values are divided by the number of days selected, so you can
+          have meaningful comparisons of rates of change with other timescales
+        </p>
+      </ToggleablePanel>
+    </ToggleablePanel>
   );
 }
 
