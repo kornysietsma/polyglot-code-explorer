@@ -17,6 +17,7 @@ import {
 } from "./nodeData";
 import { humanizeDate } from "./datetimes";
 import ToggleablePanel from "./ToggleablePanel";
+import HelpPanel from "./HelpPanel";
 
 function findGitUrl(node) {
   let suffix = node.data.name;
@@ -105,12 +106,7 @@ function churnReport(churnData) {
           </tr>
         </tbody>
       </table>
-      <ToggleablePanel
-        title=""
-        showInitially={false}
-        showText="help"
-        borderlessIfHidden
-      >
+      <HelpPanel>
         <p>
           Code Churn shows how often the code has changed in the selected date
           range
@@ -123,7 +119,7 @@ function churnReport(churnData) {
           These values are divided by the number of days selected, so you can
           have meaningful comparisons of rates of change with other timescales
         </p>
-      </ToggleablePanel>
+      </HelpPanel>
     </ToggleablePanel>
   );
 }

@@ -16,11 +16,11 @@ const ToggleablePanel = props => {
   console.log("show results", showResults);
   const onClick = () => setShowResults(!showResults);
   const hiddenBorderStyle = borderlessIfHidden
-    ? styles.panel_hidden_borderless
-    : styles.panel_hidden;
+    ? styles.borderless
+    : styles.hidden;
   if (!showResults) {
     return (
-      <div className={hiddenBorderStyle}>
+      <div className={`${styles.panel} ${hiddenBorderStyle}`}>
         <h4>
           {title}{" "}
           <button type="button" onClick={onClick}>
@@ -31,7 +31,7 @@ const ToggleablePanel = props => {
     );
   }
   return (
-    <div className={styles.panel_shown}>
+    <div className={`${styles.panel} ${styles.shown}`}>
       <h4>
         {title}{" "}
         <button type="button" onClick={onClick}>
