@@ -8,14 +8,34 @@ import {
   nodeDepth,
   nodeIndentationFn,
   nodeLocData,
-  nodeNumberOfChangers
+  nodeNumberOfChangers,
+  nodeCreationDate,
+  nodeCreationDaysAgo
 } from "./nodeData";
-import { numberOfChangersScale } from "./ColourScales";
+import {
+  numberOfChangersScale,
+  lowHighScale,
+  goodBadUglyScale
+} from "./ColourScales";
 import { dateToUnix, unixToDate } from "./datetimes";
+
+// overrides most other colours - mostly top-level circle packed background, and files that don't exist yet
+// returns a colour, or undefined if there is no override
+function overrideColourFunction(node, config) {
+  const { nonexistentColour, circlePackBackground } = config.colours;
+  const { latest } = config.dateRange;
+
+  if (node.data.layout.algorithm === "circlePack") return circlePackBackground;
+  const creationDate = nodeCreationDate(node);
+  if (creationDate && creationDate > latest) return nonexistentColour;
+  return undefined;
+}
 
 function buildLanguageFn(languages, config) {
   const { languageMap } = languages;
   return d => {
+    const override = overrideColourFunction(d, config);
+    if (override) return override;
     const loc = nodeLocData(d);
     if (!loc) {
       return config.colours.neutralColour;
@@ -24,26 +44,29 @@ function buildLanguageFn(languages, config) {
   };
 }
 
-function buildGoodBadUglyFnDetailed(dataFn, parentFn, config, good, bad, ugly) {
-  const {
-    goodColour,
-    badColour,
-    uglyColour,
-    neutralColour,
-    circlePackBackground
-  } = config.colours;
+function buildLowHighFn(dataFn, parentFn, config, low, high) {
+  const { neutralColour } = config.colours;
 
-  const goodBadUglyScale = d3
-    .scaleLinear()
-    .domain([good, bad, ugly])
-    .range([goodColour, badColour, uglyColour])
-    .interpolate(d3.interpolateHcl)
-    .clamp(true);
+  const scale = lowHighScale(config, low, high);
+
   return d => {
-    if (d.data.layout.algorithm === "circlePack") return circlePackBackground;
+    const override = overrideColourFunction(d, config);
+    if (override) return override;
+    const value = d.children ? parentFn(d) : dataFn(d);
+    return value === undefined ? neutralColour : scale(value);
+  };
+}
+
+function buildGoodBadUglyFnDetailed(dataFn, parentFn, config, good, bad, ugly) {
+  const { neutralColour } = config.colours;
+
+  const scale = goodBadUglyScale(config, good, bad, ugly);
+  return d => {
+    const override = overrideColourFunction(d, config);
+    if (override) return override;
     const value = d.children ? parentFn(d) : dataFn(d);
 
-    return value === undefined ? neutralColour : goodBadUglyScale(value);
+    return value === undefined ? neutralColour : scale(value);
   };
 }
 
@@ -67,11 +90,12 @@ function buildChurnFn(config, expensiveConfig) {
 }
 
 function buildNumberOfChangersFn(config, expensiveConfig) {
-  const { neutralColour, circlePackBackground } = config.colours;
+  const { neutralColour } = config.colours;
 
   const scale = numberOfChangersScale(config);
   return d => {
-    if (d.data.layout.algorithm === "circlePack") return circlePackBackground;
+    const override = overrideColourFunction(d, config);
+    if (override) return override;
     if (d.children) return neutralColour; // no changers yet for dirs
 
     const value = nodeNumberOfChangers(
@@ -85,19 +109,23 @@ function buildNumberOfChangersFn(config, expensiveConfig) {
 }
 
 function buildDepthColourFn(depthFn, config, stats) {
-  const { neutralColour, circlePackBackground } = config.colours;
+  const { neutralColour } = config.colours;
   const scale = d3
     .scaleSequential(d3.interpolatePlasma)
     .domain([0, stats.maxDepth])
     .clamp(true);
   return d => {
-    if (d.data.layout.algorithm === "circlePack") return circlePackBackground;
+    const override = overrideColourFunction(d, config);
+    if (override) return override;
     const value = depthFn(d);
     return value === undefined ? neutralColour : scale(value);
   };
 }
 
 function buildFillFunctions(config, expensiveConfig, stats, languages) {
+  const {
+    dateRange: { earliest, latest }
+  } = config;
   return {
     loc: buildGoodBadUglyFn(
       nodeCumulativeLinesOfCode,
@@ -113,10 +141,17 @@ function buildFillFunctions(config, expensiveConfig, stats, languages) {
       "indentation"
     ),
     age: buildGoodBadUglyFn(
-      nodeAge,
+      d => nodeAge(d, earliest, latest),
       () => 0, // TODO: better parent handling
       config,
       "age"
+    ),
+    creation: buildLowHighFn(
+      d => nodeCreationDaysAgo(d, earliest, latest),
+      () => undefined,
+      config,
+      0,
+      (latest - earliest) / (24 * 60 * 60)
     ),
     language: buildLanguageFn(languages, config),
     numberOfChangers: buildNumberOfChangersFn(config, expensiveConfig),

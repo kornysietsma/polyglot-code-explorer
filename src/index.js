@@ -8,19 +8,16 @@ import * as serviceWorker from "./serviceWorker";
 const xhttp = new XMLHttpRequest();
 let data = {};
 xhttp.onreadystatechange = function() {
-    console.log('loaded raw data');
+  console.log("loaded raw data");
   if (this.readyState === 4 && this.status === 200) {
-      console.log('loading app');
+    console.log("loading app");
     // load up the raw data when it is available
     data = JSON.parse(xhttp.responseText);
-    ReactDOM.render(
-      <App rawData={data} />,
-      document.getElementById("root")
-    );
+    ReactDOM.render(<App rawData={data} />, document.getElementById("root"));
   }
 };
 
-const dataFile = process.env.REACT_APP_LATI_DATA || 'default';
+const dataFile = process.env.REACT_APP_LATI_DATA || "default";
 
 xhttp.open("GET", `${process.env.PUBLIC_URL}/data/${dataFile}.json`, true);
 xhttp.send();

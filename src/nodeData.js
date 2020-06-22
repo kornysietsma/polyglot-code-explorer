@@ -67,11 +67,22 @@ export function nodeGitData(node) {
   return data.git;
 }
 
-export function nodeAge(node) {
+export function nodeCreationDate(node) {
   const git = nodeGitData(node);
   if (!git) return undefined;
 
-  return git.age_in_days;
+  return git.creation_date;
+}
+
+export function nodeCreationDaysAgo(node, earliest, latest) {
+  const creationDate = nodeCreationDate(node);
+  if (!creationDate) return undefined;
+  if (creationDate > latest) return undefined;
+  if (creationDate < earliest) return undefined;
+
+  const result = Math.ceil((latest - creationDate) / (24 * 60 * 60));
+  console.log("creation days ago", result);
+  return result;
 }
 
 export function nodeRemoteUrl(node) {
@@ -118,6 +129,18 @@ function nodeChangeDetails(node, earliest, latest) {
   return details.filter(
     d => d.commit_day >= earliest && d.commit_day <= latest
   );
+}
+
+export function nodeLastCommitDay(node, earliest, latest) {
+  const details = nodeChangeDetails(node, earliest, latest);
+  if (!details || details.length === 0) return undefined; // TODO: distinguish no history from undefined!
+  return details[details.length - 1].commit_day;
+}
+
+export function nodeAge(node, earliest, latest) {
+  const lastCommit = nodeLastCommitDay(node, earliest, latest);
+  if (!lastCommit) return undefined;
+  return Math.ceil((latest - lastCommit) / (24 * 60 * 60));
 }
 
 export function nodeTopChangers(node, earliest, latest, maxPeople) {

@@ -1,6 +1,11 @@
-# Korny's d3 react playground
+# Polyglot Code Explorer
 
-This is the base project for my react-ising my d3 visualizations.
+This is the base project for my react-ising my d3 source code visualizations.
+
+*Note* if you stumble across this - it needs two other projects to generate the JSON file, and calculate the layouts - and I haven't documented those or checked them in - so it's not useable at the moment except for exploring.
+
+*This is a work in progress, more docs to come*
+
 
 A few key concepts:
 
@@ -42,7 +47,7 @@ On a UI triggered change:
 
 ## Running with a particular data file
 
-Initially I had data files in `src/data/flare.jso` loaded with
+Initially I had data files in `src/data/flare.json` loaded with
 
 ```js
 import rawData from "./data/flare.json";

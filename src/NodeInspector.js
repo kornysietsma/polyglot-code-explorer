@@ -3,6 +3,7 @@ import React from "react";
 import PathInspector from "./PathInspector";
 import {
   nodeAge,
+  nodeLastCommitDay,
   nodeGitData,
   nodeIndentation,
   nodeIndentationData,
@@ -11,7 +12,8 @@ import {
   nodeRemoteHead,
   nodeRemoteUrl,
   nodeTopChangers,
-  nodeChurnData
+  nodeChurnData,
+  nodeCreationDate
 } from "./nodeData";
 import { humanizeDate } from "./datetimes";
 
@@ -109,14 +111,25 @@ function churnReport(churnData) {
 
 const NodeInspector = props => {
   const { node, dispatch, state, metadata } = props;
-  const age = nodeAge(node);
-  const humanAge = humanizeDays(age);
-  const ageText = `file last changed ${age} days ago (${humanAge})`;
   const locData = nodeLocData(node);
   const indentationData = nodeIndentationData(node);
   const gitUrl = findGitUrl(node);
   const { earliest, latest } = state.config.dateRange;
   const { topChangersCount } = state.config.numberOfChangers;
+  const age = nodeAge(node, earliest, latest);
+  const lastCommit = nodeLastCommitDay(node, earliest, latest);
+  const creationDate = nodeCreationDate(node, earliest, latest);
+  let creationText = creationDate
+    ? `File created on ${humanizeDate(creationDate)}`
+    : "";
+  if (creationDate && creationDate > latest) {
+    creationText += " (after current date selection)";
+  }
+  const ageText = age
+    ? `file last changed ${age} days ago on ${humanizeDate(
+        lastCommit
+      )} (${humanizeDays(age)})`
+    : "";
   const changerCount = nodeNumberOfChangers(node, earliest, latest);
   const topChangers = nodeTopChangers(node, earliest, latest, topChangersCount);
   const userName = userId => {
@@ -184,9 +197,10 @@ const NodeInspector = props => {
       ) : (
         ""
       )}
-      {age ? <p>{ageText}</p> : ""}
       <h4>
         Based on date range {humanizeDate(earliest)} to {humanizeDate(latest)}
+        {creationDate ? <p>{creationText}</p> : "(not created in this range)"}
+        {age ? <p>{ageText}</p> : ""}
       </h4>
       {changerCount ? <h5>Unique changers: {changerCount}</h5> : ""}
       {topChangerTable}

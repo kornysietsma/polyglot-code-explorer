@@ -1,5 +1,5 @@
 import _ from "lodash";
-import moment from "moment";
+import moment, { unix } from "moment";
 
 function setIndentationMetric(state, metric) {
   const result = _.cloneDeep(state);
@@ -112,6 +112,12 @@ function initialiseGlobalState(initialData) {
         maxAge: 365 * 2,
         precision: 0
       },
+      creation: {
+        // these are not needed - using selection!
+        low: 0,
+        high: Math.floor((latestCommit - earliestCommit) / (24 * 60 * 60)),
+        precision: 0
+      },
       numberOfChangers: {
         // more of a colour thing than a scale really
         noChangersColour: "cyan",
@@ -134,7 +140,10 @@ function initialiseGlobalState(initialData) {
         goodColour: "blue",
         badColour: "red",
         uglyColour: "yellow",
+        lowColour: "blue",
+        highColour: "green",
         neutralColour: "#808080",
+        nonexistentColour: "#111111",
         circlePackBackground: "#111111"
       },
       dateRange: {

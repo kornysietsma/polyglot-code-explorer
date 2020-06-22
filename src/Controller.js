@@ -6,6 +6,7 @@ import _uniqueId from "lodash/uniqueId";
 import GoodBadUglyKey from "./GoodBadUglyKey";
 import DepthKey from "./DepthKey";
 import ColourKey from "./ColourKey";
+import CreationKey from "./CreationKey";
 import { numberOfChangersScale } from "./ColourScales";
 import { humanizeDate } from "./datetimes";
 
@@ -94,11 +95,25 @@ const Controller = props => {
         );
       case "age":
         return (
-          <GoodBadUglyKey
-            title="Age of code (days)"
-            visualization={visualization}
-            config={config}
-          />
+          <div>
+            <p>As at: {latestDate}</p>
+
+            <GoodBadUglyKey
+              title="Age of last change (days)"
+              visualization={visualization}
+              config={config}
+            />
+          </div>
+        );
+      case "creation":
+        return (
+          <div>
+            <p>As at: {latestDate}</p>
+
+            <CreationKey
+              config={config} state={state}
+            />
+          </div>
         );
       case "depth":
         return <DepthKey config={config} stats={stats} />;
@@ -157,7 +172,8 @@ const Controller = props => {
             <option value="loc">Lines of Code</option>
             <option value="depth">Nesting depth</option>
             <option value="indentation">Indentation</option>
-            <option value="age">Code age</option>
+            <option value="age">Age of last change</option>
+            <option value="creation">Creation date</option>
             <option value="numberOfChangers">Number of changers</option>
             <option value="churn">Churn</option>
           </select>
