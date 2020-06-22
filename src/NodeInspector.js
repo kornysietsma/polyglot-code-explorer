@@ -149,8 +149,8 @@ const NodeInspector = props => {
         <h5>Top {topChangersCount} changers:</h5>
         <table>
           <thead>
-            <td>User</td>
-            <td>Change count</td>
+            <th>User</th>
+            <th>Change count</th>
           </thead>
           <tbody>
             {topChangers.map(([user, count]) => {

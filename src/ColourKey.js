@@ -9,8 +9,8 @@ const ColourKey = props => {
       <table>
         <thead>
           <tr>
-            <td>Value</td>
-            <td>Colour</td>
+            <th>Value</th>
+            <th>Colour</th>
           </tr>
         </thead>
         <tbody>

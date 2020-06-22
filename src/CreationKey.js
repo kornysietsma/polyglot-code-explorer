@@ -13,8 +13,7 @@ const CreationKey = props => {
 
   const scale = earlyLateScale(config, earliest, latest);
 
-  const keyText = value =>
-    `${humanizeDate(value)}`;
+  const keyText = value => `${humanizeDate(value)}`;
 
   const key = [["Outside date range", config.colours.neutralColour]];
   for (let ix = 0; ix <= 20; ix += 1) {
@@ -25,21 +24,25 @@ const CreationKey = props => {
     <div>
       <p>Creation date</p>
       <table>
-        <th>
-          <td>Date</td>
-          <td>Colour</td>
-        </th>
-        {key.map(([value, colour]) => {
-          return (
-            <tr>
-              <td>{value}</td>
-              <td
-                className="colourSample"
-                style={{ backgroundColor: colour, width: "4em" }}
-              />
-            </tr>
-          );
-        })}
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Colour</th>
+          </tr>
+        </thead>
+        <tbody>
+          {key.map(([value, colour]) => {
+            return (
+              <tr>
+                <td>{value}</td>
+                <td
+                  className="colourSample"
+                  style={{ backgroundColor: colour, width: "4em" }}
+                />
+              </tr>
+            );
+          })}
+        </tbody>
       </table>
     </div>
   );
