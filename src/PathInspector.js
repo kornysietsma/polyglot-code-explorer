@@ -2,6 +2,7 @@
 import React from "react";
 import _ from "lodash";
 import styles from "./PathInspector.module.css";
+import ToggleablePanel from "./ToggleablePanel";
 
 const PathInspector = props => {
   const { node, dispatch } = props;
@@ -16,8 +17,7 @@ const PathInspector = props => {
   parents = parents.reverse();
 
   return (
-    <div>
-      <p>Path:</p>
+    <ToggleablePanel title="Path" showInitially>
       <ul className={styles.pathlist}>
         {parents.map(parent => (
           <li key={parent.data.path}>
@@ -35,7 +35,7 @@ const PathInspector = props => {
           </li>
         ))}
       </ul>
-    </div>
+    </ToggleablePanel>
   );
 };
 

@@ -9,6 +9,7 @@ import ColourKey from "./ColourKey";
 import CreationKey from "./CreationKey";
 import { numberOfChangersScale } from "./ColourScales";
 import { humanizeDate } from "./datetimes";
+import HelpPanel from "./HelpPanel";
 
 function buildNumberOfChangersKey(state) {
   const {
@@ -64,10 +65,29 @@ const Controller = props => {
   function renderVizDetails(visualization) {
     switch (visualization) {
       case "language":
-        return <ColourKey title="Languages" keyData={displayedLanguageKey} />;
+        return (
+          <div>
+            <HelpPanel>
+              <p>Shows the most used languages</p>
+            </HelpPanel>
+            <ColourKey title="Languages" keyData={displayedLanguageKey} />
+          </div>
+        );
       case "numberOfChangers":
         return (
           <div>
+            <HelpPanel>
+              <p>
+                Shows unique changers in selected date range. Too few changers
+                might indicate lack of shared understanding of code. Too many
+                changers might indicate poorly designed code that has too many
+                concerns and needs constant change.
+              </p>
+              <p>
+                Note currently there is no way to tell if one user with multiple
+                logins is not multiple people!
+              </p>
+            </HelpPanel>
             <p>
               From: {earliestDate} to {latestDate}
             </p>
@@ -79,24 +99,57 @@ const Controller = props => {
         );
       case "loc":
         return (
-          <GoodBadUglyKey
-            title="Lines of Code"
-            visualization={visualization}
-            config={config}
-          />
+          <div>
+            <HelpPanel>
+              <p>
+                Large lines of code has been shown to be strongly correlated
+                with complexity. Good code &ldquo;fits in your head&rdquo;.
+              </p>
+            </HelpPanel>
+            <GoodBadUglyKey
+              title="Lines of Code"
+              visualization={visualization}
+              config={config}
+            />
+          </div>
         );
       case "indentation":
         return (
-          <GoodBadUglyKey
-            title="Indentation"
-            visualization={visualization}
-            config={config}
-          />
+          <div>
+            <HelpPanel>
+              <p>Code indentation can be correlated with complexity</p>
+              <p>
+                Standard Deviation is a good overall indicator, Total Area (sum
+                of all indentations) also shows large complex files, Worst
+                Indentation highlights files with individual spots of large
+                indentation
+              </p>
+            </HelpPanel>
+            <GoodBadUglyKey
+              title="Indentation"
+              visualization={visualization}
+              config={config}
+            />
+          </div>
         );
       case "age":
         return (
           <div>
-            <p>As at: {latestDate}</p>
+            <HelpPanel>
+              <p>Highlights code which has had no changes for some time.</p>
+              <p>
+                This may indicate code which has not been touched or refactored
+                in a long time, indicating lost knowledge
+              </p>
+              <p>It may also indicate code that is stable and bug-free</p>
+              <p>
+                The meaning may depend on development culture, and quality of
+                tests
+              </p>
+            </HelpPanel>
+            <p>
+              From: {earliestDate} to {latestDate}
+            </p>
 
             <GoodBadUglyKey
               title="Age of last change (days)"
@@ -108,18 +161,55 @@ const Controller = props => {
       case "creation":
         return (
           <div>
-            <p>As at: {latestDate}</p>
+            <HelpPanel>
+              <p>
+                Creation date - only shows files created in the selected date
+                range
+              </p>
+              <p>
+                This isn't really related to quality, but is useful for
+                visualizing code history
+              </p>
+              <p>
+                Note that this is not a true historical view - the layout
+                doesn't change with changing time scales, and deleted files
+                aren't shown even if you select past dates.
+              </p>
+            </HelpPanel>
+            <p>
+              From: {earliestDate} to {latestDate}
+            </p>
 
-            <CreationKey
-              config={config} state={state}
-            />
+            <CreationKey config={config} state={state} />
           </div>
         );
       case "depth":
-        return <DepthKey config={config} stats={stats} />;
+        return (
+          <div>
+            <HelpPanel>
+              <p>Shows nesting depth in the directory tree</p>
+            </HelpPanel>
+            <DepthKey config={config} stats={stats} />
+          </div>
+        );
       case "churn":
         return (
           <div>
+            <HelpPanel>
+              <p>
+                Code Churn shows how often the code has changed in the selected
+                date range
+              </p>
+              <p>
+                You can show the number of days that had any changes, the total
+                number of changes, or the total lines changed (added + deleted)
+              </p>
+              <p>
+                These values are divided by the number of days selected, so you
+                can have meaningful comparisons of rates of change with other
+                timescales
+              </p>
+            </HelpPanel>
             <p>
               From: {earliestDate} to {latestDate}
             </p>

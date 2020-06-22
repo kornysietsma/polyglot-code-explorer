@@ -81,7 +81,7 @@ function churnReport(churnData) {
     fractionalDays
   } = churnData;
   return (
-    <ToggleablePanel title="Code Churn" showInitially>
+    <ToggleablePanel title="Code Churn" showInitially={false}>
       <table>
         <thead>
           <th>Metric</th>
@@ -106,20 +106,6 @@ function churnReport(churnData) {
           </tr>
         </tbody>
       </table>
-      <HelpPanel>
-        <p>
-          Code Churn shows how often the code has changed in the selected date
-          range
-        </p>
-        <p>
-          We show the number of days that had any changes, the total number of
-          changes, and the total lines changed (added + deleted)
-        </p>
-        <p>
-          These values are divided by the number of days selected, so you can
-          have meaningful comparisons of rates of change with other timescales
-        </p>
-      </HelpPanel>
     </ToggleablePanel>
   );
 }
@@ -188,7 +174,7 @@ const NodeInspector = props => {
     <div>
       {gitUrl ? (
         <h3>
-          {node.data.name}
+          {node.data.name}&nbsp;
           <a href={gitUrl} target="#">
             (remote code)
           </a>
@@ -197,28 +183,36 @@ const NodeInspector = props => {
         <h3>{node.data.name}</h3>
       )}
       <PathInspector node={node} dispatch={dispatch} />
-      <p>File type: {locData.language}</p>
-      <p>Lines of code: {locData.code}</p>
+      <p>
+        Selected date range {humanizeDate(earliest)} to {humanizeDate(latest)}
+      </p>
+
+      <ToggleablePanel title="basic stats" showInitially>
+        <p>File type: {locData.language}</p>
+        <p>Lines of code: {locData.code}</p>
+        {creationDate ? (
+          <p>{creationText}</p>
+        ) : (
+          "(not created in selected range)"
+        )}
+        {age ? <p>{ageText}</p> : ""}
+      </ToggleablePanel>
       {indentationData ? (
-        <p>
-          Indentation:
+        <ToggleablePanel title="Indentation" showInitially={false}>
           <ul>
             <li>stddev: {indentationData.stddev}</li>
             <li>p90: {indentationData.p90}</li>
             <li>worst: {indentationData.p99}</li>
             <li>area: {indentationData.sum}</li>
           </ul>
-        </p>
+        </ToggleablePanel>
       ) : (
         ""
       )}
-      <h4>
-        Based on date range {humanizeDate(earliest)} to {humanizeDate(latest)}
-        {creationDate ? <p>{creationText}</p> : "(not created in this range)"}
-        {age ? <p>{ageText}</p> : ""}
-      </h4>
-      {changerCount ? <h5>Unique changers: {changerCount}</h5> : ""}
-      {topChangerTable}
+      <ToggleablePanel title="file changers" showInitially={false}>
+        {changerCount ? <h5>Unique changers: {changerCount}</h5> : ""}
+        {topChangerTable}
+      </ToggleablePanel>
       {churnReport(churnData)}
     </div>
   );
