@@ -10,11 +10,11 @@ import {
   nodeLocData,
   nodeNumberOfChangers,
   nodeCreationDate,
-  nodeCreationDaysAgo
+  nodeCreationDateClipped
 } from "./nodeData";
 import {
   numberOfChangersScale,
-  lowHighScale,
+  earlyLateScale,
   goodBadUglyScale
 } from "./ColourScales";
 import { dateToUnix, unixToDate } from "./datetimes";
@@ -44,10 +44,10 @@ function buildLanguageFn(languages, config) {
   };
 }
 
-function buildLowHighFn(dataFn, parentFn, config, low, high) {
+function buildEarlyLateFn(dataFn, parentFn, config, early, late) {
   const { neutralColour } = config.colours;
 
-  const scale = lowHighScale(config, low, high);
+  const scale = earlyLateScale(config, early, late);
 
   return d => {
     const override = overrideColourFunction(d, config);
@@ -146,12 +146,12 @@ function buildFillFunctions(config, expensiveConfig, stats, languages) {
       config,
       "age"
     ),
-    creation: buildLowHighFn(
-      d => nodeCreationDaysAgo(d, earliest, latest),
+    creation: buildEarlyLateFn(
+      d => nodeCreationDateClipped(d, earliest, latest),
       () => undefined,
       config,
-      0,
-      (latest - earliest) / (24 * 60 * 60)
+      earliest,
+      latest
     ),
     language: buildLanguageFn(languages, config),
     numberOfChangers: buildNumberOfChangersFn(config, expensiveConfig),

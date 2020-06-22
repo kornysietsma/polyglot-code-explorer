@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types */
 import React from "react";
 import * as d3 from "d3";
-import { lowHighScale } from "./ColourScales";
+import { earlyLateScale } from "./ColourScales";
 import { humanizeDate } from "./datetimes";
 
 const CreationKey = props => {
@@ -9,24 +9,24 @@ const CreationKey = props => {
   const {
     dateRange: { earliest, latest }
   } = config;
-  const maxAge = (latest - earliest) / (24 * 60 * 60);
+  const dateRange = latest - earliest;
 
-  const scale = lowHighScale(config, 0, maxAge);
+  const scale = earlyLateScale(config, earliest, latest);
 
   const keyText = value =>
-    `${Math.floor(value)} (${humanizeDate(latest - value * (24 * 60 * 60))})`;
+    `${humanizeDate(value)}`;
 
   const key = [["Outside date range", config.colours.neutralColour]];
   for (let ix = 0; ix <= 20; ix += 1) {
-    const age = Math.floor((ix * maxAge) / 20);
+    const age = earliest + Math.floor((ix * dateRange) / 20);
     key.push([keyText(age), scale(age)]);
   }
   return (
     <div>
-      <p>Creation age in days</p>
+      <p>Creation date</p>
       <table>
         <th>
-          <td>Age</td>
+          <td>Date</td>
           <td>Colour</td>
         </th>
         {key.map(([value, colour]) => {

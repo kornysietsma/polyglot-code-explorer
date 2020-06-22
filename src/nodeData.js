@@ -74,15 +74,12 @@ export function nodeCreationDate(node) {
   return git.creation_date;
 }
 
-export function nodeCreationDaysAgo(node, earliest, latest) {
+export function nodeCreationDateClipped(node, earliest, latest) {
   const creationDate = nodeCreationDate(node);
   if (!creationDate) return undefined;
   if (creationDate > latest) return undefined;
   if (creationDate < earliest) return undefined;
-
-  const result = Math.ceil((latest - creationDate) / (24 * 60 * 60));
-  console.log("creation days ago", result);
-  return result;
+  return creationDate;
 }
 
 export function nodeRemoteUrl(node) {

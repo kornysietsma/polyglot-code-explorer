@@ -23,12 +23,12 @@ export function numberOfChangersScale(config) {
     .clamp(true);
 }
 
-export function lowHighScale(config, low, high) {
-  const { lowColour, highColour } = config.colours;
+export function earlyLateScale(config, early, late) {
+  const { earlyColour, lateColour } = config.colours;
   return d3
     .scaleLinear()
-    .domain([low, high])
-    .range([lowColour, highColour])
+    .domain([early, late])
+    .range([earlyColour, lateColour])
     .interpolate(d3.interpolateHcl)
     .clamp(true);
 }

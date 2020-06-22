@@ -140,8 +140,8 @@ function initialiseGlobalState(initialData) {
         goodColour: "blue",
         badColour: "red",
         uglyColour: "yellow",
-        lowColour: "blue",
-        highColour: "green",
+        earlyColour: "blue",
+        lateColour: "green",
         neutralColour: "#808080",
         nonexistentColour: "#111111",
         circlePackBackground: "#111111"
