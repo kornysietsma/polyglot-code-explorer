@@ -3,21 +3,18 @@ import React from "react";
 import PathInspector from "./PathInspector";
 import {
   nodeAge,
-  nodeLastCommitDay,
-  nodeGitData,
-  nodeIndentation,
+  nodeChurnData,
+  nodeCreationDate,
   nodeIndentationData,
+  nodeLastCommitDay,
   nodeLocData,
   nodeNumberOfChangers,
   nodeRemoteHead,
   nodeRemoteUrl,
-  nodeTopChangers,
-  nodeChurnData,
-  nodeCreationDate
+  nodeTopChangers
 } from "./nodeData";
-import { humanizeDate } from "./datetimes";
+import {humanizeDate, humanizeDays} from "./datetimes";
 import ToggleablePanel from "./ToggleablePanel";
-import HelpPanel from "./HelpPanel";
 
 function findGitUrl(node) {
   let suffix = node.data.name;
@@ -45,29 +42,6 @@ function findGitUrl(node) {
     return `${remote}/blob/master/${suffix}`;
   }
   return undefined;
-}
-
-function humanizeDays(days) {
-  let daysRemaining = days;
-  let years = 0;
-  let weeks = 0; // no months, as they are not really precise
-  if (daysRemaining > 365) {
-    years = Math.floor(daysRemaining / 365);
-    daysRemaining %= 365;
-  }
-  if (daysRemaining > 7) {
-    weeks = Math.floor(daysRemaining / 7);
-    daysRemaining %= 7;
-  }
-  const yearText =
-    years > 0 ? `${years} year${years > 1 ? "s" : ""}` : undefined;
-  const weekText =
-    weeks > 0 ? `${weeks} week${weeks > 1 ? "s" : ""}` : undefined;
-  const dayText =
-    daysRemaining > 0
-      ? `${daysRemaining} day${daysRemaining > 1 ? "s" : ""}`
-      : undefined;
-  return [yearText, weekText, dayText].filter(t => t !== undefined).join(", ");
 }
 
 function churnReport(churnData) {

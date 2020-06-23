@@ -279,12 +279,14 @@ const draw = (d3Container, files, languages, state, dispatch) => {
     .selectAll(".cell")
     .data(allNodes, node => node.path);
 
+  // TODO - consider reworking this with d3.join which seems to be the new hotness?
   const newNodes = nodes
     .enter()
     .append("path")
     .classed("cell", true);
 
   redrawPolygons(nodes.merge(newNodes), files, languages, state)
+      // eslint-disable-next-line no-unused-vars
     .on("click", (node, i, nodeList) => {
       // console.log("onClicked", node, i, nodeList[i]);
       dispatch({ type: "selectNode", payload: node });
