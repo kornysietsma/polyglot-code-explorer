@@ -136,13 +136,13 @@ function buildFillFunctions(config, expensiveConfig, stats, languages) {
     depth: buildDepthColourFn(nodeDepth, config, stats),
     indentation: buildGoodBadUglyFn(
       nodeIndentationFn(config),
-      () => undefined, // TODO: better parenting
+      () => undefined,
       config,
       "indentation"
     ),
     age: buildGoodBadUglyFn(
       d => nodeAge(d, earliest, latest),
-      () => 0, // TODO: better parent handling
+      () => undefined,
       config,
       "age"
     ),
@@ -243,15 +243,18 @@ const update = (d3Container, files, languages, state) => {
 
 const draw = (d3Container, files, languages, state, dispatch) => {
   const { config, expensiveConfig } = state;
+  const {
+    layout: { timescaleHeight }
+  } = config;
 
   if (!d3Container.current) {
     console.warn("in draw but d3container not yet current");
     return;
   }
   const vizEl = d3Container.current;
-  // console.log(vizEl);
   const w = vizEl.clientWidth;
-  const h = vizEl.clientHeight;
+  const h = vizEl.clientHeight - timescaleHeight;
+
   const { layout } = files;
   const svg = d3
     .select(vizEl)
@@ -325,20 +328,18 @@ const draw = (d3Container, files, languages, state, dispatch) => {
 function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
   const { config, expensiveConfig } = state;
   const {
-    dateRange: { earliest, latest }
+    dateRange: { earliest, latest },
+    layout: { timescaleHeight }
   } = config;
 
-  console.log("draw timescale dates", earliest, latest);
-
   const margin = { left: 5, right: 5, bottom: 20, top: 10 };
-  const height = 100;
+  const height = timescaleHeight - (margin.bottom + margin.top);
 
   if (!d3TimescaleContainer.current) {
     console.warn("in drawTimescale but d3TimescaleContainer not yet current");
     return;
   }
   const vizEl = d3TimescaleContainer.current;
-  // console.log(vizEl);
   const width = vizEl.clientWidth;
   const svg = d3
     .select(vizEl)
@@ -384,17 +385,15 @@ function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
       [margin.left, 0.5],
       [width - margin.right, height - margin.bottom + 0.5]
     ])
-    .on("brush", () => {
-      console.log("brush ignored");
-    })
+    // .on("brush", () => {
+    //   console.log("brush ignored");
+    // })
     .on("end", () => {
       if (d3.event.selection) {
-        console.log("Updating date range?");
         const [startDate, endDate] = d3.event.selection
           .map(x => xScale.invert(x))
           .map(dateToUnix);
         if (startDate !== earliest || endDate !== latest) {
-          // console.log("Date change", startDate, endDate, earliest, latest);
           dispatch({ type: "setDateRange", payload: [startDate, endDate] });
         }
       }
@@ -414,9 +413,9 @@ function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
     );
 
   svg
-    .selectAll("path.foo")
+    .selectAll("path.graph")
     .data([timescaleData])
-    .join(enter => enter.append("path").classed("foo", true))
+    .join(enter => enter.append("path").classed("graph", true))
     .attr("fill", "steelblue")
     .attr("d", area(xScale, yScale));
 
@@ -477,10 +476,10 @@ const Viz = props => {
 
   return (
     <aside className="Viz">
-      <svg ref={d3Container}>
+      <svg className="chart" ref={d3Container}>
         <g className="topGroup" />
       </svg>
-      <svg ref={d3TimescaleContainer} />
+      <svg className="timescale" ref={d3TimescaleContainer} />
     </aside>
   );
 };

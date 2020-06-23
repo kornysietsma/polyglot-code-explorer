@@ -124,6 +124,11 @@ const Controller = props => {
                 Indentation highlights files with individual spots of large
                 indentation
               </p>
+              <p>
+                Note that inconsistent indentation (e.g. deep indenting which
+                doesn&apos;t relate to code structure) or mixing of tabs/spaces
+                can mess this up. Current code assumes tabs are 4 spaces.
+              </p>
             </HelpPanel>
             <GoodBadUglyKey
               title="Indentation"

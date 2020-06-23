@@ -96,6 +96,9 @@ function initialiseGlobalState(initialData) {
   let defaults = {
     config: {
       visualization: "language",
+      layout: {
+        timescaleHeight: 130 // including margins
+      },
       loc: {
         bad: 1000,
         good: 0,
@@ -161,7 +164,7 @@ function initialiseGlobalState(initialData) {
       churn: { maxLines, maxCommits, maxDays } // duplicate so we can get it later!
     }
   };
-  defaults = setIndentationMetric(defaults, "sum");
+  defaults = setIndentationMetric(defaults, "stddev");
   defaults = setChurnMetric(defaults, "days");
   return defaults;
 }

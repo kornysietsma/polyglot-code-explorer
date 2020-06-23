@@ -5,6 +5,7 @@
 
 .App-header h1 {
   font-size: 2.0rem;
+    margin: 0.3em 0;
 }
 
 /* Should only include top-level layout stuff here -
@@ -14,9 +15,14 @@
   background-color: #010e35;
 }
 
-.Viz > svg {
+/* TODO: fix the grid so we can scale svg area responsively again? */
+.Viz > svg.chart {
   width: 100%;
-  height: 100%;
+  height: 1024px;
+}
+.Viz > svg.timescale {
+    width: 100%;
+    height: 130px;
 }
 .Controller {
   /*background-color: #010e35;*/
@@ -38,7 +44,8 @@
 .Controller { grid-area: controls; }
 .Inspector { grid-area: inspect; }
 
-/* The goal is to have a 1024x768 chart in the middle.
+/* The goal is to have a 1024x1024 chart in the middle.
+  Plus 130px for the timescale.
   If you have room, the inspect and control panels
   will be left and right,
   If not they will be below, on the left and right.
@@ -58,7 +65,7 @@
                          "padding padding padding";
     grid-template-columns: 448px 1024px 448px;
     grid-template-rows: auto
-                        1024px
+                        1154px
                         auto;
     min-height: 100vh;
     justify-content: center;
@@ -71,7 +78,7 @@
                            "controls . inspect";
       grid-template-columns: 448px 128px 448px;
       grid-template-rows: auto
-                          1024px
+                          1154px
                           auto
                           auto;
     }
