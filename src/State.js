@@ -1,77 +1,6 @@
 import _ from "lodash";
 import moment, { unix } from "moment";
-
-function setIndentationMetric(state, metric) {
-  const result = _.cloneDeep(state);
-  switch (metric) {
-    case "sum":
-      _.set(result, ["config", "indentation"], {
-        metric: "sum",
-        bad: 10000,
-        good: 0,
-        ugly: 100000,
-        precision: 0
-      });
-      break;
-    case "p99":
-      _.set(result, ["config", "indentation"], {
-        metric: "p99",
-        bad: 30,
-        good: 0,
-        ugly: 80,
-        precision: 0
-      });
-      break;
-    case "stddev":
-      _.set(result, ["config", "indentation"], {
-        metric: "stddev",
-        bad: 10,
-        good: 3,
-        ugly: 20,
-        precision: 2
-      });
-      break;
-    default:
-      throw Error(`Invalid metric: ${metric}`);
-  }
-  return result;
-}
-
-function setChurnMetric(state, metric) {
-  const result = _.cloneDeep(state);
-  switch (metric) {
-    case "lines":
-      _.set(result, ["config", "churn"], {
-        metric,
-        bad: 10,
-        good: 0,
-        ugly: 100,
-        precision: 2
-      });
-      break;
-    case "days":
-      _.set(result, ["config", "churn"], {
-        metric,
-        bad: 0.1,
-        good: 0,
-        ugly: 0.5,
-        precision: 4
-      });
-      break;
-    case "commits":
-      _.set(result, ["config", "churn"], {
-        metric,
-        bad: 0.1,
-        good: 0,
-        ugly: 1,
-        precision: 4
-      });
-      break;
-    default:
-      throw Error(`Invalid metric: ${metric}`);
-  }
-  return result;
-}
+import VisualizationData from "./visualizationData";
 
 function initialiseGlobalState(initialData) {
   const {
@@ -93,9 +22,10 @@ function initialiseGlobalState(initialData) {
 
   const earliest = twoYearsAgo < earliestCommit ? earliestCommit : twoYearsAgo;
 
-  let defaults = {
+  const defaults = {
     config: {
       visualization: "language",
+      subVis: undefined,
       layout: {
         timescaleHeight: 130 // including margins
       },
@@ -106,7 +36,25 @@ function initialiseGlobalState(initialData) {
         precision: 0 // number of float digits to show
       },
       indentation: {
-        note: "overridden later!"
+        // replace indentation when we've refactored everything
+        sum: {
+          bad: 10000,
+          good: 0,
+          ugly: 100000,
+          precision: 0
+        },
+        p99: {
+          bad: 30,
+          good: 0,
+          ugly: 80,
+          precision: 0
+        },
+        stddev: {
+          bad: 10,
+          good: 3,
+          ugly: 20,
+          precision: 2
+        }
       },
       age: {
         bad: 365,
@@ -121,6 +69,26 @@ function initialiseGlobalState(initialData) {
         high: Math.floor((latestCommit - earliestCommit) / (24 * 60 * 60)),
         precision: 0
       },
+      churn: {
+        lines: {
+          bad: 10,
+          good: 0,
+          ugly: 100,
+          precision: 2
+        },
+        days: {
+          bad: 0.1,
+          good: 0,
+          ugly: 0.5,
+          precision: 4
+        },
+        commits: {
+          bad: 0.1,
+          good: 0,
+          ugly: 1,
+          precision: 4
+        }
+      },
       numberOfChangers: {
         // more of a colour thing than a scale really
         noChangersColour: "cyan",
@@ -133,9 +101,6 @@ function initialiseGlobalState(initialData) {
         manyChangersMax: 30, // starting to feel like a crowd
         precision: 0,
         topChangersCount: 5 // show this many changers in NodeInspector
-      },
-      churn: {
-        note: "overridden later!"
       },
       colours: {
         defaultStroke: "#111111",
@@ -164,21 +129,30 @@ function initialiseGlobalState(initialData) {
       churn: { maxLines, maxCommits, maxDays } // duplicate so we can get it later!
     }
   };
-  defaults = setIndentationMetric(defaults, "stddev");
-  defaults = setChurnMetric(defaults, "days");
   return defaults;
 }
 
 function globalDispatchReducer(state, action) {
   const { expensiveConfig, config } = state;
   switch (action.type) {
-    case "setVisualization":
-      return { ...state, config: { ...config, visualization: action.payload } };
-    case "setIndentationMetric": {
-      const result = _.cloneDeep(state);
-      _.set(result, ["config", "indentation", "metric"], action.payload);
-      return setIndentationMetric(state, action.payload);
+    case "setVisualization": {
+      const visualization = action.payload;
+      const visData = VisualizationData[visualization];
+      if (visData.subVis) {
+        const subVis = visData.defaultChild;
+        return {
+          ...state,
+          config: {
+            ...config,
+            visualization,
+            subVis
+          }
+        };
+      }
+      return { ...state, config: { ...config, visualization } };
     }
+    case "setSubVisualization":
+      return { ...state, config: { ...config, subVis: action.payload } };
     case "setDepth":
       return {
         ...state,
@@ -189,11 +163,7 @@ function globalDispatchReducer(state, action) {
         ...state,
         config: { ...config, selectedNode: action.payload }
       };
-    case "setChurnMetric": {
-      const result = _.cloneDeep(state);
-      _.set(result, ["config", "churn", "metric"], action.payload);
-      return setChurnMetric(state, action.payload);
-    }
+
     case "setDateRange": {
       console.log("Setting dates", action.payload);
       const [early, late] = action.payload;

@@ -1,175 +1,35 @@
 /* eslint-disable react/prop-types */
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
-import {
-  nodeAge,
-  nodeChurnFn,
-  nodeCumulativeLinesOfCode,
-  nodeDepth,
-  nodeIndentationFn,
-  nodeLocData,
-  nodeNumberOfChangers,
-  nodeCreationDate,
-  nodeCreationDateClipped
-} from "./nodeData";
-import {
-  numberOfChangersScale,
-  earlyLateScale,
-  goodBadUglyScale
-} from "./ColourScales";
 import { dateToUnix, unixToDate } from "./datetimes";
+import VisualizationData from "./visualizationData";
 
-// overrides most other colours - mostly top-level circle packed background, and files that don't exist yet
-// returns a colour, or undefined if there is no override
-function overrideColourFunction(node, config) {
-  const { nonexistentColour, circlePackBackground } = config.colours;
-  const { latest } = config.dateRange;
+// TODO: should this live in Visualization.js ?
+function getCurrentVis(config) {
+  const vis = VisualizationData[config.visualization];
 
-  if (node.data.layout.algorithm === "circlePack") return circlePackBackground;
-  const creationDate = nodeCreationDate(node);
-  if (creationDate && creationDate > latest) return nonexistentColour;
-  return undefined;
-}
-
-function buildLanguageFn(languages, config) {
-  const { languageMap } = languages;
-  return d => {
-    const override = overrideColourFunction(d, config);
-    if (override) return override;
-    const loc = nodeLocData(d);
-    if (!loc) {
-      return config.colours.neutralColour;
+  let selected = vis;
+  if (vis.subVis) {
+    if (config.subVis) {
+      selected = vis.children[config.subVis];
+    } else {
+      // can this happen?
+      console.warn("No config.subVis selected - using default");
+      selected = vis.children[vis.defaultChild];
     }
-    return languageMap[loc.language].colour;
-  };
+  }
+  return selected;
 }
 
-function buildEarlyLateFn(dataFn, parentFn, config, early, late) {
-  const { neutralColour } = config.colours;
-
-  const scale = earlyLateScale(config, early, late);
-
-  return d => {
-    const override = overrideColourFunction(d, config);
-    if (override) return override;
-    const value = d.children ? parentFn(d) : dataFn(d);
-    return value === undefined ? neutralColour : scale(value);
-  };
-}
-
-function buildGoodBadUglyFnDetailed(dataFn, parentFn, config, good, bad, ugly) {
-  const { neutralColour } = config.colours;
-
-  const scale = goodBadUglyScale(config, good, bad, ugly);
-  return d => {
-    const override = overrideColourFunction(d, config);
-    if (override) return override;
-    const value = d.children ? parentFn(d) : dataFn(d);
-
-    return value === undefined ? neutralColour : scale(value);
-  };
-}
-
-function buildGoodBadUglyFn(dataFn, parentFn, config, visualization) {
-  const { good, bad, ugly } = config[visualization];
-  return buildGoodBadUglyFnDetailed(dataFn, parentFn, config, good, bad, ugly);
-}
-
-function buildChurnFn(config, expensiveConfig) {
-  const churnDataFn = nodeChurnFn(config, expensiveConfig);
-  const { good, bad, ugly } = config.churn;
-
-  return buildGoodBadUglyFnDetailed(
-    churnDataFn,
-    () => undefined, // TODO: better parenting
-    config,
-    good,
-    bad,
-    ugly
-  );
-}
-
-function buildNumberOfChangersFn(config, expensiveConfig) {
-  const { neutralColour } = config.colours;
-
-  const scale = numberOfChangersScale(config);
-  return d => {
-    const override = overrideColourFunction(d, config);
-    if (override) return override;
-    if (d.children) return neutralColour; // no changers yet for dirs
-
-    const value = nodeNumberOfChangers(
-      d,
-      config.dateRange.earliest,
-      config.dateRange.latest
-    );
-
-    return value === undefined ? neutralColour : scale(value);
-  };
-}
-
-function buildDepthColourFn(depthFn, config, stats) {
-  const { neutralColour } = config.colours;
-  const scale = d3
-    .scaleSequential(d3.interpolatePlasma)
-    .domain([0, stats.maxDepth])
-    .clamp(true);
-  return d => {
-    const override = overrideColourFunction(d, config);
-    if (override) return override;
-    const value = depthFn(d);
-    return value === undefined ? neutralColour : scale(value);
-  };
-}
-
-function buildFillFunctions(config, expensiveConfig, stats, languages) {
-  const {
-    dateRange: { earliest, latest }
-  } = config;
-  return {
-    loc: buildGoodBadUglyFn(
-      nodeCumulativeLinesOfCode,
-      () => undefined,
-      config,
-      "loc"
-    ),
-    depth: buildDepthColourFn(nodeDepth, config, stats),
-    indentation: buildGoodBadUglyFn(
-      nodeIndentationFn(config),
-      () => undefined,
-      config,
-      "indentation"
-    ),
-    age: buildGoodBadUglyFn(
-      d => nodeAge(d, earliest, latest),
-      () => undefined,
-      config,
-      "age"
-    ),
-    creation: buildEarlyLateFn(
-      d => nodeCreationDateClipped(d, earliest, latest),
-      () => undefined,
-      config,
-      earliest,
-      latest
-    ),
-    language: buildLanguageFn(languages, config),
-    numberOfChangers: buildNumberOfChangersFn(config, expensiveConfig),
-    churn: buildChurnFn(config, expensiveConfig)
-  };
-}
-
-const redrawPolygons = (svgSelection, files, languages, state) => {
+const redrawPolygons = (svgSelection, files, metadata, state) => {
   const { config, expensiveConfig, stats } = state;
 
-  const fillFunctions = buildFillFunctions(
-    config,
-    expensiveConfig,
-    stats,
-    languages
+  const { fillFnBuilder, colourScaleBuilder, dataFn, parentFn } = getCurrentVis(
+    config
   );
+  const scale = colourScaleBuilder(config, metadata, stats);
+  const fillFn = fillFnBuilder(config, scale, dataFn, parentFn);
 
-  const fillFn = fillFunctions[config.visualization];
   const strokeWidthFn = d => {
     if (d.data.layout.algorithm === "circlePack") return 0;
     return d.depth < 4 ? 4 - d.depth : 1;
@@ -215,13 +75,13 @@ function findSelectionPath(data, state) {
   return results.reverse();
 }
 
-const update = (d3Container, files, languages, state) => {
+const update = (d3Container, files, metadata, state) => {
   if (!d3Container.current) {
     throw Error("No current container");
   }
   const vizEl = d3Container.current;
   const svg = d3.select(vizEl);
-  redrawPolygons(svg.selectAll(".cell"), files, languages, state);
+  redrawPolygons(svg.selectAll(".cell"), files, metadata, state);
 
   // TODO: DRY this up - or should selecting just be expensive config?
   const selectionPath = findSelectionPath(files, state);
@@ -237,11 +97,9 @@ const update = (d3Container, files, languages, state) => {
 
   redrawSelection(selectionNodes.merge(newSelectionNodes), files, state);
   selectionNodes.exit().remove();
-
-  // redrawSelection(svg.selectAll(".selected"), data, state);
 };
 
-const draw = (d3Container, files, languages, state, dispatch) => {
+const draw = (d3Container, files, metadata, state, dispatch) => {
   const { config, expensiveConfig } = state;
   const {
     layout: { timescaleHeight }
@@ -285,8 +143,8 @@ const draw = (d3Container, files, languages, state, dispatch) => {
     .append("path")
     .classed("cell", true);
 
-  redrawPolygons(nodes.merge(newNodes), files, languages, state)
-      // eslint-disable-next-line no-unused-vars
+  redrawPolygons(nodes.merge(newNodes), files, metadata, state)
+    // eslint-disable-next-line no-unused-vars
     .on("click", (node, i, nodeList) => {
       // console.log("onClicked", node, i, nodeList[i]);
       dispatch({ type: "selectNode", payload: node });
@@ -453,7 +311,8 @@ const Viz = props => {
   } = props;
 
   const {
-    metadata: { languages, timescaleData },
+    metadata: { timescaleData },
+    metadata,
     files
   } = data.current;
 
@@ -465,11 +324,11 @@ const Viz = props => {
       prevState.expensiveConfig !== expensiveConfig
     ) {
       console.log("expensive config change - rebuild all");
-      draw(d3Container, files, languages, state, dispatch);
+      draw(d3Container, files, metadata, state, dispatch);
       drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch);
     } else if (prevState.config !== config) {
       console.log("cheap config change - just redraw");
-      update(d3Container, files, languages, state);
+      update(d3Container, files, metadata, state);
     } else {
       console.log("no change in visible config - not doing nothing");
     }

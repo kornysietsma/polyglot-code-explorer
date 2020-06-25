@@ -13,7 +13,7 @@ import {
   nodeRemoteUrl,
   nodeTopChangers
 } from "./nodeData";
-import {humanizeDate, humanizeDays} from "./datetimes";
+import { humanizeDate, humanizeDays } from "./datetimes";
 import ToggleablePanel from "./ToggleablePanel";
 
 function findGitUrl(node) {

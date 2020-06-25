@@ -45,6 +45,12 @@ export function nodeLocData(node) {
   return data.loc;
 }
 
+export function nodeLanguage(node) {
+  const loc = nodeLocData(node);
+  if (!loc) return undefined;
+  return loc.language;
+}
+
 export function nodeLinesOfCode(node) {
   const loc = nodeLocData(node);
   if (!loc) return undefined;
@@ -108,11 +114,22 @@ export function nodeIndentation(node, metric) {
   return data.indentation[metric];
 }
 
-// uses current metric from config
-export function nodeIndentationFn(config) {
-  return d => {
-    return nodeIndentation(d, config.indentation.metric);
-  };
+export function nodeIndentationSum(node) {
+  const { data } = dataNode(node);
+  if (!data || !data.indentation) return undefined;
+  return data.indentation.sum;
+}
+
+export function nodeIndentationP99(node) {
+  const { data } = dataNode(node);
+  if (!data || !data.indentation) return undefined;
+  return data.indentation.p99;
+}
+
+export function nodeIndentationStddev(node) {
+  const { data } = dataNode(node);
+  if (!data || !data.indentation) return undefined;
+  return data.indentation.stddev;
 }
 
 // Date range based data, mostly git details
@@ -191,39 +208,21 @@ export function nodeChurnData(node, earliest, latest) {
   };
 }
 
-export function nodeChurnFn(config, expensiveConfig) {
-  switch (config.churn.metric) {
-    case "lines":
-      return d => {
-        const data = nodeChurnData(
-          d,
-          config.dateRange.earliest,
-          config.dateRange.latest
-        );
-        if (!data) return undefined;
-        return data.fractionalLines;
-      };
-    case "days":
-      return d => {
-        const data = nodeChurnData(
-          d,
-          config.dateRange.earliest,
-          config.dateRange.latest
-        );
-        if (!data) return undefined;
-        return data.fractionalDays;
-      };
-    case "commits":
-      return d => {
-        const data = nodeChurnData(
-          d,
-          config.dateRange.earliest,
-          config.dateRange.latest
-        );
-        if (!data) return undefined;
-        return data.fractionalCommits;
-      };
-    default:
-      throw Error(`Invalid churn metric ${config.churn.metric}`);
-  }
+
+export function nodeChurnDays(node, earliest, latest) {
+  const data = nodeChurnData(node, earliest, latest);
+  if (!data) return undefined;
+  return data.fractionalDays;
+}
+
+export function nodeChurnCommits(node, earliest, latest) {
+  const data = nodeChurnData(node, earliest, latest);
+  if (!data) return undefined;
+  return data.fractionalCommits;
+}
+
+export function nodeChurnLines(node, earliest, latest) {
+  const data = nodeChurnData(node, earliest, latest);
+  if (!data) return undefined;
+  return data.fractionalLines;
 }

@@ -1,6 +1,5 @@
 /* eslint-disable react/prop-types */
 import React from "react";
-import _ from "lodash";
 import styles from "./PathInspector.module.css";
 import ToggleablePanel from "./ToggleablePanel";
 
