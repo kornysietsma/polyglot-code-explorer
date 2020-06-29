@@ -10,6 +10,7 @@ function initialiseGlobalState(initialData) {
         maxLoc,
         earliestCommit,
         latestCommit,
+        coupling,
         churn: { maxLines, maxCommits, maxDays }
       }
     }
@@ -21,6 +22,7 @@ function initialiseGlobalState(initialData) {
     .unix();
 
   const earliest = twoYearsAgo < earliestCommit ? earliestCommit : twoYearsAgo;
+  const couplingAvailable = coupling !== undefined;
 
   const defaults = {
     config: {
@@ -105,6 +107,7 @@ function initialiseGlobalState(initialData) {
       colours: {
         defaultStroke: "#111111",
         selectedStroke: "#fffa00",
+        couplingStroke: "#ff6300",
         goodColour: "blue",
         badColour: "red",
         uglyColour: "yellow",
@@ -121,7 +124,12 @@ function initialiseGlobalState(initialData) {
       selectedNode: null
     },
     expensiveConfig: {
-      depth: Math.min(8, maxDepth)
+      depth: Math.min(8, maxDepth),
+      couplingAvailable,
+      coupling: {
+        shown: false,
+        minRatio: 0.9
+      }
     },
     stats: {
       maxDepth,
@@ -158,6 +166,11 @@ function globalDispatchReducer(state, action) {
         ...state,
         expensiveConfig: { ...expensiveConfig, depth: action.payload }
       };
+    case "setShowCoupling": {
+      const result = _.cloneDeep(state);
+      result.expensiveConfig.coupling.shown = action.payload;
+      return result;
+    }
     case "selectNode":
       return {
         ...state,

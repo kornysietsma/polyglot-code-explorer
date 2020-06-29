@@ -1,8 +1,15 @@
 /* eslint-disable react/prop-types */
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
+import _ from "lodash";
 import { dateToUnix, unixToDate } from "./datetimes";
 import VisualizationData from "./visualizationData";
+import {
+  nodeCenter,
+  nodeCouplingFiles,
+  nodeHasCouplingData,
+  nodeCouplingFilesFiltered
+} from "./nodeData";
 
 // TODO: should this live in Visualization.js ?
 function getCurrentVis(config) {
@@ -102,8 +109,10 @@ const update = (d3Container, files, metadata, state) => {
 const draw = (d3Container, files, metadata, state, dispatch) => {
   const { config, expensiveConfig } = state;
   const {
-    layout: { timescaleHeight }
+    layout: { timescaleHeight },
+    dateRange: { earliest, latest }
   } = config;
+  const { nodesByPath } = metadata;
 
   if (!d3Container.current) {
     console.warn("in draw but d3container not yet current");
@@ -167,6 +176,53 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
   redrawSelection(selectionNodes.merge(newSelectionNodes), files, state);
 
   selectionNodes.exit().remove();
+
+  const allCouplingNodes =
+    expensiveConfig.coupling.shown === false
+      ? []
+      : rootNode
+          .descendants()
+          .filter(d => d.depth <= expensiveConfig.depth)
+          .filter(nodeHasCouplingData)
+          .filter(
+            d => d.children === undefined || d.depth === expensiveConfig.depth
+          )
+          .map(d =>
+            nodeCouplingFilesFiltered(
+              d,
+              earliest,
+              latest,
+              state.expensiveConfig.coupling.minRatio
+            )
+          )
+          .flat();
+
+  const couplingNodes = group
+    .datum(rootNode)
+    .selectAll(".coupling")
+    .data(allCouplingNodes, node => [node.source.path, node.targetFile]);
+
+  // TODO - consider reworking this with d3.join which seems to be the new hotness?
+  const newCouplingNodes = couplingNodes
+    .enter()
+    .append("path")
+    .classed("coupling", true);
+
+  const couplingLine = d => {
+    const sourcePos = nodeCenter(d.source);
+    const target = nodesByPath[d.targetFile];
+    const targetPos = nodeCenter(target);
+    return `${d3.line()([sourcePos, targetPos])}z`;
+  };
+
+  couplingNodes
+    .merge(newCouplingNodes)
+    .attr("d", couplingLine)
+    .style("stroke", config.colours.couplingStroke)
+    .style("stroke-width", "1")
+    .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
+
+  couplingNodes.exit().remove();
 
   // zooming - see https://observablehq.com/@d3/zoomable-map-tiles?collection=@d3/d3-zoom
   const zoomed = () => {
@@ -321,12 +377,17 @@ const Viz = props => {
   useEffect(() => {
     if (
       prevState === undefined ||
-      prevState.expensiveConfig !== expensiveConfig
+      !_.isEqual(prevState.expensiveConfig, expensiveConfig)
     ) {
       console.log("expensive config change - rebuild all");
+      if (prevState === undefined) {
+        console.log("No prev state");
+      } else {
+        console.log(prevState.expensiveConfig, expensiveConfig);
+      }
       draw(d3Container, files, metadata, state, dispatch);
       drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch);
-    } else if (prevState.config !== config) {
+    } else if (!_.isEqual(prevState.config, config)) {
       console.log("cheap config change - just redraw");
       update(d3Container, files, metadata, state);
     } else {

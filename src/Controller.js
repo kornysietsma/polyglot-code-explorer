@@ -31,6 +31,39 @@ const Controller = props => {
 
   const currentVisOrSub = currentSubVisData || currentParentVisData;
 
+  let churnControls = "";
+  if (expensiveConfig.couplingAvailable) {
+    if (expensiveConfig.coupling.shown) {
+      churnControls = (
+        <button
+          type="button"
+          onClick={() =>
+            dispatch({
+              type: "setShowCoupling",
+              payload: false
+            })
+          }
+        >
+          Hide coupling
+        </button>
+      );
+    } else {
+      churnControls = (
+        <button
+          type="button"
+          onClick={() =>
+            dispatch({
+              type: "setShowCoupling",
+              payload: true
+            })
+          }
+        >
+          Show coupling
+        </button>
+      );
+    }
+  }
+
   return (
     <aside className="Controller">
       <div>
@@ -54,6 +87,7 @@ const Controller = props => {
           </select>
         </label>
       </div>
+      {churnControls}
       <div>
         <label htmlFor={vizId}>
           Visualization:

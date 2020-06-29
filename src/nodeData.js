@@ -208,7 +208,6 @@ export function nodeChurnData(node, earliest, latest) {
   };
 }
 
-
 export function nodeChurnDays(node, earliest, latest) {
   const data = nodeChurnData(node, earliest, latest);
   if (!data) return undefined;
@@ -225,4 +224,68 @@ export function nodeChurnLines(node, earliest, latest) {
   const data = nodeChurnData(node, earliest, latest);
   if (!data) return undefined;
   return data.fractionalLines;
+}
+
+export function nodeCouplingData(node) {
+  const { data } = dataNode(node);
+
+  if (!data || !data.coupling) return undefined;
+  return data.coupling;
+}
+
+export function nodeHasCouplingData(node) {
+  return nodeCouplingData(node) !== undefined;
+}
+
+export function nodeCouplingFiles(node, earliest, latest) {
+  const couplingData = nodeCouplingData(node);
+  if (!couplingData) return undefined;
+  const buckets = couplingData.buckets.filter(bucket => {
+    const midpoint = (bucket.bucket_start + bucket.bucket_end) / 2;
+    return midpoint >= earliest && midpoint <= latest;
+  });
+  if (buckets.length === 0) {
+    console.warn("No buckets in selected date range");
+    return [];
+  }
+  let totalCommitDays = 0;
+  const files = {};
+  buckets.forEach(bucket => {
+    totalCommitDays += bucket.commit_days;
+    bucket.coupled_files.forEach(([filename, count]) => {
+      if (files[filename] === undefined) {
+        files[filename] = count;
+      } else {
+        files[filename] += count;
+      }
+    });
+  });
+  // convert to array so vis.js can render each coupling line
+  return Object.entries(files).map(([file, count]) => {
+    return {
+      source: node,
+      targetFile: file,
+      sourceCount: totalCommitDays,
+      targetCount: count
+    };
+  });
+}
+
+export function nodeCouplingFilesFiltered(node, earliest, latest, minRatio) {
+  const files = nodeCouplingFiles(node, earliest, latest);
+  if (files === undefined || files.length === 0) return files;
+  return files.filter(f => f.targetCount / f.sourceCount > minRatio);
+}
+
+export function nodeLayoutData(node) {
+  const theNode = dataNode(node); // not in nested 'data' part!
+
+  if (!theNode || !theNode.layout) return undefined;
+  return theNode.layout;
+}
+
+export function nodeCenter(node) {
+  const layoutData = nodeLayoutData(node);
+  if (!layoutData) return undefined;
+  return layoutData.center;
 }

@@ -9,7 +9,8 @@ import { globalDispatchReducer, initialiseGlobalState } from "./State";
 import {
   countLanguagesIn,
   gatherTimescaleData,
-  gatherGlobalStats
+  gatherGlobalStats,
+  gatherNodesByPath
 } from "./preprocess";
 
 const App = props => {
@@ -19,14 +20,20 @@ const App = props => {
   const languages = countLanguagesIn(rawData);
   console.log("postprocessing global stats");
   const stats = gatherGlobalStats(rawData);
+  console.log("building node index");
+  const nodesByPath = gatherNodesByPath(rawData);
   console.log("building date scale data");
   const timescaleData = gatherTimescaleData(rawData, "week");
   console.log("postprocessing complete");
   const { users } = rawData.data.git_meta;
+  if (rawData.data.coupling_meta) {
+    stats.coupling = { ...rawData.data.coupling_meta };
+  }
   const metadata = {
     languages,
     stats,
     users,
+    nodesByPath,
     timescaleData
   };
   const [vizState, dispatch] = useReducer(
@@ -39,7 +46,7 @@ const App = props => {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>Polyglot Code Explorer</h1>
+        <h1>Polyglot Code Explorer (beta)</h1>
       </header>
       <Viz data={data} state={vizState} dispatch={dispatch} />
       <Controller data={data} state={vizState} dispatch={dispatch} />

@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 import React from "react";
 import PathInspector from "./PathInspector";
+import CouplingInspector from "./CouplingInspector";
 import {
   nodeAge,
   nodeChurnData,
@@ -58,9 +59,11 @@ function churnReport(churnData) {
     <ToggleablePanel title="Code Churn" showInitially={false}>
       <table>
         <thead>
-          <th>Metric</th>
-          <th>Total</th>
-          <th>Per day</th>
+          <tr>
+            <th>Metric</th>
+            <th>Total</th>
+            <th>Per day</th>
+          </tr>
         </thead>
         <tbody>
           <tr>
@@ -123,8 +126,10 @@ const NodeInspector = props => {
         <h5>Top {topChangersCount} changers:</h5>
         <table>
           <thead>
-            <th>User</th>
-            <th>Change count</th>
+            <tr>
+              <th>User</th>
+              <th>Change count</th>
+            </tr>
           </thead>
           <tbody>
             {topChangers.map(([user, count]) => {
@@ -188,6 +193,7 @@ const NodeInspector = props => {
         {topChangerTable}
       </ToggleablePanel>
       {churnReport(churnData)}
+      <CouplingInspector node={node} dispatch={dispatch} state={state} />
     </div>
   );
 };

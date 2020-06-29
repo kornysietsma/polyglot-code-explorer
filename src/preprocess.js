@@ -137,3 +137,20 @@ export function gatherTimescaleData(data, timeUnit) {
     })
     .sort((a, b) => a.day - b.day);
 }
+
+// yes, I'm modifying a parameter, it's hard to avoid in JavaScript with big data structures
+function addNodesByPath(nodesByPath, node) {
+  // eslint-disable-next-line no-param-reassign
+  nodesByPath[node.path] = node;
+  if (node.children !== undefined) {
+    node.children.forEach(child => {
+      addNodesByPath(nodesByPath, child);
+    });
+  }
+}
+
+export function gatherNodesByPath(data) {
+  const nodesByPath = {};
+  addNodesByPath(nodesByPath, data);
+  return nodesByPath;
+}
