@@ -2,12 +2,18 @@
 import React from "react";
 
 import ToggleablePanel from "./ToggleablePanel";
-import { nodeCouplingFiles } from "./nodeData";
+import { nodeCouplingFiles, nodeCouplingFilesFiltered } from "./nodeData";
 
 const CouplingInspector = props => {
   const { node, dispatch, state } = props;
   const { earliest, latest } = state.config.dateRange;
-  let files = nodeCouplingFiles(node, earliest, latest);
+  const { couplingConfig } = state;
+  let files = nodeCouplingFilesFiltered(
+    node,
+    earliest,
+    latest,
+    couplingConfig.minRatio
+  );
   if (files === undefined || files.length === 0) {
     return <h4>No coupling data</h4>;
   }

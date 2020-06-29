@@ -5,6 +5,7 @@ import _ from "lodash";
 import { dateToUnix, unixToDate } from "./datetimes";
 import VisualizationData from "./visualizationData";
 import {
+  nodeDescendants,
   nodeCenter,
   nodeCouplingFiles,
   nodeHasCouplingData,
@@ -106,8 +107,71 @@ const update = (d3Container, files, metadata, state) => {
   selectionNodes.exit().remove();
 };
 
+// flatten out all nodes for coupling line display
+function normalizedCouplingNodes(rootNode, state) {
+  const { config, expensiveConfig, couplingConfig } = state;
+  const {
+    dateRange: { earliest, latest }
+  } = config;
+  return couplingConfig.shown === false
+    ? []
+    : nodeDescendants(rootNode)
+        .filter(nodeHasCouplingData)
+        .map(d =>
+          nodeCouplingFilesFiltered(
+            d,
+            earliest,
+            latest,
+            couplingConfig.minRatio
+          )
+        )
+        .flat();
+}
+
+function drawCoupling(group, files, metadata, state) {
+  const { config } = state;
+  const { nodesByPath } = metadata;
+  const allCouplingNodes = normalizedCouplingNodes(files, state);
+
+  const couplingNodes = group
+    .selectAll(".coupling")
+    .data(allCouplingNodes, node => [node.source.path, node.targetFile]);
+
+  // TODO - consider reworking this with d3.join which seems to be the new hotness?
+  const newCouplingNodes = couplingNodes
+    .enter()
+    .append("path")
+    .classed("coupling", true);
+
+  const couplingLine = d => {
+    const sourcePos = nodeCenter(d.source);
+    const target = nodesByPath[d.targetFile];
+    const targetPos = nodeCenter(target);
+    return `${d3.line()([sourcePos, targetPos])}z`;
+  };
+
+  couplingNodes
+    .merge(newCouplingNodes)
+    .attr("d", couplingLine)
+    .style("stroke", config.colours.couplingStroke)
+    .style("stroke-width", "1")
+    .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
+
+  couplingNodes.exit().remove();
+}
+
+const updateCoupling = (d3Container, files, metadata, state) => {
+  if (!d3Container.current) {
+    throw Error("No current container");
+  }
+  const vizEl = d3Container.current;
+  const svg = d3.select(vizEl);
+  const group = svg.selectAll(".topGroup");
+  drawCoupling(group, files, metadata, state);
+};
+
 const draw = (d3Container, files, metadata, state, dispatch) => {
-  const { config, expensiveConfig } = state;
+  const { config, expensiveConfig, couplingConfig } = state;
   const {
     layout: { timescaleHeight },
     dateRange: { earliest, latest }
@@ -177,52 +241,11 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
 
   selectionNodes.exit().remove();
 
-  const allCouplingNodes =
-    expensiveConfig.coupling.shown === false
-      ? []
-      : rootNode
-          .descendants()
-          .filter(d => d.depth <= expensiveConfig.depth)
-          .filter(nodeHasCouplingData)
-          .filter(
-            d => d.children === undefined || d.depth === expensiveConfig.depth
-          )
-          .map(d =>
-            nodeCouplingFilesFiltered(
-              d,
-              earliest,
-              latest,
-              state.expensiveConfig.coupling.minRatio
-            )
-          )
-          .flat();
+  drawCoupling(group, files, metadata, state);
 
-  const couplingNodes = group
-    .datum(rootNode)
-    .selectAll(".coupling")
-    .data(allCouplingNodes, node => [node.source.path, node.targetFile]);
-
-  // TODO - consider reworking this with d3.join which seems to be the new hotness?
-  const newCouplingNodes = couplingNodes
-    .enter()
-    .append("path")
-    .classed("coupling", true);
-
-  const couplingLine = d => {
-    const sourcePos = nodeCenter(d.source);
-    const target = nodesByPath[d.targetFile];
-    const targetPos = nodeCenter(target);
-    return `${d3.line()([sourcePos, targetPos])}z`;
-  };
-
-  couplingNodes
-    .merge(newCouplingNodes)
-    .attr("d", couplingLine)
-    .style("stroke", config.colours.couplingStroke)
-    .style("stroke-width", "1")
-    .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
-
-  couplingNodes.exit().remove();
+  // if we are redrawing after expensive config change, need to force coupling nodes to the front!
+  // TODO: better would be to use a different top-level group...
+  group.selectAll(".coupling").raise();
 
   // zooming - see https://observablehq.com/@d3/zoomable-map-tiles?collection=@d3/d3-zoom
   const zoomed = () => {
@@ -363,7 +386,7 @@ const Viz = props => {
     data,
     state,
     dispatch,
-    state: { config, expensiveConfig, stats }
+    state: { config, expensiveConfig, couplingConfig, stats }
   } = props;
 
   const {
@@ -372,7 +395,7 @@ const Viz = props => {
     files
   } = data.current;
 
-  const prevState = usePrevious({ config, expensiveConfig });
+  const prevState = usePrevious({ config, expensiveConfig, couplingConfig });
 
   useEffect(() => {
     if (
@@ -387,11 +410,15 @@ const Viz = props => {
       }
       draw(d3Container, files, metadata, state, dispatch);
       drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch);
-    } else if (!_.isEqual(prevState.config, config)) {
-      console.log("cheap config change - just redraw");
-      update(d3Container, files, metadata, state);
     } else {
-      console.log("no change in visible config - not doing nothing");
+      if (!_.isEqual(prevState.config, config)) {
+        console.log("cheap config change - just redraw");
+        update(d3Container, files, metadata, state);
+      }
+      if (!_.isEqual(prevState.couplingConfig, couplingConfig)) {
+        console.log("coupling change");
+        updateCoupling(d3Container, files, metadata, state);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [files, state]);

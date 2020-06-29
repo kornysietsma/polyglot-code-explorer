@@ -123,13 +123,18 @@ function initialiseGlobalState(initialData) {
       },
       selectedNode: null
     },
-    expensiveConfig: {
-      depth: Math.min(8, maxDepth),
+    couplingConfig: {
       couplingAvailable,
-      coupling: {
-        shown: false,
-        minRatio: 0.9
+      shown: false,
+      minRatio: 0.9,
+      dateRange: {
+        // TODO: use buckets instead!
+        earliest,
+        latest: latestCommit
       }
+    },
+    expensiveConfig: {
+      depth: Math.min(8, maxDepth)
     },
     stats: {
       maxDepth,
@@ -141,7 +146,7 @@ function initialiseGlobalState(initialData) {
 }
 
 function globalDispatchReducer(state, action) {
-  const { expensiveConfig, config } = state;
+  const { expensiveConfig, couplingConfig, config } = state;
   switch (action.type) {
     case "setVisualization": {
       const visualization = action.payload;
@@ -168,7 +173,7 @@ function globalDispatchReducer(state, action) {
       };
     case "setShowCoupling": {
       const result = _.cloneDeep(state);
-      result.expensiveConfig.coupling.shown = action.payload;
+      result.couplingConfig.shown = action.payload;
       return result;
     }
     case "selectNode":
@@ -183,6 +188,8 @@ function globalDispatchReducer(state, action) {
       const result = _.cloneDeep(state);
       result.config.dateRange.earliest = early;
       result.config.dateRange.latest = late;
+      result.couplingConfig.dateRange.earliest = early;
+      result.couplingConfig.dateRange.latest = late;
       return result;
     }
     default:

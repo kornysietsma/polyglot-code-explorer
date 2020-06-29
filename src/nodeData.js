@@ -1,4 +1,5 @@
 import _ from "lodash";
+import * as d3 from "d3";
 
 /* Note most functions here work on both:
 - a data node, the data from the raw JSON file, which is roughly
@@ -36,6 +37,23 @@ export function isDirectory(node) {
 
 export function dataNode(node) {
   return isHierarchyNode(node) ? node.data : node;
+}
+
+function addDescendants(nodes, node) {
+  nodes.push(node);
+  if (node.children) {
+    node.children.forEach(child => addDescendants(nodes, child));
+  }
+}
+// simulate d3.descendants but works for non-hierarchy nodes (so we don't need to build a hierarchy)
+export function nodeDescendants(node) {
+  if (isHierarchyNode(node)) {
+    return node.descendants();
+  }
+  const nodes = [];
+  node.children.forEach(child => addDescendants(nodes, child));
+
+  return nodes;
 }
 
 export function nodeLocData(node) {

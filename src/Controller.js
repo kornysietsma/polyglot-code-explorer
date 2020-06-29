@@ -10,7 +10,7 @@ import VisColourKey from "./VisColourKey";
 const Controller = props => {
   const { data, state, dispatch } = props;
   const { metadata } = data.current;
-  const { config, expensiveConfig, stats } = state;
+  const { config, expensiveConfig, couplingConfig, stats } = state;
   // ID logic from https://stackoverflow.com/questions/29420835/how-to-generate-unique-ids-for-form-labels-in-react
   const { current: vizId } = useRef(_uniqueId("controller-"));
   const { current: depthId } = useRef(_uniqueId("controller-"));
@@ -32,8 +32,8 @@ const Controller = props => {
   const currentVisOrSub = currentSubVisData || currentParentVisData;
 
   let churnControls = "";
-  if (expensiveConfig.couplingAvailable) {
-    if (expensiveConfig.coupling.shown) {
+  if (couplingConfig.couplingAvailable) {
+    if (couplingConfig.shown) {
       churnControls = (
         <button
           type="button"
