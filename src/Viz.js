@@ -7,7 +7,6 @@ import VisualizationData from "./visualizationData";
 import {
   nodeDescendants,
   nodeCenter,
-  nodeCouplingFiles,
   nodeHasCouplingData,
   nodeCouplingFilesFiltered
 } from "./nodeData";
@@ -29,13 +28,13 @@ function getCurrentVis(config) {
   return selected;
 }
 
-const redrawPolygons = (svgSelection, files, metadata, state) => {
-  const { config, expensiveConfig, stats } = state;
+const redrawPolygons = (svgSelection, metadata, state) => {
+  const { config, expensiveConfig } = state;
 
   const { fillFnBuilder, colourScaleBuilder, dataFn, parentFn } = getCurrentVis(
     config
   );
-  const scale = colourScaleBuilder(config, metadata, stats);
+  const scale = colourScaleBuilder(config, metadata);
   const fillFn = fillFnBuilder(config, scale, dataFn, parentFn);
 
   const strokeWidthFn = d => {
@@ -53,8 +52,8 @@ const redrawPolygons = (svgSelection, files, metadata, state) => {
     .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
 };
 
-const redrawSelection = (svgSelection, files, state) => {
-  const { config, stats } = state;
+const redrawSelection = (svgSelection, state) => {
+  const { config } = state;
 
   const strokeWidthFn = d => {
     if (d.data.layout.algorithm === "circlePack") return 0;
@@ -89,7 +88,7 @@ const update = (d3Container, files, metadata, state) => {
   }
   const vizEl = d3Container.current;
   const svg = d3.select(vizEl);
-  redrawPolygons(svg.selectAll(".cell"), files, metadata, state);
+  redrawPolygons(svg.selectAll(".cell"), metadata, state);
 
   // TODO: DRY this up - or should selecting just be expensive config?
   const selectionPath = findSelectionPath(files, state);
@@ -103,7 +102,7 @@ const update = (d3Container, files, metadata, state) => {
     .append("path")
     .classed("selected", true);
 
-  redrawSelection(selectionNodes.merge(newSelectionNodes), files, state);
+  redrawSelection(selectionNodes.merge(newSelectionNodes), state);
   selectionNodes.exit().remove();
 };
 
@@ -136,25 +135,11 @@ function arcPath(leftHand, source, target) {
   const dx = x2 - x1;
   const dy = y2 - y1;
   const dr = Math.sqrt(dx * dx + dy * dy);
-  let drx = dr;
-  let dry = dr;
   const sweep = leftHand ? 0 : 1;
-  // const siblingCount = 1;
   const xRotation = 0;
   const largeArc = 0;
 
-  // if (siblingCount > 1) {
-  //   const siblings = getSiblingLinks(d.source, d.target);
-  //   console.log(siblings);
-  //   const arcScale = d3.scale
-  //     .ordinal()
-  //     .domain(siblings)
-  //     .rangePoints([1, siblingCount]);
-  //   drx /= 1 + (1 / siblingCount) * (arcScale(d.value) - 1);
-  //   dry /= 1 + (1 / siblingCount) * (arcScale(d.value) - 1);
-  // }
-
-  return `M${x1},${y1}A${drx}, ${dry} ${xRotation}, ${largeArc}, ${sweep} ${x2},${y2}`;
+  return `M${x1},${y1}A${dr}, ${dr} ${xRotation}, ${largeArc}, ${sweep} ${x2},${y2}`;
 }
 
 function drawCoupling(group, files, metadata, state) {
@@ -181,12 +166,26 @@ function drawCoupling(group, files, metadata, state) {
     // return `${d3.line()([sourcePos, targetPos])}`;
   };
 
+  const couplingLineStroke = d => {
+    const colour = d3.color(config.colours.couplingStroke);
+    const ratio = d.targetCount / d.sourceCount;
+    colour.opacity = ratio;
+    return colour;
+  };
+
+  const couplingLineWidth = d => {
+    const ratio = d.targetCount / d.sourceCount;
+    if (ratio >= 0.95) return "3px";
+    if (ratio > 0.8) return "2px";
+    return "1px";
+  };
+
   couplingNodes
     .merge(newCouplingNodes)
     .attr("d", couplingLine)
     .attr("marker-end", "url(#arrow)") // sadly the marker colour is fixed!
-    .style("stroke", config.colours.couplingStroke)
-    .style("stroke-width", "1")
+    .style("stroke", couplingLineStroke)
+    .style("stroke-width", couplingLineWidth)
     .style("fill", "none")
     .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
 
@@ -204,12 +203,10 @@ const updateCoupling = (d3Container, files, metadata, state) => {
 };
 
 const draw = (d3Container, files, metadata, state, dispatch) => {
-  const { config, expensiveConfig, couplingConfig } = state;
+  const { config, expensiveConfig } = state;
   const {
-    layout: { timescaleHeight },
-    dateRange: { earliest, latest }
+    layout: { timescaleHeight }
   } = config;
-  const { nodesByPath } = metadata;
 
   if (!d3Container.current) {
     console.warn("in draw but d3container not yet current");
@@ -249,7 +246,7 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
     .append("path")
     .classed("cell", true);
 
-  redrawPolygons(nodes.merge(newNodes), files, metadata, state)
+  redrawPolygons(nodes.merge(newNodes), metadata, state)
     // eslint-disable-next-line no-unused-vars
     .on("click", (node, i, nodeList) => {
       // console.log("onClicked", node, i, nodeList[i]);
@@ -270,7 +267,7 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
     .append("path")
     .classed("selected", true);
 
-  redrawSelection(selectionNodes.merge(newSelectionNodes), files, state);
+  redrawSelection(selectionNodes.merge(newSelectionNodes), state);
 
   selectionNodes.exit().remove();
 
@@ -419,7 +416,7 @@ const Viz = props => {
     data,
     state,
     dispatch,
-    state: { config, expensiveConfig, couplingConfig, stats }
+    state: { config, expensiveConfig, couplingConfig }
   } = props;
 
   const {

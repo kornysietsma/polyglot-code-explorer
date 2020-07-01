@@ -2,28 +2,51 @@
 import React from "react";
 
 import ToggleablePanel from "./ToggleablePanel";
-import { nodeCouplingFiles, nodeCouplingFilesFiltered } from "./nodeData";
+import { nodeCouplingFilesFiltered } from "./nodeData";
+import { couplingDateRange } from "./couplingBuckets";
+import { humanizeDate } from "./datetimes";
 
 const CouplingInspector = props => {
-  const { node, dispatch, state } = props;
+  const { node, dispatch, state, stats } = props;
   const { earliest, latest } = state.config.dateRange;
   const { couplingConfig } = state;
+
+  const { couplingStart, couplingEnd } = couplingDateRange(
+    stats.coupling,
+    earliest,
+    latest
+  );
+
   let files = nodeCouplingFilesFiltered(
     node,
     earliest,
     latest,
     couplingConfig.minRatio
   );
-  if (files === undefined || files.length === 0) {
-    return <h4>No coupling data</h4>;
-  }
-  const { sourceCount } = files[0];
-  files.sort((f1, f2) => f2.targetCount - f1.targetCount);
-  files = files.slice(0, 20);
+  // this is ugly - but we can't return early if no coupling data
+  //  or the toggleablepanel state gets lost when you change nodes!
 
-  return (
-    <ToggleablePanel title="Coupling" showInitially={false}>
-      <h5>Source commits: {sourceCount} in date range</h5>
+  let title;
+  let couplingDetails;
+  if (files === undefined || files.length === 0) {
+    title = (
+      <h5>
+        No coupling data in range {humanizeDate(couplingStart)} to
+        {humanizeDate(couplingEnd)}
+      </h5>
+    );
+    couplingDetails = <div />;
+  } else {
+    const { sourceCount } = files[0];
+    files.sort((f1, f2) => f2.targetCount - f1.targetCount);
+    files = files.slice(0, 20);
+    title = (
+      <h5>
+        Source commits: {sourceCount} in range {humanizeDate(couplingStart)} to
+        {humanizeDate(couplingEnd)}
+      </h5>
+    );
+    couplingDetails = (
       <table>
         <thead>
           <tr>
@@ -45,6 +68,13 @@ const CouplingInspector = props => {
           })}
         </tbody>
       </table>
+    );
+  }
+
+  return (
+    <ToggleablePanel title="Coupling" showInitially={false}>
+      {title}
+      {couplingDetails}
     </ToggleablePanel>
   );
 };

@@ -29,7 +29,15 @@ const Inspector = props => {
       {hasSelection ? (
         nodeInspector
       ) : (
-        <p>Please click on the chart to select a file/folder</p>
+        <div>
+          <p>Please click on the chart to select a file/folder</p>
+          <p>
+            <i>
+              <b>Note </b>
+            </i>
+            there is a date selector at the bottom of the diagram!
+          </p>
+        </div>
       )}
     </aside>
   );

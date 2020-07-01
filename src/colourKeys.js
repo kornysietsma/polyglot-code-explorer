@@ -3,9 +3,9 @@ import _ from "lodash";
 import { humanizeDate } from "./datetimes";
 
 export function goodBadUglyColourKeyData(configLocation) {
-  return (vis, config, metadata, stats) => {
+  return (vis, config, metadata) => {
     const { good, bad, ugly, precision } = _.get(config, configLocation);
-    const scale = vis.colourScaleBuilder(config, metadata, stats);
+    const scale = vis.colourScaleBuilder(config, metadata);
 
     const goodBad = d3.interpolateNumber(good, bad);
     const badUgly = d3.interpolateNumber(bad, ugly);
@@ -32,7 +32,7 @@ export function goodBadUglyColourKeyData(configLocation) {
   };
 }
 
-export function languageColourKeyData(vis, config, metadata, stats) {
+export function languageColourKeyData(vis, config, metadata) {
   const { languageKey, otherColour } = metadata.languages;
   return [
     ...languageKey.map(k => [k.language, k.colour]),
@@ -40,17 +40,18 @@ export function languageColourKeyData(vis, config, metadata, stats) {
   ];
 }
 
-export function depthKeyData(vis, config, metadata, stats) {
-  const scale = vis.colourScaleBuilder(config, metadata, stats);
+export function depthKeyData(vis, config, metadata) {
+  const { maxDepth } = metadata.stats;
+  const scale = vis.colourScaleBuilder(config, metadata);
   const key = [];
-  for (let ix = 1; ix <= stats.maxDepth; ix += 1) {
+  for (let ix = 1; ix <= maxDepth; ix += 1) {
     key.push([ix, scale(ix)]);
   }
   return key;
 }
 
-export function creationKeyData(vis, config, metadata, stats) {
-  const scale = vis.colourScaleBuilder(config, metadata, stats);
+export function creationKeyData(vis, config, metadata) {
+  const scale = vis.colourScaleBuilder(config, metadata);
   const {
     dateRange: { earliest, latest }
   } = config;
@@ -66,8 +67,8 @@ export function creationKeyData(vis, config, metadata, stats) {
   return key;
 }
 
-export function numberOfChangersKeyData(vis, config, metadata, stats) {
-  const scale = vis.colourScaleBuilder(config, metadata, stats);
+export function numberOfChangersKeyData(vis, config, metadata) {
+  const scale = vis.colourScaleBuilder(config, metadata);
   const { numberOfChangers } = config;
   const key = [
     ["None", numberOfChangers.noChangersColour],

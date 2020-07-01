@@ -30,7 +30,11 @@ xhttp.onreadystatechange = function() {
     console.log("postprocessing complete");
     const { users } = data.data.git_meta;
     if (data.data.coupling_meta) {
-      stats.coupling = { ...data.data.coupling_meta };
+      stats.coupling = {
+        bucketCount: data.data.coupling_meta.bucket_count,
+        bucketSize: data.data.coupling_meta.bucket_size,
+        firstBucketStart: data.data.coupling_meta.first_bucket_start
+      };
     }
     const metadata = {
       languages,

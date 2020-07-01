@@ -259,8 +259,9 @@ export function nodeCouplingFiles(node, earliest, latest) {
   const couplingData = nodeCouplingData(node);
   if (!couplingData) return undefined;
   const buckets = couplingData.buckets.filter(bucket => {
-    const midpoint = (bucket.bucket_start + bucket.bucket_end) / 2;
-    return midpoint >= earliest && midpoint <= latest;
+    if (bucket.bucket_start > latest) return false;
+    if (bucket.bucket_end < earliest) return false;
+    return true;
   });
   if (buckets.length === 0) {
     // nothing in current selection

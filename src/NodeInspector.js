@@ -89,6 +89,7 @@ function churnReport(churnData) {
 
 const NodeInspector = props => {
   const { node, dispatch, state, metadata } = props;
+  const { stats } = metadata;
   const locData = nodeLocData(node);
   const indentationData = nodeIndentationData(node);
   const gitUrl = findGitUrl(node);
@@ -193,7 +194,12 @@ const NodeInspector = props => {
         {topChangerTable}
       </ToggleablePanel>
       {churnReport(churnData)}
-      <CouplingInspector node={node} dispatch={dispatch} state={state} />
+      <CouplingInspector
+        node={node}
+        dispatch={dispatch}
+        state={state}
+        stats={stats}
+      />
     </div>
   );
 };

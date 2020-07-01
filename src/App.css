@@ -52,8 +52,8 @@
   If you don't have 1024px then it'll be a single column,
   scaled.
 
-  My laptop has 1920 pixels width,
-  removing 1024 for the graph gives 896 or 2x448 pixel panels.
+  My laptop has 1920 pixels width, but with scrollbars seems to be 1776 available
+  removing 1024 for the graph gives 752 or 2x376 pixel panels.
 
   Note padding on the bottom just so the main area isn't always bottom-aligned
 */
@@ -63,7 +63,7 @@
     grid-template-areas: "header header header"
                          "controls main inspect"
                          "padding padding padding";
-    grid-template-columns: 448px 1024px 448px;
+    grid-template-columns: 376px 1024px 376px;
     grid-template-rows: auto
                         1154px
                         auto;
@@ -71,12 +71,13 @@
     justify-content: center;
 }
 
-@media screen and (max-width: 1919px) {
+/* pushes columns to left/right, graph still 1024x1154 */
+@media screen and (max-width: 1791px) {
     .App {
       grid-template-areas: "header header header"
                            "main main main"
                            "controls . inspect";
-      grid-template-columns: 448px 128px 448px;
+      grid-template-columns: 376px 272px 376px; 
       grid-template-rows: auto
                           1154px
                           auto

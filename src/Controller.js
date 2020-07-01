@@ -7,11 +7,14 @@ import { numberOfChangersScale } from "./ColourScales";
 import VisualizationData from "./visualizationData";
 import VisColourKey from "./VisColourKey";
 import CouplingController from "./CouplingController";
+import { humanizeDate } from "./datetimes";
 
 const Controller = props => {
   const { data, state, dispatch } = props;
   const { metadata } = data.current;
-  const { config, expensiveConfig, couplingConfig, stats } = state;
+  const { maxDepth } = metadata.stats;
+  const { config, expensiveConfig, couplingConfig } = state;
+  const { earliest, latest } = state.config.dateRange;
   // ID logic from https://stackoverflow.com/questions/29420835/how-to-generate-unique-ids-for-form-labels-in-react
   const { current: vizId } = useRef(_uniqueId("controller-"));
   const { current: depthId } = useRef(_uniqueId("controller-"));
@@ -35,6 +38,9 @@ const Controller = props => {
   return (
     <aside className="Controller">
       <div>
+        <p>
+          Selected date range {humanizeDate(earliest)} to {humanizeDate(latest)}
+        </p>
         <label htmlFor={depthId}>
           Display maximum depth:
           <select
@@ -47,7 +53,7 @@ const Controller = props => {
               })
             }
           >
-            {[...Array(state.stats.maxDepth + 1).keys()].map(d => (
+            {[...Array(maxDepth + 1).keys()].map(d => (
               <option key={d} value={d}>
                 {d}
               </option>
@@ -55,7 +61,11 @@ const Controller = props => {
           </select>
         </label>
       </div>
-      <CouplingController dispatch={dispatch} state={state} stats={metadata.stats} />
+      <CouplingController
+        dispatch={dispatch}
+        state={state}
+        stats={metadata.stats}
+      />
       <div>
         <label htmlFor={vizId}>
           Visualization:
@@ -95,12 +105,7 @@ const Controller = props => {
       ) : (
         ""
       )}
-      <VisColourKey
-        vis={currentVisOrSub}
-        config={config}
-        metadata={metadata}
-        stats={stats}
-      />
+      <VisColourKey vis={currentVisOrSub} config={config} metadata={metadata} />
     </aside>
   );
 };

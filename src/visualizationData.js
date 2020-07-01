@@ -243,7 +243,8 @@ const VisualizationData = {
             </p>
             <p>
               This visualisation shows the proportion of days containing a
-              change, so a value of "1" means the code changed every day.
+              change, so a value of &ldquo;1&rdquo; means the code changed every
+              day.
             </p>
           </div>
         ),
@@ -264,8 +265,8 @@ const VisualizationData = {
             </p>
             <p>
               This visualisation shows the number of commits per day, so a value
-              of "0.1" means the code was committed on average once every ten
-              days.
+              of &ldquo;0.1&rdquo; means the code was committed on average once
+              every ten days.
             </p>
           </div>
         ),
@@ -286,8 +287,8 @@ const VisualizationData = {
             </p>
             <p>
               This visualisation shows the number of lines changed per day, a
-              sum of additions and deletions, so a value of "10" means ten lines
-              of code were changed per day on average.
+              sum of additions and deletions, so a value of &ldquo;10&rdquo;
+              means ten lines of code were changed per day on average.
             </p>
             <p>
               Note this is a pretty rough measure - if someone added 10 lines

@@ -1,9 +1,8 @@
 import * as d3 from "d3";
 import _ from "lodash";
 
-export function numberOfChangersScale(config, metadata, stats) {
+export function numberOfChangersScale(config, metadata) {
   const { numberOfChangers: conf } = config;
-
   return d3
     .scaleLinear()
     .domain([
@@ -36,27 +35,29 @@ export function goodBadUglyScale(config, good, bad, ugly) {
 }
 
 export function goodBadUglyScaleBuilder(configLocation) {
-  return (config, metadata, stats) => {
+  return (config, metadata) => {
     const { good, bad, ugly } = _.get(config, configLocation);
     return goodBadUglyScale(config, good, bad, ugly);
   };
 }
 
-export function languageScaleBuilder(config, metadata, stats) {
+export function languageScaleBuilder(config, metadata) {
   const { languageMap } = metadata.languages;
   return d => {
     return languageMap[d].colour;
   };
 }
 
-export function depthScaleBuilder(config, metadata, stats) {
+export function depthScaleBuilder(config, metadata) {
+  const { maxDepth } = metadata.stats;
+
   return d3
     .scaleSequential(d3.interpolatePlasma)
-    .domain([0, stats.maxDepth])
+    .domain([0, maxDepth])
     .clamp(true);
 }
 
-export function earlyLateScaleBuilder(config, metadata, stats) {
+export function earlyLateScaleBuilder(config, metadata) {
   const { earlyColour, lateColour } = config.colours;
   const { earliest, latest } = config.dateRange;
 

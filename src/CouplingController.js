@@ -4,18 +4,19 @@ import React, { useState, useRef } from "react";
 import _uniqueId from "lodash/uniqueId";
 import ToggleablePanel from "./ToggleablePanel";
 import HelpPanel from "./HelpPanel";
+import { couplingDateRange } from "./couplingBuckets";
+import { humanizeDate } from "./datetimes";
 
 const CouplingController = props => {
   const { dispatch, state, stats } = props;
   const {
     couplingConfig: { couplingAvailable, shown, minRatio }
   } = state;
-  console.log(stats);
-  const {
-    coupling: { bucket_count, bucket_size, first_bucket_start }
-  } = stats;
 
-  const bucketDays = bucket_size / (24 * 60 * 60);
+  const {
+    coupling: { bucketCount, bucketSize, firstBucketStart }
+  } = stats;
+  const { earliest, latest } = state.config.dateRange;
 
   const { current: sliderId } = useRef(_uniqueId("coupling-controller-"));
 
@@ -28,6 +29,14 @@ const CouplingController = props => {
       </div>
     );
   }
+
+  const bucketDays = bucketSize / (24 * 60 * 60);
+
+  const { couplingStart, couplingEnd } = couplingDateRange(
+    stats.coupling,
+    earliest,
+    latest
+  );
 
   const showButton = shown ? (
     <button
@@ -85,27 +94,32 @@ const CouplingController = props => {
             Be aware this can easily have false positives! For example, if
             bar.rs is changed extremely regularly, it will look like a lot of
             other files are coupled to it! You should probably consider
-            excluding bar.rs from your initial scan - it's probably not normal
-            source code. (there is no way to ignore it in the explorer
+            excluding bar.rs from your initial scan - it&apos;s probably not
+            normal source code. (there is no way to ignore it in the explorer
             currently)
           </p>
           <p>Note there are some limits on coupling data stored, for sanity:</p>
           <p>
-            Coupling is calculated in "buckets" of {bucketDays} days each, so
-            you can see coupling change over time. If you have multiple buckets
-            selected, the changes are averaged. Buckets will be shown on the
-            timescale below soon!
+            Coupling is calculated in &ldquo;buckets&rdquo; of {bucketDays} days
+            each, so you can see coupling change over time. If you have multiple
+            buckets selected, the changes are averaged. Buckets will be shown on
+            the timescale below soon!
           </p>
           <p>
             Coupling data is only stored for files with 10 changes in a coupling
-            bucket (by default, this is configurable)
+            bucket (by default, this is configurable) - this means files with a
+            low rate of change may not show coupling. This is hard to avoid,
+            lowering this filter can lead to a lot of false positives.
           </p>
           <p>
             Coupling data is only stored if a ratio of 0.25 is observed (by
             default, this is configurable)
           </p>
         </HelpPanel>
-
+        <p>
+          Coupling date range {humanizeDate(couplingStart)} to{" "}
+          {humanizeDate(couplingEnd)}
+        </p>
         <label htmlFor={sliderId}>
           Coupling Ratio: &nbsp;
           {minRatio.toFixed(2)}

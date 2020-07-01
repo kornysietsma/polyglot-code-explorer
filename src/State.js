@@ -1,18 +1,11 @@
 import _ from "lodash";
-import moment, { unix } from "moment";
+import moment from "moment";
 import VisualizationData from "./visualizationData";
 
 function initialiseGlobalState(initialData) {
   const {
     metadata: {
-      stats: {
-        maxDepth,
-        maxLoc,
-        earliestCommit,
-        latestCommit,
-        coupling,
-        churn: { maxLines, maxCommits, maxDays }
-      }
+      stats: { maxDepth, earliestCommit, latestCommit, coupling }
     }
   } = initialData;
 
@@ -135,12 +128,6 @@ function initialiseGlobalState(initialData) {
     },
     expensiveConfig: {
       depth: Math.min(8, maxDepth)
-    },
-      // TODO - do we really need state.stats - just use metadata.stats!
-      stats: {
-      maxDepth,
-      maxLoc: Math.min(maxLoc, 2000), // TODO - this should be in loc visualization really
-      churn: { maxLines, maxCommits, maxDays } // duplicate so we can get it later!
     }
   };
   return defaults;
