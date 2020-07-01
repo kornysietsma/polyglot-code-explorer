@@ -128,6 +128,35 @@ function normalizedCouplingNodes(rootNode, state) {
         .flat();
 }
 
+function arcPath(leftHand, source, target) {
+  const x1 = leftHand ? source[0] : target[0];
+  const y1 = leftHand ? source[1] : target[1];
+  const x2 = leftHand ? target[0] : source[0];
+  const y2 = leftHand ? target[1] : source[1];
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const dr = Math.sqrt(dx * dx + dy * dy);
+  let drx = dr;
+  let dry = dr;
+  const sweep = leftHand ? 0 : 1;
+  // const siblingCount = 1;
+  const xRotation = 0;
+  const largeArc = 0;
+
+  // if (siblingCount > 1) {
+  //   const siblings = getSiblingLinks(d.source, d.target);
+  //   console.log(siblings);
+  //   const arcScale = d3.scale
+  //     .ordinal()
+  //     .domain(siblings)
+  //     .rangePoints([1, siblingCount]);
+  //   drx /= 1 + (1 / siblingCount) * (arcScale(d.value) - 1);
+  //   dry /= 1 + (1 / siblingCount) * (arcScale(d.value) - 1);
+  // }
+
+  return `M${x1},${y1}A${drx}, ${dry} ${xRotation}, ${largeArc}, ${sweep} ${x2},${y2}`;
+}
+
 function drawCoupling(group, files, metadata, state) {
   const { config } = state;
   const { nodesByPath } = metadata;
@@ -147,14 +176,18 @@ function drawCoupling(group, files, metadata, state) {
     const sourcePos = nodeCenter(d.source);
     const target = nodesByPath[d.targetFile];
     const targetPos = nodeCenter(target);
-    return `${d3.line()([sourcePos, targetPos])}z`;
+
+    return arcPath(true, sourcePos, targetPos);
+    // return `${d3.line()([sourcePos, targetPos])}`;
   };
 
   couplingNodes
     .merge(newCouplingNodes)
     .attr("d", couplingLine)
+    .attr("marker-end", "url(#arrow)") // sadly the marker colour is fixed!
     .style("stroke", config.colours.couplingStroke)
     .style("stroke-width", "1")
+    .style("fill", "none")
     .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
 
   couplingNodes.exit().remove();
@@ -259,7 +292,7 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
         [0, 0],
         [w, h]
       ])
-      .scaleExtent([0.5, 8])
+      .scaleExtent([0.5, 16])
       .on("zoom", zoomed)
   );
 };
@@ -426,6 +459,22 @@ const Viz = props => {
   return (
     <aside className="Viz">
       <svg className="chart" ref={d3Container}>
+        <defs>
+          {/* arrowhead marker definition */}
+          <marker
+            id="arrow"
+            viewBox="0 0 4 4"
+            refX="2"
+            refY="2"
+            markerWidth="5"
+            markerHeight="5"
+            markerUnits="strokeWidth"
+            xoverflow="visible"
+            orient="auto-start-reverse"
+          >
+            <path d="M0,0L4,2L0,4z" fill="#ff6300" />
+          </marker>
+        </defs>
         <g className="topGroup" />
       </svg>
       <svg className="timescale" ref={d3TimescaleContainer} />

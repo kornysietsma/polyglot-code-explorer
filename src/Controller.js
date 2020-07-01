@@ -6,6 +6,7 @@ import _uniqueId from "lodash/uniqueId";
 import { numberOfChangersScale } from "./ColourScales";
 import VisualizationData from "./visualizationData";
 import VisColourKey from "./VisColourKey";
+import CouplingController from "./CouplingController";
 
 const Controller = props => {
   const { data, state, dispatch } = props;
@@ -31,39 +32,6 @@ const Controller = props => {
 
   const currentVisOrSub = currentSubVisData || currentParentVisData;
 
-  let churnControls = "";
-  if (couplingConfig.couplingAvailable) {
-    if (couplingConfig.shown) {
-      churnControls = (
-        <button
-          type="button"
-          onClick={() =>
-            dispatch({
-              type: "setShowCoupling",
-              payload: false
-            })
-          }
-        >
-          Hide coupling
-        </button>
-      );
-    } else {
-      churnControls = (
-        <button
-          type="button"
-          onClick={() =>
-            dispatch({
-              type: "setShowCoupling",
-              payload: true
-            })
-          }
-        >
-          Show coupling
-        </button>
-      );
-    }
-  }
-
   return (
     <aside className="Controller">
       <div>
@@ -87,7 +55,7 @@ const Controller = props => {
           </select>
         </label>
       </div>
-      {churnControls}
+      <CouplingController dispatch={dispatch} state={state} stats={metadata.stats} />
       <div>
         <label htmlFor={vizId}>
           Visualization:

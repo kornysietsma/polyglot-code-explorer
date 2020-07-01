@@ -263,7 +263,7 @@ export function nodeCouplingFiles(node, earliest, latest) {
     return midpoint >= earliest && midpoint <= latest;
   });
   if (buckets.length === 0) {
-    console.warn("No buckets in selected date range");
+    // nothing in current selection
     return [];
   }
   let totalCommitDays = 0;

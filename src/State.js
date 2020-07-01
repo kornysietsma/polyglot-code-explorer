@@ -107,7 +107,7 @@ function initialiseGlobalState(initialData) {
       colours: {
         defaultStroke: "#111111",
         selectedStroke: "#fffa00",
-        couplingStroke: "#ff6300",
+        couplingStroke: "#ff6300", // need to change the arrow colour as well if you change this!
         goodColour: "blue",
         badColour: "red",
         uglyColour: "yellow",
@@ -136,9 +136,10 @@ function initialiseGlobalState(initialData) {
     expensiveConfig: {
       depth: Math.min(8, maxDepth)
     },
-    stats: {
+      // TODO - do we really need state.stats - just use metadata.stats!
+      stats: {
       maxDepth,
-      maxLoc: Math.min(maxLoc, 2000),
+      maxLoc: Math.min(maxLoc, 2000), // TODO - this should be in loc visualization really
       churn: { maxLines, maxCommits, maxDays } // duplicate so we can get it later!
     }
   };
@@ -172,9 +173,16 @@ function globalDispatchReducer(state, action) {
         expensiveConfig: { ...expensiveConfig, depth: action.payload }
       };
     case "setShowCoupling": {
-      const result = _.cloneDeep(state);
-      result.couplingConfig.shown = action.payload;
-      return result;
+      return {
+        ...state,
+        couplingConfig: { ...couplingConfig, shown: action.payload }
+      };
+    }
+    case "setMinCouplingRatio": {
+      return {
+        ...state,
+        couplingConfig: { ...couplingConfig, minRatio: action.payload }
+      };
     }
     case "selectNode":
       return {

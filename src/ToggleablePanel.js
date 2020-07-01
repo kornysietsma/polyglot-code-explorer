@@ -10,10 +10,7 @@ const ToggleablePanel = props => {
     hideText = "hide",
     borderlessIfHidden = false
   } = props;
-  console.log("ShowInitially:", showInitially);
-  console.log("bih", borderlessIfHidden);
   const [showResults, setShowResults] = React.useState(showInitially);
-  console.log("show results", showResults);
   const onClick = () => setShowResults(!showResults);
   const hiddenBorderStyle = borderlessIfHidden
     ? styles.borderless

@@ -4,6 +4,12 @@ import "./css/normalize.css";
 import "./css/custom.css";
 import App from "./App";
 import * as serviceWorker from "./serviceWorker";
+import {
+  countLanguagesIn,
+  gatherTimescaleData,
+  gatherGlobalStats,
+  gatherNodesByPath
+} from "./preprocess";
 
 const xhttp = new XMLHttpRequest();
 let data = {};
@@ -13,7 +19,30 @@ xhttp.onreadystatechange = function() {
     console.log("loading app");
     // load up the raw data when it is available
     data = JSON.parse(xhttp.responseText);
-    ReactDOM.render(<App rawData={data} />, document.getElementById("root"));
+    console.log("postprocessing languages");
+    const languages = countLanguagesIn(data);
+    console.log("postprocessing global stats");
+    const stats = gatherGlobalStats(data);
+    console.log("building node index");
+    const nodesByPath = gatherNodesByPath(data);
+    console.log("building date scale data");
+    const timescaleData = gatherTimescaleData(data, "week");
+    console.log("postprocessing complete");
+    const { users } = data.data.git_meta;
+    if (data.data.coupling_meta) {
+      stats.coupling = { ...data.data.coupling_meta };
+    }
+    const metadata = {
+      languages,
+      stats,
+      users,
+      nodesByPath,
+      timescaleData
+    };
+    ReactDOM.render(
+      <App rawData={data} metadata={metadata} />,
+      document.getElementById("root")
+    );
   }
 };
 
