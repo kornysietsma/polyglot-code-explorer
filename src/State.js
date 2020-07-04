@@ -2,12 +2,12 @@ import _ from "lodash";
 import moment from "moment";
 import VisualizationData from "./visualizationData";
 
-function initialiseGlobalState(initialData) {
+function initialiseGlobalState(initialDataRef) {
   const {
     metadata: {
       stats: { maxDepth, earliestCommit, latestCommit, coupling }
     }
-  } = initialData;
+  } = initialDataRef.current;
 
   const twoYearsAgo = moment
     .unix(latestCommit)

@@ -9,23 +9,22 @@ import { globalDispatchReducer, initialiseGlobalState } from "./State";
 
 const App = props => {
   // eslint-disable-next-line react/prop-types
-  const { rawData, metadata } = props;
+  const { dataRef } = props;
 
   const [vizState, dispatch] = useReducer(
     globalDispatchReducer,
-    { rawData, metadata },
+    dataRef,
     initialiseGlobalState
   );
-  const data = useRef({ metadata, files: rawData });
 
   return (
     <div className="App">
       <header className="App-header">
         <h1>Polyglot Code Explorer (beta)</h1>
       </header>
-      <Viz data={data} state={vizState} dispatch={dispatch} />
-      <Controller data={data} state={vizState} dispatch={dispatch} />
-      <Inspector metadata={metadata} state={vizState} dispatch={dispatch} />
+      <Viz dataRef={dataRef} state={vizState} dispatch={dispatch} />
+      <Controller dataRef={dataRef} state={vizState} dispatch={dispatch} />
+      <Inspector dataRef={dataRef} state={vizState} dispatch={dispatch} />
     </div>
   );
 };

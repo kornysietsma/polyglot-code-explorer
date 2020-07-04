@@ -413,32 +413,22 @@ function usePrevious(value) {
 const Viz = props => {
   const d3Container = useRef(null);
   const d3TimescaleContainer = useRef(null);
-  const {
-    data,
-    state,
-    dispatch,
-    state: { config, expensiveConfig, couplingConfig }
-  } = props;
+  const { dataRef, state, dispatch } = props;
 
-  const {
-    metadata: { timescaleData },
-    metadata,
-    files
-  } = data.current;
-
-  const prevState = usePrevious({ config, expensiveConfig, couplingConfig });
+  const prevState = usePrevious(state);
 
   useEffect(() => {
+    const {
+      metadata: { timescaleData },
+      metadata,
+      files
+    } = dataRef.current;
+    const { config, expensiveConfig, couplingConfig } = state;
     if (
       prevState === undefined ||
       !_.isEqual(prevState.expensiveConfig, expensiveConfig)
     ) {
       console.log("expensive config change - rebuild all");
-      if (prevState === undefined) {
-        console.log("No prev state");
-      } else {
-        console.log(prevState.expensiveConfig, expensiveConfig);
-      }
       draw(d3Container, files, metadata, state, dispatch);
       drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch);
     } else {
@@ -451,8 +441,7 @@ const Viz = props => {
         updateCoupling(d3Container, files, metadata, state);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [files, state]);
+  }, [dataRef, state, dispatch, prevState]);
 
   return (
     <aside className="Viz">

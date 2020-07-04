@@ -10,8 +10,8 @@ import CouplingController from "./CouplingController";
 import { humanizeDate } from "./datetimes";
 
 const Controller = props => {
-  const { data, state, dispatch } = props;
-  const { metadata } = data.current;
+  const { dataRef, state, dispatch } = props;
+  const { metadata } = dataRef.current;
   const { maxDepth } = metadata.stats;
   const { config, expensiveConfig, couplingConfig } = state;
   const { earliest, latest } = state.config.dateRange;
