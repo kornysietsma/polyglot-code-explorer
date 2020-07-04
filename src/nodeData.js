@@ -290,10 +290,18 @@ export function nodeCouplingFiles(node, earliest, latest) {
   });
 }
 
-export function nodeCouplingFilesFiltered(node, earliest, latest, minRatio) {
+export function nodeCouplingFilesFiltered(
+  node,
+  earliest,
+  latest,
+  minRatio,
+  minDays
+) {
   const files = nodeCouplingFiles(node, earliest, latest);
   if (files === undefined || files.length === 0) return files;
-  return files.filter(f => f.targetCount / f.sourceCount > minRatio);
+  return files.filter(
+    f => f.sourceCount >= minDays && f.targetCount / f.sourceCount > minRatio
+  );
 }
 
 export function nodeLayoutData(node) {

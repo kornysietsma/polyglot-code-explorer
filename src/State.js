@@ -119,6 +119,7 @@ function initialiseGlobalState(initialData) {
     couplingConfig: {
       couplingAvailable,
       shown: false,
+      minDays: 10,
       minRatio: 0.9,
       dateRange: {
         // TODO: use buckets instead!
@@ -169,6 +170,12 @@ function globalDispatchReducer(state, action) {
       return {
         ...state,
         couplingConfig: { ...couplingConfig, minRatio: action.payload }
+      };
+    }
+    case "setCouplingMinDays": {
+      return {
+        ...state,
+        couplingConfig: { ...couplingConfig, minDays: action.payload }
       };
     }
     case "selectNode":

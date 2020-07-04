@@ -21,7 +21,8 @@ const CouplingInspector = props => {
     node,
     earliest,
     latest,
-    couplingConfig.minRatio
+    couplingConfig.minRatio,
+    couplingConfig.minDays
   );
   // this is ugly - but we can't return early if no coupling data
   //  or the toggleablepanel state gets lost when you change nodes!
@@ -42,7 +43,7 @@ const CouplingInspector = props => {
     files = files.slice(0, 20);
     title = (
       <h5>
-        Source commits: {sourceCount} in range {humanizeDate(couplingStart)} to
+        Source days: {sourceCount} in range {humanizeDate(couplingStart)} to
         {humanizeDate(couplingEnd)}
       </h5>
     );
@@ -51,7 +52,7 @@ const CouplingInspector = props => {
         <thead>
           <tr>
             <td>File</td>
-            <td>Matching commits</td>
+            <td>Matching days</td>
             <td>Ratio</td>
           </tr>
         </thead>

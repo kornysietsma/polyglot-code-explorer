@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/no-onchange */
 /* eslint-disable react/prop-types */
 import React, { useState, useRef } from "react";
 
@@ -10,17 +11,10 @@ import { humanizeDate } from "./datetimes";
 const CouplingController = props => {
   const { dispatch, state, stats } = props;
   const {
-    couplingConfig: { couplingAvailable, shown, minRatio }
+    couplingConfig: { couplingAvailable, shown, minRatio, minDays }
   } = state;
-
-  const {
-    coupling: { bucketCount, bucketSize, firstBucketStart }
-  } = stats;
-  const { earliest, latest } = state.config.dateRange;
-
   const { current: sliderId } = useRef(_uniqueId("coupling-controller-"));
-
-  // TODO: debounce slider?  Tried using 'onInput' but 'onChange' fires on every change anyway
+  const { current: minDaysId } = useRef(_uniqueId("coupling-controller-"));
 
   if (!couplingAvailable) {
     return (
@@ -29,6 +23,13 @@ const CouplingController = props => {
       </div>
     );
   }
+
+  const {
+    coupling: { bucketCount, bucketSize, firstBucketStart }
+  } = stats;
+  const { earliest, latest } = state.config.dateRange;
+
+  // TODO: debounce slider?  Tried using 'onInput' but 'onChange' fires on every change anyway
 
   const bucketDays = bucketSize / (24 * 60 * 60);
 
@@ -63,6 +64,9 @@ const CouplingController = props => {
       Show coupling
     </button>
   );
+
+  const minMinDays = 5;
+  const maxMinDays = 30;
 
   return (
     <div>
@@ -124,6 +128,7 @@ const CouplingController = props => {
           Coupling Ratio: &nbsp;
           {minRatio.toFixed(2)}
           <input
+            id={sliderId}
             type="range"
             min="0.25"
             max="1.0"
@@ -135,6 +140,29 @@ const CouplingController = props => {
               dispatch({ type: "setMinCouplingRatio", payload: value });
             }}
           />
+        </label>
+        <label htmlFor={minDaysId}>
+          Minimum days for coupling:
+          <select
+            name="minDays"
+            id={minDaysId}
+            value={minDays}
+            onChange={evt =>
+              dispatch({
+                type: "setCouplingMinDays",
+                payload: Number.parseInt(evt.target.value, 10)
+              })
+            }
+          >
+            {[...Array(maxMinDays - minMinDays + 1).keys()].map(d => {
+              const days = minMinDays + d;
+              return (
+                <option key={days} value={days}>
+                  {days}
+                </option>
+              );
+            })}
+          </select>
         </label>
       </ToggleablePanel>
     </div>

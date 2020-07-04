@@ -32,10 +32,10 @@ function findGitUrl(node) {
     const sshRemoteRe = /\w+@([^:]+):([a-zA-Z./]+)/; // ssh login not http(s) url
     if (sshRemoteRe.test(remote)) {
       remote = remote.replace(sshRemoteRe, "https://$1/$2");
-      if (remote.endsWith(".git")) {
-        remote = remote.substr(0, remote.length - 4);
-      }
     }
+    if (remote.endsWith(".git")) {
+      remote = remote.substr(0, remote.length - 4);
+    } 
     const head = nodeRemoteHead(current);
     if (head) {
       return `${remote}/blob/${head}/${suffix}`;
@@ -95,6 +95,7 @@ const NodeInspector = props => {
   const gitUrl = findGitUrl(node);
   const { earliest, latest } = state.config.dateRange;
   const { topChangersCount } = state.config.numberOfChangers;
+  const { couplingAvailable } = state.couplingConfig;
   const age = nodeAge(node, earliest, latest);
   const lastCommit = nodeLastCommitDay(node, earliest, latest);
   const creationDate = nodeCreationDate(node, earliest, latest);
@@ -166,7 +167,6 @@ const NodeInspector = props => {
       <p>
         Selected date range {humanizeDate(earliest)} to {humanizeDate(latest)}
       </p>
-
       <ToggleablePanel title="basic stats" showInitially>
         <p>File type: {locData.language}</p>
         <p>Lines of code: {locData.code}</p>
@@ -194,12 +194,16 @@ const NodeInspector = props => {
         {topChangerTable}
       </ToggleablePanel>
       {churnReport(churnData)}
-      <CouplingInspector
-        node={node}
-        dispatch={dispatch}
-        state={state}
-        stats={stats}
-      />
+      {couplingAvailable ? (
+        <CouplingInspector
+          node={node}
+          dispatch={dispatch}
+          state={state}
+          stats={stats}
+        />
+      ) : (
+        ""
+      )}
     </div>
   );
 };
