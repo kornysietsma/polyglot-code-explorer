@@ -8,7 +8,8 @@ import {
   nodeDescendants,
   nodeCenter,
   nodeHasCouplingData,
-  nodeCouplingFilesFiltered
+  nodeCouplingFilesFiltered,
+  nodePath
 } from "./nodeData";
 
 // TODO: should this live in Visualization.js ?
@@ -122,7 +123,8 @@ function normalizedCouplingNodes(rootNode, state) {
             earliest,
             latest,
             couplingConfig.minRatio,
-            couplingConfig.minDays
+            couplingConfig.minDays,
+            couplingConfig.maxCommonRoots
           )
         )
         .flat();
@@ -143,7 +145,7 @@ function arcPath(leftHand, source, target) {
   return `M${x1},${y1}A${dr}, ${dr} ${xRotation}, ${largeArc}, ${sweep} ${x2},${y2}`;
 }
 
-function drawCoupling(group, files, metadata, state) {
+function drawCoupling(group, files, metadata, state, dispatch) {
   const { config } = state;
   const { nodesByPath } = metadata;
   const allCouplingNodes = normalizedCouplingNodes(files, state);
@@ -181,6 +183,12 @@ function drawCoupling(group, files, metadata, state) {
     return "1px";
   };
 
+  const couplingLabel = d => {
+    const ratio = d.targetCount / d.sourceCount;
+    const from = nodePath(d.source);
+    return `${from} -> ${d.targetFile} (${ratio.toFixed(3)})`;
+  };
+
   couplingNodes
     .merge(newCouplingNodes)
     .attr("d", couplingLine)
@@ -188,19 +196,25 @@ function drawCoupling(group, files, metadata, state) {
     .style("stroke", couplingLineStroke)
     .style("stroke-width", couplingLineWidth)
     .style("fill", "none")
-    .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
+    .style("vector-effect", "non-scaling-stroke")
+    .on("click", (node, i, nodeList) => {
+      console.log("onClicked", node, i, nodeList[i]);
+      dispatch({ type: "selectNode", payload: node.source.hierarchNode });
+    })
+    .append("svg:title")
+    .text(couplingLabel); // so zooming doesn't make thick lines
 
   couplingNodes.exit().remove();
 }
 
-const updateCoupling = (d3Container, files, metadata, state) => {
+const updateCoupling = (d3Container, files, metadata, state, dispatch) => {
   if (!d3Container.current) {
     throw Error("No current container");
   }
   const vizEl = d3Container.current;
   const svg = d3.select(vizEl);
   const group = svg.selectAll(".topGroup");
-  drawCoupling(group, files, metadata, state);
+  drawCoupling(group, files, metadata, state, dispatch);
 };
 
 const draw = (d3Container, files, metadata, state, dispatch) => {
@@ -228,6 +242,12 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
     ]);
   const group = svg.selectAll(".topGroup");
   const rootNode = d3.hierarchy(files); // .sum(d => d.value);
+
+  // ugly - we cross-link each node to the hierarchy node, because so much needs hierarchy nodes.
+  // some time this should be fixed properly
+  rootNode.descendants().forEach(node => {
+    node.data.hierarchNode = node;
+  });
 
   // note we filter out nodes that are parents who will be hidden by their children, for speed
   // so only show parent nodes at the clipping level.
@@ -435,7 +455,7 @@ const Viz = props => {
       }
       if (!_.isEqual(prevState.couplingConfig, couplingConfig)) {
         console.log("coupling change");
-        updateCoupling(d3Container, files, metadata, state);
+        updateCoupling(d3Container, files, metadata, state, dispatch);
       }
     }
   }, [dataRef, state, dispatch, prevState]);

@@ -16,6 +16,7 @@ const Inspector = props => {
       node={selectedNode}
       state={state}
       dispatch={dispatch}
+      metadata={metadata}
     />
   ) : (
     <NodeInspector

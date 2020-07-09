@@ -11,10 +11,17 @@ import { humanizeDate } from "./datetimes";
 const CouplingController = props => {
   const { dispatch, state, stats } = props;
   const {
-    couplingConfig: { couplingAvailable, shown, minRatio, minDays }
+    couplingConfig: {
+      couplingAvailable,
+      shown,
+      minRatio,
+      minDays,
+      maxCommonRoots
+    }
   } = state;
   const { current: sliderId } = useRef(_uniqueId("coupling-controller-"));
   const { current: minDaysId } = useRef(_uniqueId("coupling-controller-"));
+  const { current: maxRootsId } = useRef(_uniqueId("coupling-controller-"));
 
   if (!couplingAvailable) {
     return (
@@ -162,6 +169,36 @@ const CouplingController = props => {
                 </option>
               );
             })}
+          </select>
+        </label>
+        <label htmlFor={maxRootsId}>
+          Filter coupling by distance:
+          <select
+            name="maxRoots"
+            id={maxRootsId}
+            value={maxCommonRoots}
+            onChange={evt =>
+              dispatch({
+                type: "setCouplingMaxCommonRoots",
+                payload: Number.parseInt(evt.target.value, 10)
+              })
+            }
+          >
+            <option key="-1" value="-1">
+              No filter
+            </option>
+            <option key="0" value="0">
+              top-level directories
+            </option>
+            <option key="1" value="1">
+              0-1st level directories
+            </option>
+            <option key="2" value="2">
+              0-2nd level directories
+            </option>
+            <option key="3" value="3">
+              0-3rd level directories
+            </option>
           </select>
         </label>
       </ToggleablePanel>

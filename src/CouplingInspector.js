@@ -22,7 +22,8 @@ const CouplingInspector = props => {
     earliest,
     latest,
     couplingConfig.minRatio,
-    couplingConfig.minDays
+    couplingConfig.minDays,
+    couplingConfig.maxCommonRoots
   );
   // this is ugly - but we can't return early if no coupling data
   //  or the toggleablepanel state gets lost when you change nodes!

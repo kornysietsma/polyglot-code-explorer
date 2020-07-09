@@ -39,6 +39,13 @@ export function dataNode(node) {
   return isHierarchyNode(node) ? node.data : node;
 }
 
+export function nodePath(node) {
+  return dataNode(node).path;
+}
+export function nodeName(node) {
+  return dataNode(node).name;
+}
+
 function addDescendants(nodes, node) {
   nodes.push(node);
   if (node.children) {
@@ -290,18 +297,47 @@ export function nodeCouplingFiles(node, earliest, latest) {
   });
 }
 
+function commonRoots(file1, file2) {
+  const f1bits = file1.split("/");
+  const f2bits = file2.split("/");
+  let maxLength = f1bits.length;
+  if (f2bits.length < maxLength) {
+    maxLength = f2bits.length;
+  }
+  let commonLength = 0;
+  let index = 0;
+  while (f1bits[index] === f2bits[index]) {
+    commonLength += 1;
+    if (index >= maxLength) break;
+    index += 1;
+  }
+  console.log("commonRoots", file1, file2, commonLength);
+  return commonLength;
+}
+
+function filesHaveMaxCommonRoots(maxCommonRoots, file1, file2) {
+  if (maxCommonRoots < 0) return true;
+  const common = commonRoots(file1, file2);
+  return common <= maxCommonRoots;
+}
+
 export function nodeCouplingFilesFiltered(
   node,
   earliest,
   latest,
   minRatio,
-  minDays
+  minDays,
+  maxCommonRoots
 ) {
   const files = nodeCouplingFiles(node, earliest, latest);
   if (files === undefined || files.length === 0) return files;
-  return files.filter(
-    f => f.sourceCount >= minDays && f.targetCount / f.sourceCount > minRatio
-  );
+  return files.filter(f => {
+    return (
+      f.sourceCount >= minDays &&
+      f.targetCount / f.sourceCount > minRatio &&
+      filesHaveMaxCommonRoots(maxCommonRoots, nodePath(f.source), f.targetFile)
+    );
+  });
 }
 
 export function nodeLayoutData(node) {

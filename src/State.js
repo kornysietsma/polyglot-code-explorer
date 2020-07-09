@@ -121,6 +121,10 @@ function initialiseGlobalState(initialDataRef) {
       shown: false,
       minDays: 10,
       minRatio: 0.9,
+      // maxCommonRoots - -1 means show all coupling
+      // 0 means only show files who have no roots in common - so /foo/baz.txt and /bar/baz.js
+      // 1 means only show files who have 0 or 1 roots in common - so /foo/bar/baz and /foo/fi/fum can match
+      maxCommonRoots: -1,
       dateRange: {
         // TODO: use buckets instead!
         earliest,
@@ -176,6 +180,12 @@ function globalDispatchReducer(state, action) {
       return {
         ...state,
         couplingConfig: { ...couplingConfig, minDays: action.payload }
+      };
+    }
+    case "setCouplingMaxCommonRoots": {
+      return {
+        ...state,
+        couplingConfig: { ...couplingConfig, maxCommonRoots: action.payload }
       };
     }
     case "selectNode":
