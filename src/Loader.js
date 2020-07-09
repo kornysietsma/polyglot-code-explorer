@@ -52,7 +52,7 @@ const Loader = () => {
 
   const dataRef = useRef(null);
 
-  const data = useFetch(url, dataRef);
+  const data = useFetch(url);
   dataRef.current = data;
 
   return data == null ? <div>Loading...</div> : <App dataRef={dataRef} />;

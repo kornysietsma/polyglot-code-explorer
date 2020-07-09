@@ -236,10 +236,7 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
     .filter(d => d.depth <= expensiveConfig.depth)
     .filter(d => d.children === undefined || d.depth === expensiveConfig.depth);
 
-  const nodes = group
-    .datum(rootNode)
-    .selectAll(".cell")
-    .data(allNodes, node => node.path);
+  const nodes = group.selectAll(".cell").data(allNodes, node => node.path);
 
   // TODO - consider reworking this with d3.join which seems to be the new hotness?
   const newNodes = nodes
