@@ -289,7 +289,7 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
 
   selectionNodes.exit().remove();
 
-  drawCoupling(group, files, metadata, state);
+  drawCoupling(group, files, metadata, state, dispatch);
 
   // if we are redrawing after expensive config change, need to force coupling nodes to the front!
   // TODO: better would be to use a different top-level group...
