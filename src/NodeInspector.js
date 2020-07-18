@@ -33,9 +33,13 @@ function findGitUrl(node) {
     if (sshRemoteRe.test(remote)) {
       remote = remote.replace(sshRemoteRe, "https://$1/$2");
     }
+    // TODO: these could be regex magic?
+    if (remote.startsWith("git://")) {
+      remote = `https://${remote.substr(6, remote.length)}`;
+    }
     if (remote.endsWith(".git")) {
       remote = remote.substr(0, remote.length - 4);
-    } 
+    }
     const head = nodeRemoteHead(current);
     if (head) {
       return `${remote}/blob/${head}/${suffix}`;
