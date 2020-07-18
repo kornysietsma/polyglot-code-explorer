@@ -1,11 +1,10 @@
 # Polyglot Code Explorer
 
-This is the base project for my react-ising my d3 source code visualizations.
+This is the base project for my cross-language source code visualization thingy.
 
-*Note* if you stumble across this - it needs two other projects to generate the JSON file, and calculate the layouts - and I haven't documented those or checked them in - so it's not useable at the moment except for exploring.
+The latest documentation should be at <https://kornysietsma.github.io/polyglot-tools-docs/>
 
 *This is a work in progress, more docs to come*
-
 
 A few key concepts:
 
