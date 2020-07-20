@@ -1,8 +1,8 @@
 /* eslint-disable jsx-a11y/no-onchange */
-/* eslint-disable react/prop-types */
-import React, { useState, useRef } from "react";
-
+/* eslint-disable react/forbid-prop-types */
+import React, { useRef } from "react";
 import _uniqueId from "lodash/uniqueId";
+import defaultPropTypes from "./defaultPropTypes";
 import ToggleablePanel from "./ToggleablePanel";
 import HelpPanel from "./HelpPanel";
 import { couplingDateRange } from "./couplingBuckets";
@@ -205,5 +205,7 @@ const CouplingController = props => {
     </div>
   );
 };
+
+CouplingController.propTypes = defaultPropTypes;
 
 export default CouplingController;

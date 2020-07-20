@@ -1,5 +1,7 @@
-/* eslint-disable react/prop-types */
+/* eslint-disable react/forbid-prop-types */
+
 import React from "react";
+import defaultPropTypes from "./defaultPropTypes";
 import ToggleablePanel from "./ToggleablePanel";
 import HelpPanel from "./HelpPanel";
 import { humanizeDate } from "./datetimes";
@@ -22,5 +24,5 @@ const VisColourKey = props => {
     </div>
   );
 };
-
+VisColourKey.propTypes = defaultPropTypes;
 export default VisColourKey;

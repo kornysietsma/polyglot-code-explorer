@@ -1,6 +1,7 @@
-/* eslint-disable react/prop-types */
-import React from "react";
+/* eslint-disable react/forbid-prop-types */
 
+import React from "react";
+import defaultPropTypes from "./defaultPropTypes";
 import ToggleablePanel from "./ToggleablePanel";
 import { nodeCouplingFilesFiltered } from "./nodeData";
 import { couplingDateRange } from "./couplingBuckets";
@@ -80,5 +81,7 @@ const CouplingInspector = props => {
     </ToggleablePanel>
   );
 };
+
+CouplingInspector.propTypes = defaultPropTypes;
 
 export default CouplingInspector;

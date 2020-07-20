@@ -1,5 +1,7 @@
-/* eslint-disable react/prop-types */
+/* eslint-disable react/forbid-prop-types */
+
 import React from "react";
+import defaultPropTypes from "./defaultPropTypes";
 import PathInspector from "./PathInspector";
 import CouplingInspector from "./CouplingInspector";
 import {
@@ -211,5 +213,7 @@ const NodeInspector = props => {
     </div>
   );
 };
+
+NodeInspector.propTypes = defaultPropTypes;
 
 export default NodeInspector;

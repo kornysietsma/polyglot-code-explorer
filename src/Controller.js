@@ -1,9 +1,8 @@
-/* eslint-disable react/prop-types */
-// as prop-types seem painful to implement without going full typescript
 /* eslint-disable jsx-a11y/no-onchange */
-import React, { useState, useRef } from "react";
+/* eslint-disable react/forbid-prop-types */
+import React, { useRef } from "react";
 import _uniqueId from "lodash/uniqueId";
-import { numberOfChangersScale } from "./ColourScales";
+import defaultPropTypes from "./defaultPropTypes";
 import VisualizationData from "./visualizationData";
 import VisColourKey from "./VisColourKey";
 import CouplingController from "./CouplingController";
@@ -109,5 +108,7 @@ const Controller = props => {
     </aside>
   );
 };
+
+Controller.propTypes = defaultPropTypes;
 
 export default Controller;

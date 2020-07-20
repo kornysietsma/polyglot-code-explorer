@@ -1,5 +1,7 @@
-/* eslint react/prop-types: 0 */
+/* eslint-disable react/forbid-prop-types */
+
 import React from "react";
+import defaultPropTypes from "./defaultPropTypes";
 import NodeInspector from "./NodeInspector";
 import DirectoryNodeInspector from "./DirectoryNodeInspector";
 import { isDirectory } from "./nodeData";
@@ -44,5 +46,5 @@ const Inspector = props => {
     </aside>
   );
 };
-
+Inspector.propTypes = defaultPropTypes;
 export default Inspector;

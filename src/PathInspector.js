@@ -1,5 +1,7 @@
-/* eslint-disable react/prop-types */
+/* eslint-disable react/forbid-prop-types */
+
 import React from "react";
+import defaultPropTypes from "./defaultPropTypes";
 import styles from "./PathInspector.module.css";
 import ToggleablePanel from "./ToggleablePanel";
 
@@ -37,5 +39,5 @@ const PathInspector = props => {
     </ToggleablePanel>
   );
 };
-
+PathInspector.propTypes = defaultPropTypes;
 export default PathInspector;

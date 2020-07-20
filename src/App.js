@@ -1,6 +1,6 @@
-/* eslint-disable react/prop-types */
-// as prop-types seem painful to implement without going full typescript
-import React, { useReducer, useRef } from "react";
+/* eslint-disable react/forbid-prop-types */
+import React, { useReducer } from "react";
+import PropTypes from "prop-types";
 import "./App.css";
 import Controller from "./Controller";
 import Inspector from "./Inspector";
@@ -27,6 +27,10 @@ const App = props => {
       <Inspector dataRef={dataRef} state={vizState} dispatch={dispatch} />
     </div>
   );
+};
+
+App.propTypes = {
+  dataRef: PropTypes.shape({ current: PropTypes.any }).isRequired
 };
 
 export default App;

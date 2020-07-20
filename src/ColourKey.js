@@ -1,5 +1,5 @@
-/* eslint-disable react/prop-types */
 import React from "react";
+import PropTypes from "prop-types";
 
 const ColourKey = props => {
   const { title, keyData } = props;
@@ -30,5 +30,8 @@ const ColourKey = props => {
     </div>
   );
 };
-
+ColourKey.propTypes = {
+  title: PropTypes.string.isRequired,
+  keyData: PropTypes.arrayOf(PropTypes.array).isRequired
+};
 export default ColourKey;

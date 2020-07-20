@@ -1,7 +1,9 @@
-/* eslint-disable react/prop-types */
+/* eslint-disable react/forbid-prop-types */
+
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import _ from "lodash";
+import defaultPropTypes from "./defaultPropTypes";
 import { dateToUnix, unixToDate } from "./datetimes";
 import VisualizationData from "./visualizationData";
 import {
@@ -485,5 +487,5 @@ const Viz = props => {
     </aside>
   );
 };
-
+Viz.propTypes = defaultPropTypes;
 export default Viz;
