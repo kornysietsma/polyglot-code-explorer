@@ -57,18 +57,18 @@ also I couldn't easily test with other files without a lot of fun copying over t
 
 Now, instead it looks for a file in `public/data/default.json` and loads it via an `xmlhttprequest` in `index.js`
 
-If you want a different file, set `REACT_APP_LATI_DATA` with the file prefix (ignoring the `.json` part) - create-react-app
+If you want a different file, set `REACT_APP_EXPLORER_DATA` with the file prefix (ignoring the `.json` part) - create-react-app
 will pass variables starting `REACT_APP_` to the app, so `index.js` can read it and load the right file.
 
 For example:
 
 ```shell script
-REACT_APP_LATI_DATA=big yarn start
+REACT_APP_EXPLORER_DATA=big yarn start
 ```
 
 or if you don't want to re-open the browser:
 ```shell script
-REACT_APP_LATI_DATA=big BROWSER=none yarn start
+REACT_APP_EXPLORER_DATA=big BROWSER=none yarn start
 ```
 
 

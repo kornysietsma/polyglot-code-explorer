@@ -47,7 +47,7 @@ const useFetch = url => {
 };
 
 const Loader = () => {
-  const dataFile = process.env.REACT_APP_LATI_DATA || "default";
+  const dataFile = process.env.REACT_APP_EXPLORER_DATA || "default";
   const url = `${process.env.PUBLIC_URL}/data/${dataFile}.json`;
 
   const dataRef = useRef(null);
