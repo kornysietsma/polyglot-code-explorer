@@ -77,8 +77,8 @@ const CouplingController = props => {
 
   return (
     <div>
-      {showButton}
       <ToggleablePanel title="coupling controls" showInitially={false}>
+        {showButton}
         <HelpPanel>
           <p>
             Temporal coupling is based on git history - two files which

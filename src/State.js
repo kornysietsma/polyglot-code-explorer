@@ -132,7 +132,7 @@ function initialiseGlobalState(initialDataRef) {
       }
     },
     expensiveConfig: {
-      depth: Math.min(8, maxDepth)
+      depth: maxDepth
     }
   };
   return defaults;
