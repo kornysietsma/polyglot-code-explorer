@@ -24,7 +24,9 @@ export function numberOfChangersScale(config, metadata) {
 }
 
 export function goodBadUglyScale(config, good, bad, ugly) {
-  const { goodColour, badColour, uglyColour } = config.colours;
+  const { goodColour, badColour, uglyColour } = config.colours[
+    config.colours.currentTheme
+  ];
 
   return d3
     .scaleLinear()
@@ -58,7 +60,9 @@ export function depthScaleBuilder(config, metadata) {
 }
 
 export function earlyLateScaleBuilder(config, metadata) {
-  const { earlyColour, lateColour } = config.colours;
+  const { earlyColour, lateColour } = config.colours[
+    config.colours.currentTheme
+  ];
   const { earliest, latest } = config.dateRange;
 
   return d3

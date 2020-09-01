@@ -95,17 +95,33 @@ function initialiseGlobalState(initialDataRef) {
         topChangersCount: 5, // show this many changers in NodeInspector
       },
       colours: {
-        defaultStroke: "#111111",
-        selectedStroke: "#fffa00",
-        couplingStroke: "#ff6300", // need to change the arrow colour as well if you change this!
-        goodColour: "blue",
-        badColour: "red",
-        uglyColour: "yellow",
-        earlyColour: "blue",
-        lateColour: "green",
-        neutralColour: "#808080",
-        nonexistentColour: "#111111",
-        circlePackBackground: "#111111",
+        currentTheme: "dark", // also sets css on the body!
+        dark: {
+          defaultStroke: "#111111",
+          selectedStroke: "#fffa00",
+          couplingStroke: "#ff6300", // need to change the arrow colour as well if you change this!
+          goodColour: "blue",
+          badColour: "red",
+          uglyColour: "yellow",
+          earlyColour: "blue",
+          lateColour: "green",
+          neutralColour: "#808080",
+          nonexistentColour: "#111111",
+          circlePackBackground: "#111111",
+        },
+        light: {
+          defaultStroke: "#f7f7f7",
+          selectedStroke: "#fffa00",
+          couplingStroke: "#ff6300", // need to change the arrow colour as well if you change this!
+          goodColour: "blue",
+          badColour: "red",
+          uglyColour: "yellow",
+          earlyColour: "blue",
+          lateColour: "green",
+          neutralColour: "#808080",
+          nonexistentColour: "#f7f7f7",
+          circlePackBackground: "#f7f7f7",
+        },
       },
       dateRange: {
         earliest,
@@ -133,6 +149,10 @@ function initialiseGlobalState(initialDataRef) {
     },
   };
   return defaults;
+}
+
+function themedColours(config) {
+  return config.colours[config.colours.currentTheme];
 }
 
 function globalDispatchReducer(state, action) {
@@ -201,9 +221,16 @@ function globalDispatchReducer(state, action) {
       result.couplingConfig.dateRange.latest = late;
       return result;
     }
+
+    case "setTheme": {
+      const result = _.cloneDeep(state);
+      result.config.colours.currentTheme = action.payload;
+      return result;
+    }
+
     default:
       throw new Error(`Invalid dispatch type ${action.type}`);
   }
 }
 
-export { initialiseGlobalState, globalDispatchReducer };
+export { themedColours, initialiseGlobalState, globalDispatchReducer };

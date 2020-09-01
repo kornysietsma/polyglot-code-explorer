@@ -20,7 +20,7 @@ import {
   languageScaleBuilder,
   numberOfChangersScale,
 } from "./ColourScales";
-import { standardFillBuilder } from "./fillFunctions";
+import standardFillBuilder from "./fillFunctions";
 import {
   creationKeyData,
   depthKeyData,

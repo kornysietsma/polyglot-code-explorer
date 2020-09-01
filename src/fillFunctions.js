@@ -8,7 +8,9 @@ which only needs a node as a parameter, and return a colour.
 import { nodeCreationDate } from "./nodeData";
 
 function overrideColourFunction(node, config) {
-  const { nonexistentColour, circlePackBackground } = config.colours;
+  const { nonexistentColour, circlePackBackground } = config.colours[
+    config.colours.currentTheme
+  ];
   const { latest } = config.dateRange;
 
   if (node.data.layout.algorithm === "circlePack") return circlePackBackground;
@@ -18,8 +20,8 @@ function overrideColourFunction(node, config) {
 }
 
 // TODO: this could be scrapped as it works for every case!
-export function standardFillBuilder(config, scale, dataFn, parentFn) {
-  const { neutralColour } = config.colours;
+export default function standardFillBuilder(config, scale, dataFn, parentFn) {
+  const { neutralColour } = config.colours[config.colours.currentTheme];
   const { earliest, latest } = config.dateRange;
   return (d) => {
     const override = overrideColourFunction(d, config);

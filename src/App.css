@@ -11,7 +11,12 @@
 /* Should only include top-level layout stuff here -
   move these bits to component CSS files if they get to be non-trivial
 */
-.Viz {
+
+body.light .Viz {
+  background-color: #ffffff;
+}
+
+body.dark .Viz {
   background-color: #010e35;
 }
 

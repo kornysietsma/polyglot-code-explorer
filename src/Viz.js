@@ -50,7 +50,7 @@ const redrawPolygons = (svgSelection, metadata, state) => {
       return `${d3.line()(d.data.layout.polygon)}z`;
     })
     .style("fill", fillFn)
-    .style("stroke", config.colours.defaultStroke)
+    .style("stroke", config.colours[config.colours.currentTheme].defaultStroke)
     .style("stroke-width", strokeWidthFn)
     .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
 };
@@ -68,7 +68,7 @@ const redrawSelection = (svgSelection, state) => {
       return `${d3.line()(d.data.layout.polygon)}z`;
     })
     .style("stroke-width", strokeWidthFn)
-    .style("stroke", config.colours.selectedStroke)
+    .style("stroke", config.colours[config.colours.currentTheme].selectedStroke)
     .style("fill", "none")
     .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
 };
@@ -172,7 +172,9 @@ function drawCoupling(group, files, metadata, state, dispatch) {
   };
 
   const couplingLineStroke = (d) => {
-    const colour = d3.color(config.colours.couplingStroke);
+    const colour = d3.color(
+      config.colours[config.colours.currentTheme].couplingStroke
+    );
     const ratio = d.targetCount / d.sourceCount;
     colour.opacity = ratio;
     return colour;
@@ -420,6 +422,10 @@ function usePrevious(value) {
   return ref.current;
 }
 
+const updateBodyTheme = (newTheme) => {
+  document.body.className = newTheme;
+};
+
 const Viz = (props) => {
   const d3Container = useRef(null);
   const d3TimescaleContainer = useRef(null);
@@ -441,10 +447,17 @@ const Viz = (props) => {
       console.log("expensive config change - rebuild all");
       draw(d3Container, files, metadata, state, dispatch);
       drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch);
+      updateBodyTheme(state.config.colours.currentTheme);
     } else {
       if (!_.isEqual(prevState.config, config)) {
         console.log("cheap config change - just redraw");
         update(d3Container, files, metadata, state);
+        if (
+          prevState.config.colours.currentTheme !==
+          state.config.colours.currentTheme
+        ) {
+          updateBodyTheme(state.config.colours.currentTheme);
+        }
       }
       if (!_.isEqual(prevState.couplingConfig, couplingConfig)) {
         console.log("coupling change");

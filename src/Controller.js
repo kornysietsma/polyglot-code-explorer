@@ -13,6 +13,7 @@ const Controller = (props) => {
   const { metadata } = dataRef.current;
   const { maxDepth } = metadata.stats;
   const { config } = state;
+  const { currentTheme } = config.colours;
   const { earliest, latest } = state.config.dateRange;
   // ID logic from https://stackoverflow.com/questions/29420835/how-to-generate-unique-ids-for-form-labels-in-react
   const { current: vizId } = useRef(_uniqueId("controller-"));
@@ -33,6 +34,32 @@ const Controller = (props) => {
     : undefined;
 
   const currentVisOrSub = currentSubVisData || currentParentVisData;
+
+  const themeButton = currentTheme === 'dark' ? (
+    <button
+      type="button"
+      onClick={() =>
+        dispatch({
+          type: "setTheme",
+          payload: "light",
+        })
+      }
+    >
+      Light theme
+    </button>
+  ) : (
+    <button
+      type="button"
+      onClick={() =>
+        dispatch({
+          type: "setTheme",
+          payload: "dark",
+        })
+      }
+    >
+      Dark theme
+    </button>
+  );
 
   return (
     <aside className="Controller">
@@ -105,6 +132,7 @@ const Controller = (props) => {
         ""
       )}
       <VisColourKey vis={currentVisOrSub} config={config} metadata={metadata} />
+      {themeButton}
     </aside>
   );
 };
