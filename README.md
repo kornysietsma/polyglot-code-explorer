@@ -8,6 +8,35 @@ For an overview and more documentation, take a look at <https://polyglot.korny.i
 
 ## Installing and running
 
+You can run with node.js (see below) - or you can grab a compiled static site and run it yourself.
+
+### Running from a static release
+
+See also <https://polyglot.korny.info/tools/explorer/howto> for more detailed instructions
+
+Static releases are published to <https://github.com/kornysietsma/polyglot-code-explorer/releases>
+
+These are published as a static site - you can run them by:
+
+- Download the zip file from the latest release
+- Unzip it somewhere
+- Optionally copy your own JSON data file over `data/default.json`
+- Load the static site in your favourite static web server
+
+There are quite a ways to run a static web server locally - many people have python pre-installed, in which case you can run a simple web server very easily:
+
+```sh
+# Check python version
+python -V
+# If Python version returned above is 3.X
+python3 -m http.server
+# On windows try "python" instead of "python3", or "py -3"
+# If Python version returned above is 2.X
+python -m SimpleHTTPServer
+```
+
+### Running using node.js
+
 You need node.js installed, currently tested on node 14.5.0 though it may well work on older or newer versions.
 
 You need `yarn` installed - see <https://classic.yarnpkg.com/en/docs/install>
