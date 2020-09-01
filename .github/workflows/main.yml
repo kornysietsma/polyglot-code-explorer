@@ -25,6 +25,7 @@ jobs:
           cp CHANGELOG.md polyglot-code-explorer/
           mkdir dist
           zip dist/polyglot-code-explorer.zip polyglot-code-explorer
+          mv polyglot-code-explorer build
       - name: Release
         uses: docker://antonyurchenko/git-release:v3.4.1
         env:

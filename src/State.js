@@ -5,14 +5,11 @@ import VisualizationData from "./visualizationData";
 function initialiseGlobalState(initialDataRef) {
   const {
     metadata: {
-      stats: { maxDepth, earliestCommit, latestCommit, coupling }
-    }
+      stats: { maxDepth, earliestCommit, latestCommit, coupling },
+    },
   } = initialDataRef.current;
 
-  const twoYearsAgo = moment
-    .unix(latestCommit)
-    .subtract(2, "year")
-    .unix();
+  const twoYearsAgo = moment.unix(latestCommit).subtract(2, "year").unix();
 
   const earliest = twoYearsAgo < earliestCommit ? earliestCommit : twoYearsAgo;
   const couplingAvailable = coupling !== undefined;
@@ -22,13 +19,13 @@ function initialiseGlobalState(initialDataRef) {
       visualization: "language",
       subVis: undefined,
       layout: {
-        timescaleHeight: 130 // including margins
+        timescaleHeight: 130, // including margins
       },
       loc: {
         bad: 1000,
         good: 0,
         ugly: 10000,
-        precision: 0 // number of float digits to show
+        precision: 0, // number of float digits to show
       },
       indentation: {
         // replace indentation when we've refactored everything
@@ -36,53 +33,53 @@ function initialiseGlobalState(initialDataRef) {
           bad: 10000,
           good: 0,
           ugly: 100000,
-          precision: 0
+          precision: 0,
         },
         p99: {
           bad: 30,
           good: 0,
           ugly: 80,
-          precision: 0
+          precision: 0,
         },
         stddev: {
           bad: 10,
           good: 3,
           ugly: 20,
-          precision: 2
-        }
+          precision: 2,
+        },
       },
       age: {
         bad: 365,
         good: 0,
         ugly: 365 * 4,
         maxAge: 365 * 2,
-        precision: 0
+        precision: 0,
       },
       creation: {
         // these are not needed - using selection!
         low: 0,
         high: Math.floor((latestCommit - earliestCommit) / (24 * 60 * 60)),
-        precision: 0
+        precision: 0,
       },
       churn: {
         lines: {
           bad: 10,
           good: 0,
           ugly: 100,
-          precision: 2
+          precision: 2,
         },
         days: {
           bad: 0.1,
           good: 0,
           ugly: 0.5,
-          precision: 4
+          precision: 4,
         },
         commits: {
           bad: 0.1,
           good: 0,
           ugly: 1,
-          precision: 4
-        }
+          precision: 4,
+        },
       },
       numberOfChangers: {
         // more of a colour thing than a scale really
@@ -95,7 +92,7 @@ function initialiseGlobalState(initialDataRef) {
         manyChangersColour: "yellow",
         manyChangersMax: 30, // starting to feel like a crowd
         precision: 0,
-        topChangersCount: 5 // show this many changers in NodeInspector
+        topChangersCount: 5, // show this many changers in NodeInspector
       },
       colours: {
         defaultStroke: "#111111",
@@ -108,13 +105,13 @@ function initialiseGlobalState(initialDataRef) {
         lateColour: "green",
         neutralColour: "#808080",
         nonexistentColour: "#111111",
-        circlePackBackground: "#111111"
+        circlePackBackground: "#111111",
       },
       dateRange: {
         earliest,
-        latest: latestCommit
+        latest: latestCommit,
       },
-      selectedNode: null
+      selectedNode: null,
     },
     couplingConfig: {
       couplingAvailable,
@@ -128,12 +125,12 @@ function initialiseGlobalState(initialDataRef) {
       dateRange: {
         // TODO: use buckets instead!
         earliest,
-        latest: latestCommit
-      }
+        latest: latestCommit,
+      },
     },
     expensiveConfig: {
-      depth: maxDepth
-    }
+      depth: maxDepth,
+    },
   };
   return defaults;
 }
@@ -151,8 +148,8 @@ function globalDispatchReducer(state, action) {
           config: {
             ...config,
             visualization,
-            subVis
-          }
+            subVis,
+          },
         };
       }
       return { ...state, config: { ...config, visualization } };
@@ -162,36 +159,36 @@ function globalDispatchReducer(state, action) {
     case "setDepth":
       return {
         ...state,
-        expensiveConfig: { ...expensiveConfig, depth: action.payload }
+        expensiveConfig: { ...expensiveConfig, depth: action.payload },
       };
     case "setShowCoupling": {
       return {
         ...state,
-        couplingConfig: { ...couplingConfig, shown: action.payload }
+        couplingConfig: { ...couplingConfig, shown: action.payload },
       };
     }
     case "setMinCouplingRatio": {
       return {
         ...state,
-        couplingConfig: { ...couplingConfig, minRatio: action.payload }
+        couplingConfig: { ...couplingConfig, minRatio: action.payload },
       };
     }
     case "setCouplingMinDays": {
       return {
         ...state,
-        couplingConfig: { ...couplingConfig, minDays: action.payload }
+        couplingConfig: { ...couplingConfig, minDays: action.payload },
       };
     }
     case "setCouplingMaxCommonRoots": {
       return {
         ...state,
-        couplingConfig: { ...couplingConfig, maxCommonRoots: action.payload }
+        couplingConfig: { ...couplingConfig, maxCommonRoots: action.payload },
       };
     }
     case "selectNode":
       return {
         ...state,
-        config: { ...config, selectedNode: action.payload }
+        config: { ...config, selectedNode: action.payload },
       };
 
     case "setDateRange": {

@@ -1,5 +1,4 @@
 import _ from "lodash";
-import * as d3 from "d3";
 
 /* Note most functions here work on both:
 - a data node, the data from the raw JSON file, which is roughly
@@ -49,7 +48,7 @@ export function nodeName(node) {
 function addDescendants(nodes, node) {
   nodes.push(node);
   if (node.children) {
-    node.children.forEach(child => addDescendants(nodes, child));
+    node.children.forEach((child) => addDescendants(nodes, child));
   }
 }
 // simulate d3.descendants but works for non-hierarchy nodes (so we don't need to build a hierarchy)
@@ -58,7 +57,7 @@ export function nodeDescendants(node) {
     return node.descendants();
   }
   const nodes = [];
-  node.children.forEach(child => addDescendants(nodes, child));
+  node.children.forEach((child) => addDescendants(nodes, child));
 
   return nodes;
 }
@@ -166,7 +165,7 @@ function nodeChangeDetails(node, earliest, latest) {
   if (!details) return undefined;
   if (earliest === undefined && latest === undefined) return details;
   return details.filter(
-    d => d.commit_day >= earliest && d.commit_day <= latest
+    (d) => d.commit_day >= earliest && d.commit_day <= latest
   );
 }
 
@@ -187,7 +186,7 @@ export function nodeTopChangers(node, earliest, latest, maxPeople) {
   if (!details) return undefined;
   const changerStats = new Map();
   details.forEach(({ users, commits }) => {
-    users.forEach(user => {
+    users.forEach((user) => {
       if (!changerStats.has(user)) {
         changerStats.set(user, commits);
       } else {
@@ -206,7 +205,7 @@ export function nodeTopChangers(node, earliest, latest, maxPeople) {
 export function nodeNumberOfChangers(node, earliest, latest) {
   const details = nodeChangeDetails(node, earliest, latest);
   if (!details) return undefined;
-  const changers = _.uniq(details.flatMap(d => d.users));
+  const changers = _.uniq(details.flatMap((d) => d.users));
   return changers.length;
 }
 
@@ -216,7 +215,7 @@ export function nodeChurnData(node, earliest, latest) {
   let totalLines = 0;
   let totalCommits = 0;
   const totalDays = details.length;
-  details.forEach(d => {
+  details.forEach((d) => {
     const changeSize = d.lines_added + d.lines_deleted;
     totalCommits += d.commits;
     totalLines += changeSize;
@@ -229,7 +228,7 @@ export function nodeChurnData(node, earliest, latest) {
     totalDays,
     fractionalLines: totalLines / duration,
     fractionalCommits: totalCommits / duration,
-    fractionalDays: totalDays / duration
+    fractionalDays: totalDays / duration,
   };
 }
 
@@ -265,7 +264,7 @@ export function nodeHasCouplingData(node) {
 export function nodeCouplingFiles(node, earliest, latest) {
   const couplingData = nodeCouplingData(node);
   if (!couplingData) return undefined;
-  const buckets = couplingData.buckets.filter(bucket => {
+  const buckets = couplingData.buckets.filter((bucket) => {
     if (bucket.bucket_start > latest) return false;
     if (bucket.bucket_end < earliest) return false;
     return true;
@@ -276,7 +275,7 @@ export function nodeCouplingFiles(node, earliest, latest) {
   }
   let totalCommitDays = 0;
   const files = {};
-  buckets.forEach(bucket => {
+  buckets.forEach((bucket) => {
     totalCommitDays += bucket.commit_days;
     bucket.coupled_files.forEach(([filename, count]) => {
       if (files[filename] === undefined) {
@@ -292,7 +291,7 @@ export function nodeCouplingFiles(node, earliest, latest) {
       source: node,
       targetFile: file,
       sourceCount: totalCommitDays,
-      targetCount: count
+      targetCount: count,
     };
   });
 }
@@ -331,7 +330,7 @@ export function nodeCouplingFilesFiltered(
 ) {
   const files = nodeCouplingFiles(node, earliest, latest);
   if (files === undefined || files.length === 0) return files;
-  return files.filter(f => {
+  return files.filter((f) => {
     return (
       f.sourceCount >= minDays &&
       f.targetCount / f.sourceCount > minRatio &&

@@ -25,7 +25,7 @@ function addLanguagesFromNode(counts, node) {
 export function countLanguagesIn(data) {
   const counts = {};
   addLanguagesFromNode(counts, data);
-  const countsPairs = [...Object.keys(counts)].map(k => [k, counts[k]]);
+  const countsPairs = [...Object.keys(counts)].map((k) => [k, counts[k]]);
   const sortedMap = [...countsPairs].sort(
     ([l1, k1], [l2, k2]) => k2.loc - k1.loc
   );
@@ -54,7 +54,7 @@ function gatherNodeStats(node, statsSoFar, depth) {
   }
   const gitData = nodeGitData(node);
   if (gitData && gitData.details && gitData.details.length > 0) {
-    const days = gitData.details.map(d => d.commit_day);
+    const days = gitData.details.map((d) => d.commit_day);
     if (gitData.lastUpdate) {
       days.push(gitData.lastUpdate);
     }
@@ -88,8 +88,8 @@ export function gatherGlobalStats(data) {
     churn: {
       maxLines: 0,
       maxCommits: 0,
-      maxDays: 0
-    }
+      maxDays: 0,
+    },
   };
   return gatherNodeStats(data, statsSoFar, 0);
 }
@@ -99,18 +99,15 @@ export function gatherGlobalStats(data) {
 function addTimescaleData(timescaleData, node, timeUnit) {
   const gitData = nodeGitData(node);
   if (gitData && gitData.details && gitData.details.length > 0) {
-    gitData.details.forEach(data => {
-      const startDate = moment
-        .unix(data.commit_day)
-        .startOf(timeUnit)
-        .unix();
+    gitData.details.forEach((data) => {
+      const startDate = moment.unix(data.commit_day).startOf(timeUnit).unix();
       let dateData = timescaleData.get(startDate);
       if (!dateData)
         dateData = {
           files: 0,
           commits: 0,
           lines_added: 0,
-          lines_deleted: 0
+          lines_deleted: 0,
         };
       dateData.files += 1;
       dateData.commits += data.commits;
@@ -120,7 +117,7 @@ function addTimescaleData(timescaleData, node, timeUnit) {
     });
   }
   if (node.children !== undefined) {
-    node.children.forEach(child => {
+    node.children.forEach((child) => {
       addTimescaleData(timescaleData, child, timeUnit);
     });
   }
@@ -143,7 +140,7 @@ function addNodesByPath(nodesByPath, node) {
   // eslint-disable-next-line no-param-reassign
   nodesByPath[node.path] = node;
   if (node.children !== undefined) {
-    node.children.forEach(child => {
+    node.children.forEach((child) => {
       addNodesByPath(nodesByPath, child);
     });
   }

@@ -5,7 +5,7 @@ import defaultPropTypes from "./defaultPropTypes";
 import styles from "./PathInspector.module.css";
 import ToggleablePanel from "./ToggleablePanel";
 
-const PathInspector = props => {
+const PathInspector = (props) => {
   const { node, dispatch } = props;
 
   let parents = [];
@@ -20,14 +20,14 @@ const PathInspector = props => {
   return (
     <ToggleablePanel title="Path" showInitially>
       <ul className={styles.pathlist}>
-        {parents.map(parent => (
+        {parents.map((parent) => (
           <li key={parent.data.path}>
             <button
               type="button"
               onClick={() =>
                 dispatch({
                   type: "selectNode",
-                  payload: parent
+                  payload: parent,
                 })
               }
             >

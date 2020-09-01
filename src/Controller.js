@@ -8,11 +8,11 @@ import VisColourKey from "./VisColourKey";
 import CouplingController from "./CouplingController";
 import { humanizeDate } from "./datetimes";
 
-const Controller = props => {
+const Controller = (props) => {
   const { dataRef, state, dispatch } = props;
   const { metadata } = dataRef.current;
   const { maxDepth } = metadata.stats;
-  const { config, expensiveConfig, couplingConfig } = state;
+  const { config } = state;
   const { earliest, latest } = state.config.dateRange;
   // ID logic from https://stackoverflow.com/questions/29420835/how-to-generate-unique-ids-for-form-labels-in-react
   const { current: vizId } = useRef(_uniqueId("controller-"));
@@ -45,14 +45,14 @@ const Controller = props => {
           <select
             id={depthId}
             value={state.expensiveConfig.depth}
-            onChange={evt =>
+            onChange={(evt) =>
               dispatch({
                 type: "setDepth",
-                payload: Number.parseInt(evt.target.value, 10)
+                payload: Number.parseInt(evt.target.value, 10),
               })
             }
           >
-            {[...Array(maxDepth + 1).keys()].map(d => (
+            {[...Array(maxDepth + 1).keys()].map((d) => (
               <option key={d} value={d}>
                 {d}
               </option>
@@ -71,7 +71,7 @@ const Controller = props => {
           <select
             id={vizId}
             value={state.config.visualization}
-            onChange={evt =>
+            onChange={(evt) =>
               dispatch({ type: "setVisualization", payload: evt.target.value })
             }
           >
@@ -88,10 +88,10 @@ const Controller = props => {
             <select
               id={subVizId}
               value={state.config.subVis}
-              onChange={evt =>
+              onChange={(evt) =>
                 dispatch({
                   type: "setSubVisualization",
-                  payload: evt.target.value
+                  payload: evt.target.value,
                 })
               }
             >

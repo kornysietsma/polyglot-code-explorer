@@ -14,7 +14,7 @@ import {
   nodeNumberOfChangers,
   nodeRemoteHead,
   nodeRemoteUrl,
-  nodeTopChangers
+  nodeTopChangers,
 } from "./nodeData";
 import { humanizeDate, humanizeDays } from "./datetimes";
 import ToggleablePanel from "./ToggleablePanel";
@@ -59,7 +59,7 @@ function churnReport(churnData) {
     totalDays,
     fractionalLines,
     fractionalCommits,
-    fractionalDays
+    fractionalDays,
   } = churnData;
   return (
     <ToggleablePanel title="Code Churn" showInitially={false}>
@@ -93,7 +93,7 @@ function churnReport(churnData) {
   );
 }
 
-const NodeInspector = props => {
+const NodeInspector = (props) => {
   const { node, dispatch, state, metadata } = props;
   const { stats } = metadata;
   const locData = nodeLocData(node);
@@ -118,7 +118,7 @@ const NodeInspector = props => {
     : "";
   const changerCount = nodeNumberOfChangers(node, earliest, latest);
   const topChangers = nodeTopChangers(node, earliest, latest, topChangersCount);
-  const userName = userId => {
+  const userName = (userId) => {
     const { user } = metadata.users[userId];
     if (user.name) {
       if (user.email) {

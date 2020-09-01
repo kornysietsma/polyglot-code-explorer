@@ -11,14 +11,14 @@ import {
   nodeIndentationStddev,
   nodeIndentationSum,
   nodeLanguage,
-  nodeNumberOfChangers
+  nodeNumberOfChangers,
 } from "./nodeData";
 import {
   depthScaleBuilder,
   earlyLateScaleBuilder,
   goodBadUglyScaleBuilder,
   languageScaleBuilder,
-  numberOfChangersScale
+  numberOfChangersScale,
 } from "./ColourScales";
 import { standardFillBuilder } from "./fillFunctions";
 import {
@@ -26,7 +26,7 @@ import {
   depthKeyData,
   goodBadUglyColourKeyData,
   languageColourKeyData,
-  numberOfChangersKeyData
+  numberOfChangersKeyData,
 } from "./colourKeys";
 
 const blankParent = () => undefined;
@@ -41,7 +41,7 @@ const VisualizationData = {
     parentFn: blankParent,
     fillFnBuilder: standardFillBuilder,
     colourScaleBuilder: languageScaleBuilder,
-    colourKeyBuilder: languageColourKeyData
+    colourKeyBuilder: languageColourKeyData,
   },
   loc: {
     displayOrder: 1,
@@ -63,7 +63,7 @@ const VisualizationData = {
     parentFn: blankParent,
     fillFnBuilder: standardFillBuilder,
     colourScaleBuilder: goodBadUglyScaleBuilder(["loc"]),
-    colourKeyBuilder: goodBadUglyColourKeyData(["loc"])
+    colourKeyBuilder: goodBadUglyColourKeyData(["loc"]),
   },
   depth: {
     displayOrder: 2,
@@ -74,7 +74,7 @@ const VisualizationData = {
     parentFn: nodeDepth,
     fillFnBuilder: standardFillBuilder,
     colourScaleBuilder: depthScaleBuilder,
-    colourKeyBuilder: depthKeyData
+    colourKeyBuilder: depthKeyData,
   },
   indentation: {
     displayOrder: 3,
@@ -103,7 +103,7 @@ const VisualizationData = {
         parentFn: blankParent,
         fillFnBuilder: standardFillBuilder,
         colourScaleBuilder: goodBadUglyScaleBuilder(["indentation", "sum"]),
-        colourKeyBuilder: goodBadUglyColourKeyData(["indentation", "sum"])
+        colourKeyBuilder: goodBadUglyColourKeyData(["indentation", "sum"]),
       },
       p99: {
         title: "Worst indentation",
@@ -126,7 +126,7 @@ const VisualizationData = {
         parentFn: blankParent,
         fillFnBuilder: standardFillBuilder,
         colourScaleBuilder: goodBadUglyScaleBuilder(["indentation", "p99"]),
-        colourKeyBuilder: goodBadUglyColourKeyData(["indentation", "p99"])
+        colourKeyBuilder: goodBadUglyColourKeyData(["indentation", "p99"]),
       },
       stddev: {
         title: "Standard deviation",
@@ -148,9 +148,9 @@ const VisualizationData = {
         parentFn: blankParent,
         fillFnBuilder: standardFillBuilder,
         colourScaleBuilder: goodBadUglyScaleBuilder(["indentation", "stddev"]),
-        colourKeyBuilder: goodBadUglyColourKeyData(["indentation", "stddev"])
-      }
-    }
+        colourKeyBuilder: goodBadUglyColourKeyData(["indentation", "stddev"]),
+      },
+    },
   },
   age: {
     displayOrder: 4,
@@ -174,7 +174,7 @@ const VisualizationData = {
     parentFn: blankParent,
     fillFnBuilder: standardFillBuilder,
     colourScaleBuilder: goodBadUglyScaleBuilder(["age"]),
-    colourKeyBuilder: goodBadUglyColourKeyData(["age"])
+    colourKeyBuilder: goodBadUglyColourKeyData(["age"]),
   },
   creation: {
     displayOrder: 5,
@@ -200,7 +200,7 @@ const VisualizationData = {
     parentFn: blankParent,
     fillFnBuilder: standardFillBuilder,
     colourScaleBuilder: earlyLateScaleBuilder,
-    colourKeyBuilder: creationKeyData
+    colourKeyBuilder: creationKeyData,
   },
   numberOfChangers: {
     displayOrder: 6,
@@ -224,7 +224,7 @@ const VisualizationData = {
     parentFn: blankParent,
     fillFnBuilder: standardFillBuilder,
     colourScaleBuilder: numberOfChangersScale,
-    colourKeyBuilder: numberOfChangersKeyData
+    colourKeyBuilder: numberOfChangersKeyData,
   },
   churn: {
     displayOrder: 7,
@@ -252,7 +252,7 @@ const VisualizationData = {
         parentFn: blankParent,
         fillFnBuilder: standardFillBuilder,
         colourScaleBuilder: goodBadUglyScaleBuilder(["churn", "days"]),
-        colourKeyBuilder: goodBadUglyColourKeyData(["churn", "days"])
+        colourKeyBuilder: goodBadUglyColourKeyData(["churn", "days"]),
       },
       commits: {
         title: "Commits per day",
@@ -274,7 +274,7 @@ const VisualizationData = {
         parentFn: blankParent,
         fillFnBuilder: standardFillBuilder,
         colourScaleBuilder: goodBadUglyScaleBuilder(["churn", "commits"]),
-        colourKeyBuilder: goodBadUglyColourKeyData(["churn", "commits"])
+        colourKeyBuilder: goodBadUglyColourKeyData(["churn", "commits"]),
       },
       lines: {
         title: "Lines per day",
@@ -301,10 +301,10 @@ const VisualizationData = {
         parentFn: blankParent,
         fillFnBuilder: standardFillBuilder,
         colourScaleBuilder: goodBadUglyScaleBuilder(["churn", "lines"]),
-        colourKeyBuilder: goodBadUglyColourKeyData(["churn", "lines"])
-      }
-    }
-  }
+        colourKeyBuilder: goodBadUglyColourKeyData(["churn", "lines"]),
+      },
+    },
+  },
 };
 
 export default VisualizationData;

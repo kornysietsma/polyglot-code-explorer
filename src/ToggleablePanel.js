@@ -2,14 +2,14 @@
 import React from "react";
 import styles from "./ToggleablePanel.module.css";
 
-const ToggleablePanel = props => {
+const ToggleablePanel = (props) => {
   const {
     showInitially,
     title,
     children,
     showText = "show",
     hideText = "hide",
-    borderlessIfHidden = false
+    borderlessIfHidden = false,
   } = props;
   const [showResults, setShowResults] = React.useState(showInitially);
   const onClick = () => setShowResults(!showResults);

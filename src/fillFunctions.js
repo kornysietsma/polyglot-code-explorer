@@ -21,7 +21,7 @@ function overrideColourFunction(node, config) {
 export function standardFillBuilder(config, scale, dataFn, parentFn) {
   const { neutralColour } = config.colours;
   const { earliest, latest } = config.dateRange;
-  return d => {
+  return (d) => {
     const override = overrideColourFunction(d, config);
     if (override) return override;
     const value = d.children

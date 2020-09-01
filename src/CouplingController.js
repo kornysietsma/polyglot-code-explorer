@@ -8,7 +8,7 @@ import HelpPanel from "./HelpPanel";
 import { couplingDateRange } from "./couplingBuckets";
 import { humanizeDate } from "./datetimes";
 
-const CouplingController = props => {
+const CouplingController = (props) => {
   const { dispatch, state, stats } = props;
   const {
     couplingConfig: {
@@ -16,8 +16,8 @@ const CouplingController = props => {
       shown,
       minRatio,
       minDays,
-      maxCommonRoots
-    }
+      maxCommonRoots,
+    },
   } = state;
   const { current: sliderId } = useRef(_uniqueId("coupling-controller-"));
   const { current: minDaysId } = useRef(_uniqueId("coupling-controller-"));
@@ -32,7 +32,7 @@ const CouplingController = props => {
   }
 
   const {
-    coupling: { bucketCount, bucketSize, firstBucketStart }
+    coupling: { bucketSize },
   } = stats;
   const { earliest, latest } = state.config.dateRange;
 
@@ -52,7 +52,7 @@ const CouplingController = props => {
       onClick={() =>
         dispatch({
           type: "setShowCoupling",
-          payload: false
+          payload: false,
         })
       }
     >
@@ -64,7 +64,7 @@ const CouplingController = props => {
       onClick={() =>
         dispatch({
           type: "setShowCoupling",
-          payload: true
+          payload: true,
         })
       }
     >
@@ -141,7 +141,7 @@ const CouplingController = props => {
             max="1.0"
             step="0.01"
             value={minRatio}
-            onChange={evt => {
+            onChange={(evt) => {
               const value = Number.parseFloat(evt.target.value);
 
               dispatch({ type: "setMinCouplingRatio", payload: value });
@@ -154,14 +154,14 @@ const CouplingController = props => {
             name="minDays"
             id={minDaysId}
             value={minDays}
-            onChange={evt =>
+            onChange={(evt) =>
               dispatch({
                 type: "setCouplingMinDays",
-                payload: Number.parseInt(evt.target.value, 10)
+                payload: Number.parseInt(evt.target.value, 10),
               })
             }
           >
-            {[...Array(maxMinDays - minMinDays + 1).keys()].map(d => {
+            {[...Array(maxMinDays - minMinDays + 1).keys()].map((d) => {
               const days = minMinDays + d;
               return (
                 <option key={days} value={days}>
@@ -177,10 +177,10 @@ const CouplingController = props => {
             name="maxRoots"
             id={maxRootsId}
             value={maxCommonRoots}
-            onChange={evt =>
+            onChange={(evt) =>
               dispatch({
                 type: "setCouplingMaxCommonRoots",
-                payload: Number.parseInt(evt.target.value, 10)
+                payload: Number.parseInt(evt.target.value, 10),
               })
             }
           >

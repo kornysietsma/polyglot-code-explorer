@@ -32,5 +32,7 @@ export function humanizeDays(days) {
     daysRemaining > 0
       ? `${daysRemaining} day${daysRemaining > 1 ? "s" : ""}`
       : undefined;
-  return [yearText, weekText, dayText].filter(t => t !== undefined).join(", ");
+  return [yearText, weekText, dayText]
+    .filter((t) => t !== undefined)
+    .join(", ");
 }

@@ -5,7 +5,7 @@ import defaultPropTypes from "./defaultPropTypes";
 import PathInspector from "./PathInspector";
 import { nodeCumulativeLinesOfCode } from "./nodeData";
 
-const DirectoryNodeInspector = props => {
+const DirectoryNodeInspector = (props) => {
   const { node, dispatch } = props;
   const loc = nodeCumulativeLinesOfCode(node);
   return (

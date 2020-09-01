@@ -4,10 +4,10 @@ import {
   countLanguagesIn,
   gatherTimescaleData,
   gatherGlobalStats,
-  gatherNodesByPath
+  gatherNodesByPath,
 } from "./preprocess";
 
-const useFetch = url => {
+const useFetch = (url) => {
   const [data, setData] = useState(null);
 
   useEffect(() => {
@@ -28,7 +28,7 @@ const useFetch = url => {
         stats.coupling = {
           bucketCount: json.data.coupling_meta.bucket_count,
           bucketSize: json.data.coupling_meta.bucket_size,
-          firstBucketStart: json.data.coupling_meta.first_bucket_start
+          firstBucketStart: json.data.coupling_meta.first_bucket_start,
         };
       }
       const metadata = {
@@ -36,7 +36,7 @@ const useFetch = url => {
         stats,
         users,
         nodesByPath,
-        timescaleData
+        timescaleData,
       };
       setData({ files: json, metadata });
     }

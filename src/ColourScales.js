@@ -10,14 +10,14 @@ export function numberOfChangersScale(config, metadata) {
       1,
       conf.fewChangersMin,
       conf.fewChangersMax,
-      conf.manyChangersMax
+      conf.manyChangersMax,
     ])
     .range([
       conf.noChangersColour,
       conf.oneChangerColour,
       conf.fewChangersMinColour,
       conf.fewChangersMaxColour,
-      conf.manyChangersColour
+      conf.manyChangersColour,
     ])
     .interpolate(d3.interpolateHcl)
     .clamp(true);
@@ -43,7 +43,7 @@ export function goodBadUglyScaleBuilder(configLocation) {
 
 export function languageScaleBuilder(config, metadata) {
   const { languageMap } = metadata.languages;
-  return d => {
+  return (d) => {
     return languageMap[d].colour;
   };
 }

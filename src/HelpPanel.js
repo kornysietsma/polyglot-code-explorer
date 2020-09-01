@@ -3,7 +3,7 @@ import PropTypes from "prop-types";
 
 import ToggleablePanel from "./ToggleablePanel";
 
-const HelpPanel = props => {
+const HelpPanel = (props) => {
   const { children } = props;
   return (
     <ToggleablePanel
@@ -18,7 +18,7 @@ const HelpPanel = props => {
 };
 
 HelpPanel.propTypes = {
-  children: PropTypes.node.isRequired
+  children: PropTypes.node.isRequired,
 };
 
 export default HelpPanel;

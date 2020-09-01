@@ -35,8 +35,8 @@ export function goodBadUglyColourKeyData(configLocation) {
 export function languageColourKeyData(vis, config, metadata) {
   const { languageKey, otherColour } = metadata.languages;
   return [
-    ...languageKey.map(k => [k.language, k.colour]),
-    ["Other languages", otherColour]
+    ...languageKey.map((k) => [k.language, k.colour]),
+    ["Other languages", otherColour],
   ];
 }
 
@@ -53,11 +53,11 @@ export function depthKeyData(vis, config, metadata) {
 export function creationKeyData(vis, config, metadata) {
   const scale = vis.colourScaleBuilder(config, metadata);
   const {
-    dateRange: { earliest, latest }
+    dateRange: { earliest, latest },
   } = config;
   const dateRange = latest - earliest;
 
-  const keyText = value => `${humanizeDate(value)}`;
+  const keyText = (value) => `${humanizeDate(value)}`;
 
   const key = [["Outside date range", config.colours.neutralColour]];
   for (let ix = 0; ix <= 20; ix += 1) {
@@ -72,7 +72,7 @@ export function numberOfChangersKeyData(vis, config, metadata) {
   const { numberOfChangers } = config;
   const key = [
     ["None", numberOfChangers.noChangersColour],
-    ["One", numberOfChangers.oneChangerColour]
+    ["One", numberOfChangers.oneChangerColour],
   ];
   for (
     let i = numberOfChangers.fewChangersMin;

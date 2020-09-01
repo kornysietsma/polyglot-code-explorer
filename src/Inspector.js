@@ -6,7 +6,7 @@ import NodeInspector from "./NodeInspector";
 import DirectoryNodeInspector from "./DirectoryNodeInspector";
 import { isDirectory } from "./nodeData";
 
-const Inspector = props => {
+const Inspector = (props) => {
   // console.log("inspector props", props);
   const { state, dispatch, dataRef } = props;
   const { metadata } = dataRef.current;

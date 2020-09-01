@@ -7,8 +7,8 @@ import { nodeCouplingFilesFiltered } from "./nodeData";
 import { couplingDateRange } from "./couplingBuckets";
 import { humanizeDate } from "./datetimes";
 
-const CouplingInspector = props => {
-  const { node, dispatch, state, stats } = props;
+const CouplingInspector = (props) => {
+  const { node, state, stats } = props;
   const { earliest, latest } = state.config.dateRange;
   const { couplingConfig } = state;
 
@@ -59,7 +59,7 @@ const CouplingInspector = props => {
           </tr>
         </thead>
         <tbody>
-          {files.map(file => {
+          {files.map((file) => {
             const ratio = file.targetCount / file.sourceCount;
             return (
               <tr>

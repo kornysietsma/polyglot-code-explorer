@@ -7,7 +7,7 @@ import Inspector from "./Inspector";
 import Viz from "./Viz";
 import { globalDispatchReducer, initialiseGlobalState } from "./State";
 
-const App = props => {
+const App = (props) => {
   // eslint-disable-next-line react/prop-types
   const { dataRef } = props;
 
@@ -30,7 +30,7 @@ const App = props => {
 };
 
 App.propTypes = {
-  dataRef: PropTypes.shape({ current: PropTypes.any }).isRequired
+  dataRef: PropTypes.shape({ current: PropTypes.any }).isRequired,
 };
 
 export default App;

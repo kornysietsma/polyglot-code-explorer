@@ -7,7 +7,7 @@ import HelpPanel from "./HelpPanel";
 import { humanizeDate } from "./datetimes";
 import ColourKey from "./ColourKey";
 
-const VisColourKey = props => {
+const VisColourKey = (props) => {
   const { vis, config, metadata } = props;
   const earliestDate = humanizeDate(config.dateRange.earliest);
   const latestDate = humanizeDate(config.dateRange.latest);

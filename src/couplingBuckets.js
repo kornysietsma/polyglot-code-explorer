@@ -11,7 +11,7 @@ export function allBuckets(couplingStats) {
   return results;
 }
 export function bucketsSelected(couplingStats, earliest, latest) {
-  return allBuckets(couplingStats).filter(bucket => {
+  return allBuckets(couplingStats).filter((bucket) => {
     if (bucket.start > latest) return false;
     if (bucket.end < earliest) return false;
     return true;

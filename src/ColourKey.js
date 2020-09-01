@@ -1,7 +1,7 @@
 import React from "react";
 import PropTypes from "prop-types";
 
-const ColourKey = props => {
+const ColourKey = (props) => {
   const { title, keyData } = props;
   return (
     <div>
@@ -32,6 +32,6 @@ const ColourKey = props => {
 };
 ColourKey.propTypes = {
   title: PropTypes.string.isRequired,
-  keyData: PropTypes.arrayOf(PropTypes.array).isRequired
+  keyData: PropTypes.arrayOf(PropTypes.array).isRequired,
 };
 export default ColourKey;

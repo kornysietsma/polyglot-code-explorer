@@ -11,7 +11,7 @@ import {
   nodeCenter,
   nodeHasCouplingData,
   nodeCouplingFilesFiltered,
-  nodePath
+  nodePath,
 } from "./nodeData";
 
 // TODO: should this live in Visualization.js ?
@@ -32,7 +32,7 @@ function getCurrentVis(config) {
 }
 
 const redrawPolygons = (svgSelection, metadata, state) => {
-  const { config, expensiveConfig } = state;
+  const { config } = state;
 
   const { fillFnBuilder, colourScaleBuilder, dataFn, parentFn } = getCurrentVis(
     config
@@ -40,13 +40,13 @@ const redrawPolygons = (svgSelection, metadata, state) => {
   const scale = colourScaleBuilder(config, metadata);
   const fillFn = fillFnBuilder(config, scale, dataFn, parentFn);
 
-  const strokeWidthFn = d => {
+  const strokeWidthFn = (d) => {
     if (d.data.layout.algorithm === "circlePack") return 0;
     return d.depth < 4 ? 4 - d.depth : 1;
   };
 
   return svgSelection
-    .attr("d", d => {
+    .attr("d", (d) => {
       return `${d3.line()(d.data.layout.polygon)}z`;
     })
     .style("fill", fillFn)
@@ -58,13 +58,13 @@ const redrawPolygons = (svgSelection, metadata, state) => {
 const redrawSelection = (svgSelection, state) => {
   const { config } = state;
 
-  const strokeWidthFn = d => {
+  const strokeWidthFn = (d) => {
     if (d.data.layout.algorithm === "circlePack") return 0;
     return d.depth < 4 ? 4 - d.depth : 1;
   };
 
   return svgSelection
-    .attr("d", d => {
+    .attr("d", (d) => {
       return `${d3.line()(d.data.layout.polygon)}z`;
     })
     .style("stroke-width", strokeWidthFn)
@@ -98,7 +98,7 @@ const update = (d3Container, files, metadata, state) => {
   const group = svg.selectAll(".topGroup");
   const selectionNodes = group
     .selectAll(".selected")
-    .data(selectionPath, node => node.path);
+    .data(selectionPath, (node) => node.path);
 
   const newSelectionNodes = selectionNodes
     .enter()
@@ -111,15 +111,15 @@ const update = (d3Container, files, metadata, state) => {
 
 // flatten out all nodes for coupling line display
 function normalizedCouplingNodes(rootNode, state) {
-  const { config, expensiveConfig, couplingConfig } = state;
+  const { config, couplingConfig } = state;
   const {
-    dateRange: { earliest, latest }
+    dateRange: { earliest, latest },
   } = config;
   return couplingConfig.shown === false
     ? []
     : nodeDescendants(rootNode)
         .filter(nodeHasCouplingData)
-        .map(d =>
+        .map((d) =>
           nodeCouplingFilesFiltered(
             d,
             earliest,
@@ -154,7 +154,7 @@ function drawCoupling(group, files, metadata, state, dispatch) {
 
   const couplingNodes = group
     .selectAll(".coupling")
-    .data(allCouplingNodes, node => [node.source.path, node.targetFile]);
+    .data(allCouplingNodes, (node) => [node.source.path, node.targetFile]);
 
   // TODO - consider reworking this with d3.join which seems to be the new hotness?
   const newCouplingNodes = couplingNodes
@@ -162,7 +162,7 @@ function drawCoupling(group, files, metadata, state, dispatch) {
     .append("path")
     .classed("coupling", true);
 
-  const couplingLine = d => {
+  const couplingLine = (d) => {
     const sourcePos = nodeCenter(d.source);
     const target = nodesByPath[d.targetFile];
     const targetPos = nodeCenter(target);
@@ -171,21 +171,21 @@ function drawCoupling(group, files, metadata, state, dispatch) {
     // return `${d3.line()([sourcePos, targetPos])}`;
   };
 
-  const couplingLineStroke = d => {
+  const couplingLineStroke = (d) => {
     const colour = d3.color(config.colours.couplingStroke);
     const ratio = d.targetCount / d.sourceCount;
     colour.opacity = ratio;
     return colour;
   };
 
-  const couplingLineWidth = d => {
+  const couplingLineWidth = (d) => {
     const ratio = d.targetCount / d.sourceCount;
     if (ratio >= 0.95) return "3px";
     if (ratio > 0.8) return "2px";
     return "1px";
   };
 
-  const couplingLabel = d => {
+  const couplingLabel = (d) => {
     const ratio = d.targetCount / d.sourceCount;
     const from = nodePath(d.source);
     return `${from} -> ${d.targetFile} (${ratio.toFixed(3)})`;
@@ -222,7 +222,7 @@ const updateCoupling = (d3Container, files, metadata, state, dispatch) => {
 const draw = (d3Container, files, metadata, state, dispatch) => {
   const { config, expensiveConfig } = state;
   const {
-    layout: { timescaleHeight }
+    layout: { timescaleHeight },
   } = config;
 
   if (!d3Container.current) {
@@ -240,14 +240,14 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
       -layout.width / 2,
       -layout.height / 2,
       layout.width,
-      layout.height
+      layout.height,
     ]);
   const group = svg.selectAll(".topGroup");
   const rootNode = d3.hierarchy(files); // .sum(d => d.value);
 
   // ugly - we cross-link each node to the hierarchy node, because so much needs hierarchy nodes.
   // some time this should be fixed properly
-  rootNode.descendants().forEach(node => {
+  rootNode.descendants().forEach((node) => {
     node.data.hierarchNode = node;
   });
 
@@ -255,16 +255,15 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
   // so only show parent nodes at the clipping level.
   const allNodes = rootNode
     .descendants()
-    .filter(d => d.depth <= expensiveConfig.depth)
-    .filter(d => d.children === undefined || d.depth === expensiveConfig.depth);
+    .filter((d) => d.depth <= expensiveConfig.depth)
+    .filter(
+      (d) => d.children === undefined || d.depth === expensiveConfig.depth
+    );
 
-  const nodes = group.selectAll(".cell").data(allNodes, node => node.path);
+  const nodes = group.selectAll(".cell").data(allNodes, (node) => node.path);
 
   // TODO - consider reworking this with d3.join which seems to be the new hotness?
-  const newNodes = nodes
-    .enter()
-    .append("path")
-    .classed("cell", true);
+  const newNodes = nodes.enter().append("path").classed("cell", true);
 
   redrawPolygons(nodes.merge(newNodes), metadata, state)
     // eslint-disable-next-line no-unused-vars
@@ -273,14 +272,14 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
       dispatch({ type: "selectNode", payload: node });
     })
     .append("svg:title")
-    .text(n => n.data.path);
+    .text((n) => n.data.path);
 
   nodes.exit().remove();
 
   const selectionPath = findSelectionPath(files, state);
   const selectionNodes = group
     .selectAll(".selected")
-    .data(selectionPath, node => node.path);
+    .data(selectionPath, (node) => node.path);
 
   const newSelectionNodes = selectionNodes
     .enter()
@@ -307,7 +306,7 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
       .zoom()
       .extent([
         [0, 0],
-        [w, h]
+        [w, h],
       ])
       .scaleExtent([0.5, 16])
       .on("zoom", zoomed)
@@ -315,10 +314,10 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
 };
 
 function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
-  const { config, expensiveConfig } = state;
+  const { config } = state;
   const {
     dateRange: { earliest, latest },
-    layout: { timescaleHeight }
+    layout: { timescaleHeight },
   } = config;
 
   const margin = { left: 5, right: 5, bottom: 20, top: 10 };
@@ -335,16 +334,16 @@ function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
     .attr("viewBox", [0, 0, width, height])
     .style("height", `${height}px`);
 
-  const valueFn = d => d.commits; // abstracted so we can pick a differnt one
+  const valueFn = (d) => d.commits; // abstracted so we can pick a differnt one
 
   // we might simplify these, from an overly generic example
   const area = (x, y) =>
     d3
       .area()
       // .defined(d => !isNaN(valueFn(d)))
-      .x(d => x(d.day))
+      .x((d) => x(d.day))
       .y0(y(0))
-      .y1(d => {
+      .y1((d) => {
         // console.log("y of", d, valueFn(d), y(valueFn(d)));
         return y(valueFn(d));
       });
@@ -353,7 +352,7 @@ function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
 
   const xScale = d3
     .scaleUtc()
-    .domain(d3.extent(timescaleData, d => d.day))
+    .domain(d3.extent(timescaleData, (d) => d.day))
     .range([margin.left, width - margin.right, width]);
   const yScale = d3
     .scaleLinear()
@@ -372,7 +371,7 @@ function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
     .brushX()
     .extent([
       [margin.left, 0.5],
-      [width - margin.right, height - margin.bottom + 0.5]
+      [width - margin.right, height - margin.bottom + 0.5],
     ])
     // .on("brush", () => {
     //   console.log("brush ignored");
@@ -380,7 +379,7 @@ function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
     .on("end", () => {
       if (d3.event.selection) {
         const [startDate, endDate] = d3.event.selection
-          .map(x => xScale.invert(x))
+          .map((x) => xScale.invert(x))
           .map(dateToUnix);
         if (startDate !== earliest || endDate !== latest) {
           dispatch({ type: "setDateRange", payload: [startDate, endDate] });
@@ -394,29 +393,21 @@ function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
   svg
     .selectAll("g.x-axis")
     .data([null])
-    .join(enter =>
-      enter
-        .append("g")
-        .classed("x-axis", true)
-        .call(xAxis, xScale, height)
+    .join((enter) =>
+      enter.append("g").classed("x-axis", true).call(xAxis, xScale, height)
     );
 
   svg
     .selectAll("path.graph")
     .data([timescaleData])
-    .join(enter => enter.append("path").classed("graph", true))
+    .join((enter) => enter.append("path").classed("graph", true))
     .attr("fill", "steelblue")
     .attr("d", area(xScale, yScale));
 
   svg
     .selectAll("g.brush")
     .data([null])
-    .join(enter =>
-      enter
-        .append("g")
-        .classed("brush", true)
-        .call(brush)
-    )
+    .join((enter) => enter.append("g").classed("brush", true).call(brush))
     .call(brush.move, selection);
 }
 
@@ -429,7 +420,7 @@ function usePrevious(value) {
   return ref.current;
 }
 
-const Viz = props => {
+const Viz = (props) => {
   const d3Container = useRef(null);
   const d3TimescaleContainer = useRef(null);
   const { dataRef, state, dispatch } = props;
@@ -440,7 +431,7 @@ const Viz = props => {
     const {
       metadata: { timescaleData },
       metadata,
-      files
+      files,
     } = dataRef.current;
     const { config, expensiveConfig, couplingConfig } = state;
     if (
