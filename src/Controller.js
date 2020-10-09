@@ -70,7 +70,7 @@ const Controller = (props) => {
       <p>
         Selected date range {humanizeDate(earliest)} to {humanizeDate(latest)}
       </p>
-      <ToggleablePanel title="advanced settings" showInitially>
+      <ToggleablePanel title="advanced settings" showInitially={false}>
         <div>
           <label htmlFor={depthId}>
             Display maximum depth:

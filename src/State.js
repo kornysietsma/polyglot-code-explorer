@@ -22,7 +22,7 @@ function initialiseGlobalState(initialDataRef) {
         timescaleHeight: 130, // including margins
       },
       codeInspector: {
-        enabled: true,
+        enabled: false,
         prefix: "http://localhost:8675/",
       },
       loc: {
