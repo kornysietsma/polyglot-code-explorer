@@ -45,7 +45,7 @@ run `yarn install` in the project directory to fetch all dependencies.
 
 ## Running the explorer
 
-You can run with the default data file by running `yarn run` - a browser window will open on http://localhost:3000
+You can run with the default data file by running `yarn run` - a browser window will open on <http://localhost:3000>
 
 ## Running with a particular data file
 
@@ -64,16 +64,16 @@ will pass variables starting `REACT_APP_` to the app, so `index.js` can read it 
 
 For example:
 
-```shell script
+```sh
 REACT_APP_EXPLORER_DATA=big yarn start
 ```
 
 or if you don't want to re-open the browser:
-```shell script
+
+```sh
 REACT_APP_EXPLORER_DATA=big BROWSER=none yarn start
 ```
 
 For a discussion of how I use React and D3 together, take a look at [my blog post](https://blog.korny.info/2020/07/19/better-d3-with-react.html) and [demo code](https://github.com/kornysietsma/d3-react-demo)
-
 
 This was created using Create-React-App and hasn't been "ejected" yet so you can upgrade react versions and the like.  You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
