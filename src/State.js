@@ -21,6 +21,10 @@ function initialiseGlobalState(initialDataRef) {
       layout: {
         timescaleHeight: 130, // including margins
       },
+      codeInspector: {
+        enabled: true,
+        prefix: "http://localhost:8675/",
+      },
       loc: {
         bad: 1000,
         good: 0,
@@ -52,7 +56,6 @@ function initialiseGlobalState(initialDataRef) {
         bad: 365,
         good: 0,
         ugly: 365 * 4,
-        maxAge: 365 * 2,
         precision: 0,
       },
       creation: {
@@ -225,6 +228,18 @@ function globalDispatchReducer(state, action) {
     case "setTheme": {
       const result = _.cloneDeep(state);
       result.config.colours.currentTheme = action.payload;
+      return result;
+    }
+
+    case "enableCodeServer": {
+      const result = _.cloneDeep(state);
+      result.config.codeInspector.enabled = action.payload;
+      return result;
+    }
+
+    case "setCodeServerPrefix": {
+      const result = _.cloneDeep(state);
+      result.config.codeInspector.prefix = action.payload;
       return result;
     }
 

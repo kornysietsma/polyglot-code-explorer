@@ -6,6 +6,7 @@ import defaultPropTypes from "./defaultPropTypes";
 import VisualizationData from "./visualizationData";
 import VisColourKey from "./VisColourKey";
 import CouplingController from "./CouplingController";
+import ToggleablePanel from "./ToggleablePanel";
 import { humanizeDate } from "./datetimes";
 
 const Controller = (props) => {
@@ -19,6 +20,8 @@ const Controller = (props) => {
   const { current: vizId } = useRef(_uniqueId("controller-"));
   const { current: depthId } = useRef(_uniqueId("controller-"));
   const { current: subVizId } = useRef(_uniqueId("controller-"));
+  const { current: codeServerId } = useRef(_uniqueId("controller-"));
+  const { current: codeServerPrefixId } = useRef(_uniqueId("controller-"));
 
   const sortedVis = Object.entries(VisualizationData).sort(
     ([k1, v1], [k2, v2]) => k2.displayOrder - k1.displayOrder
@@ -35,63 +38,99 @@ const Controller = (props) => {
 
   const currentVisOrSub = currentSubVisData || currentParentVisData;
 
-  const themeButton = currentTheme === 'dark' ? (
-    <button
-      type="button"
-      onClick={() =>
-        dispatch({
-          type: "setTheme",
-          payload: "light",
-        })
-      }
-    >
-      Light theme
-    </button>
-  ) : (
-    <button
-      type="button"
-      onClick={() =>
-        dispatch({
-          type: "setTheme",
-          payload: "dark",
-        })
-      }
-    >
-      Dark theme
-    </button>
-  );
+  const themeButton =
+    currentTheme === "dark" ? (
+      <button
+        type="button"
+        onClick={() =>
+          dispatch({
+            type: "setTheme",
+            payload: "light",
+          })
+        }
+      >
+        Light theme
+      </button>
+    ) : (
+      <button
+        type="button"
+        onClick={() =>
+          dispatch({
+            type: "setTheme",
+            payload: "dark",
+          })
+        }
+      >
+        Dark theme
+      </button>
+    );
 
   return (
     <aside className="Controller">
-      <div>
-        <p>
-          Selected date range {humanizeDate(earliest)} to {humanizeDate(latest)}
-        </p>
-        <label htmlFor={depthId}>
-          Display maximum depth:
-          <select
-            id={depthId}
-            value={state.expensiveConfig.depth}
-            onChange={(evt) =>
-              dispatch({
-                type: "setDepth",
-                payload: Number.parseInt(evt.target.value, 10),
-              })
-            }
-          >
-            {[...Array(maxDepth + 1).keys()].map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <CouplingController
-        dispatch={dispatch}
-        state={state}
-        stats={metadata.stats}
-      />
+      <p>
+        Selected date range {humanizeDate(earliest)} to {humanizeDate(latest)}
+      </p>
+      <ToggleablePanel title="advanced settings" showInitially>
+        <div>
+          <label htmlFor={depthId}>
+            Display maximum depth:
+            <select
+              id={depthId}
+              value={state.expensiveConfig.depth}
+              onChange={(evt) =>
+                dispatch({
+                  type: "setDepth",
+                  payload: Number.parseInt(evt.target.value, 10),
+                })
+              }
+            >
+              {[...Array(maxDepth + 1).keys()].map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div>
+          <label htmlFor={codeServerId}>
+            Code server available:&nbsp;
+            <input
+              type="checkbox"
+              id={codeServerId}
+              checked={state.config.codeInspector.enabled}
+              onChange={(evt) => {
+                console.log("chchange:", evt.target);
+                dispatch({
+                  type: "enableCodeServer",
+                  payload: evt.target.checked,
+                });
+              }}
+            />
+          </label>
+        </div>
+        <div>
+          <label htmlFor={codeServerPrefixId}>
+            Code server prefix:&nbsp;
+            <input
+              type="text"
+              id={codeServerPrefixId}
+              value={state.config.codeInspector.prefix}
+              onChange={(evt) =>
+                dispatch({
+                  type: "setCodeServerPrefix",
+                  payload: evt.target.value,
+                })
+              }
+            />
+          </label>
+        </div>
+        <CouplingController
+          dispatch={dispatch}
+          state={state}
+          stats={metadata.stats}
+        />
+      </ToggleablePanel>
       <div>
         <label htmlFor={vizId}>
           Visualization:

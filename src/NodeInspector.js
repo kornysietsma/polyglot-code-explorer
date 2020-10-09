@@ -18,6 +18,7 @@ import {
 } from "./nodeData";
 import { humanizeDate, humanizeDays } from "./datetimes";
 import ToggleablePanel from "./ToggleablePanel";
+import SourceCodeInspector from "./SourceCodeInspector";
 
 function findGitUrl(node) {
   let suffix = node.data.name;
@@ -170,6 +171,7 @@ const NodeInspector = (props) => {
         <h3>{node.data.name}</h3>
       )}
       <PathInspector node={node} dispatch={dispatch} />
+      <SourceCodeInspector node={node} state={state} dispatch={dispatch} />
       <p>
         Selected date range {humanizeDate(earliest)} to {humanizeDate(latest)}
       </p>
