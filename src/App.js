@@ -20,7 +20,7 @@ const App = (props) => {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>Polyglot Code Explorer (beta)</h1>
+        <h1>Polyglot Code Explorer v{process.env.REACT_APP_VERSION}</h1>
       </header>
       <Viz dataRef={dataRef} state={vizState} dispatch={dispatch} />
       <Controller dataRef={dataRef} state={vizState} dispatch={dispatch} />
