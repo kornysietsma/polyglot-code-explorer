@@ -1,6 +1,6 @@
 /* eslint-disable react/forbid-prop-types */
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import * as d3 from "d3";
 import _ from "lodash";
 import defaultPropTypes from "./defaultPropTypes";
@@ -37,8 +37,8 @@ const redrawPolygons = (svgSelection, metadata, state) => {
   const { fillFnBuilder, colourScaleBuilder, dataFn, parentFn } = getCurrentVis(
     config
   );
-  const scale = colourScaleBuilder(config, metadata);
-  const fillFn = fillFnBuilder(config, scale, dataFn, parentFn);
+  const scale = colourScaleBuilder(state, metadata);
+  const fillFn = fillFnBuilder(state, scale, dataFn, parentFn);
 
   const strokeWidthFn = (d) => {
     if (d.data.layout.algorithm === "circlePack") return 0;
@@ -250,6 +250,7 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
   // ugly - we cross-link each node to the hierarchy node, because so much needs hierarchy nodes.
   // some time this should be fixed properly
   rootNode.descendants().forEach((node) => {
+    // eslint-disable-next-line no-param-reassign
     node.data.hierarchNode = node;
   });
 
@@ -430,6 +431,10 @@ const Viz = (props) => {
   const d3Container = useRef(null);
   const d3TimescaleContainer = useRef(null);
   const { dataRef, state, dispatch } = props;
+  const debouncedDispatch = useCallback(
+    _.debounce((nextValue) => dispatch(nextValue), 250),
+    [] // will be created only once
+  );
 
   const prevState = usePrevious(state);
 
@@ -446,7 +451,12 @@ const Viz = (props) => {
     ) {
       console.log("expensive config change - rebuild all");
       draw(d3Container, files, metadata, state, dispatch);
-      drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch);
+      drawTimescale(
+        d3TimescaleContainer,
+        timescaleData,
+        state,
+        debouncedDispatch
+      );
       updateBodyTheme(state.config.colours.currentTheme);
     } else {
       if (!_.isEqual(prevState.config, config)) {

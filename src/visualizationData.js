@@ -12,6 +12,7 @@ import {
   nodeIndentationSum,
   nodeLanguage,
   nodeNumberOfChangers,
+  nodeOwnersNamesOnly,
 } from "./nodeData";
 import {
   depthScaleBuilder,
@@ -19,14 +20,16 @@ import {
   goodBadUglyScaleBuilder,
   languageScaleBuilder,
   numberOfChangersScale,
+  ownersColourScaleBuilder,
 } from "./ColourScales";
-import standardFillBuilder from "./fillFunctions";
+import { standardFillBuilder, fullStateFillBuilder } from "./fillFunctions";
 import {
   creationKeyData,
   depthKeyData,
   goodBadUglyColourKeyData,
   languageColourKeyData,
   numberOfChangersKeyData,
+  ownersColourKeyData,
 } from "./colourKeys";
 
 const blankParent = () => undefined;
@@ -226,8 +229,35 @@ const VisualizationData = {
     colourScaleBuilder: numberOfChangersScale,
     colourKeyBuilder: numberOfChangersKeyData,
   },
-  churn: {
+  owners: {
     displayOrder: 7,
+    title: "File ownership",
+    subVis: false,
+    help: (
+      <div>
+        <p>
+          Shows who &ldquo;owns&rdquo; files in selected date range, based on
+          threshold. So if 80% of all commits to a file are by Jane, Joe and
+          Siobhan, and the threshold is 80%, then the file is considered
+          &ldquo;owned&rdquo; by these three. This can be measured in terms of
+          commits, or lines changed (added + deleted)
+        </p>
+        <p>
+          Note currently there is no way to distinguish one user with multiple
+          logins from multiple people!
+        </p>
+      </div>
+    ),
+    // TODO: doesn't work yet!
+    dataFn: nodeOwnersNamesOnly,
+    parentFn: blankParent,
+    fillFnBuilder: fullStateFillBuilder,
+    colourScaleBuilder: ownersColourScaleBuilder,
+    colourKeyBuilder: ownersColourKeyData,
+  },
+
+  churn: {
+    displayOrder: 8,
     title: "Churn",
     subVis: true,
     defaultChild: "days",

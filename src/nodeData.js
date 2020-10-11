@@ -202,6 +202,85 @@ export function nodeTopChangers(node, earliest, latest, maxPeople) {
     .slice(0, maxPeople);
 }
 
+export function nodeTopChangersByLines(node, earliest, latest, maxPeople) {
+  const details = nodeChangeDetails(node, earliest, latest);
+  if (!details) return undefined;
+  const changerStats = new Map();
+  // eslint-disable-next-line camelcase
+  details.forEach(({ users, lines_added, lines_deleted }) => {
+    // eslint-disable-next-line camelcase
+    const totLines = lines_added + lines_deleted;
+    users.forEach((user) => {
+      if (!changerStats.has(user)) {
+        changerStats.set(user, totLines);
+      } else {
+        changerStats.set(user, changerStats.get(user) + totLines);
+      }
+    });
+  });
+
+  return [...changerStats.entries()]
+    .sort(([au, ac], [bu, bc]) => {
+      return bc - ac;
+    })
+    .slice(0, maxPeople);
+}
+
+function setAsString(set) {
+  // only works for sets of sortable things, needed as stupid es6 maps are broken with non-primitive keys
+  return Array.from(set)
+    .sort()
+    .map((v) => `${v}`)
+    .join("_");
+}
+
+export function nodeOwners(
+  node,
+  earliest,
+  latest,
+  thresholdPercent,
+  linesNotCommits
+) {
+  const details = linesNotCommits
+    ? nodeTopChangersByLines(node, earliest, latest, 9999)
+    : nodeTopChangers(node, earliest, latest, 9999);
+
+  if (!details) return undefined;
+
+  if (details.length > 0) {
+    const totalValue = _.sumBy(details, ([_user, value]) => value);
+    // OK, want to say "we have total value, we want to aggregate users until we have over the threshold percentage of the total"
+    const thresholdValue = (thresholdPercent / 100.0) * totalValue;
+    const users = new Set();
+    let aggregatedValue = 0.0;
+    // eslint-disable-next-line no-restricted-syntax
+    for (const [user, value] of details) {
+      aggregatedValue += value;
+      users.add(user);
+      if (aggregatedValue > thresholdValue) {
+        break;
+      }
+    }
+
+    return { users: setAsString(users), value: aggregatedValue, totalValue };
+  }
+  return { users: "", value: 0, totalValue: 0 };
+}
+
+export function nodeOwnersNamesOnly(node, state) {
+  const { config } = state;
+  const { earliest, latest } = config.dateRange;
+  const { thresholdPercent, linesNotCommits } = config.owners;
+  const owners = nodeOwners(
+    node,
+    earliest,
+    latest,
+    thresholdPercent,
+    linesNotCommits
+  );
+  return owners ? owners.users : undefined;
+}
+
 export function nodeNumberOfChangers(node, earliest, latest) {
   const details = nodeChangeDetails(node, earliest, latest);
   if (!details) return undefined;

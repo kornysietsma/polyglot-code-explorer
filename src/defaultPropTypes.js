@@ -7,7 +7,7 @@ const defaultPropTypes = {
     config: PropTypes.any.isRequired,
     couplingConfig: PropTypes.any.isRequired,
     expensiveConfig: PropTypes.any.isRequired,
-    constants: PropTypes.any.isRequired,
+    calculated: PropTypes.any.isRequired,
   }).isRequired,
   dispatch: PropTypes.func.isRequired,
 };

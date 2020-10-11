@@ -3,9 +3,9 @@ import _ from "lodash";
 import { humanizeDate } from "./datetimes";
 
 export function goodBadUglyColourKeyData(configLocation) {
-  return (vis, config, metadata) => {
-    const { good, bad, ugly, precision } = _.get(config, configLocation);
-    const scale = vis.colourScaleBuilder(config, metadata);
+  return (vis, state, metadata) => {
+    const { good, bad, ugly, precision } = _.get(state.config, configLocation);
+    const scale = vis.colourScaleBuilder(state, metadata);
 
     const goodBad = d3.interpolateNumber(good, bad);
     const badUgly = d3.interpolateNumber(bad, ugly);
@@ -32,7 +32,7 @@ export function goodBadUglyColourKeyData(configLocation) {
   };
 }
 
-export function languageColourKeyData(vis, config, metadata) {
+export function languageColourKeyData(vis, state, metadata) {
   const { languageKey, otherColour } = metadata.languages;
   return [
     ...languageKey.map((k) => [k.language, k.colour]),
@@ -40,9 +40,9 @@ export function languageColourKeyData(vis, config, metadata) {
   ];
 }
 
-export function depthKeyData(vis, config, metadata) {
+export function depthKeyData(vis, state, metadata) {
   const { maxDepth } = metadata.stats;
-  const scale = vis.colourScaleBuilder(config, metadata);
+  const scale = vis.colourScaleBuilder(state, metadata);
   const key = [];
   for (let ix = 1; ix <= maxDepth; ix += 1) {
     key.push([ix, scale(ix)]);
@@ -50,8 +50,9 @@ export function depthKeyData(vis, config, metadata) {
   return key;
 }
 
-export function creationKeyData(vis, config, metadata) {
-  const scale = vis.colourScaleBuilder(config, metadata);
+export function creationKeyData(vis, state, metadata) {
+  const scale = vis.colourScaleBuilder(state, metadata);
+  const { config } = state;
   const {
     dateRange: { earliest, latest },
   } = config;
@@ -67,8 +68,9 @@ export function creationKeyData(vis, config, metadata) {
   return key;
 }
 
-export function numberOfChangersKeyData(vis, config, metadata) {
-  const scale = vis.colourScaleBuilder(config, metadata);
+export function numberOfChangersKeyData(vis, state, metadata) {
+  const scale = vis.colourScaleBuilder(state, metadata);
+  const { config } = state;
   const { numberOfChangers } = config;
   const key = [
     ["None", numberOfChangers.noChangersColour],
@@ -90,5 +92,43 @@ export function numberOfChangersKeyData(vis, config, metadata) {
   ) {
     key.push([Math.round(n), scale(n)]);
   }
+  return key;
+}
+
+function shortName(user) {
+  if (user.name) return user.name;
+  return user.email;
+}
+
+function shortUserNames(ownerStr, users) {
+  if (ownerStr === "") return "(none)";
+  const userIds = ownerStr.split("_").map((s) => parseInt(s, 10));
+  if (userIds.length > 5) {
+    return `${userIds.length} different users`;
+  }
+  return userIds
+    .map((userId) => {
+      return shortName(users[userId].user);
+    })
+    .join(", ");
+}
+
+export function ownersColourKeyData(vis, state, metadata) {
+  const { ownerData } = state.calculated;
+  const { users } = metadata;
+  const scale = vis.colourScaleBuilder(state, metadata);
+
+  // for now, just give owners - later it'd be nice to have counts as well?
+  const key = [["No commits", scale("")]];
+  const { ownerColours } = state.config.colours.light; // just using counts so theme isn't important
+  const { oneOwnerColours, moreOwnerColours } = ownerColours;
+  const maxDifferentOwners = oneOwnerColours.length + moreOwnerColours.length;
+  ownerData.slice(0, maxDifferentOwners).forEach(([ownerStr, { value }]) => {
+    const label = `${shortUserNames(ownerStr, users)} (${value})`;
+    key.push([label, scale(ownerStr)]);
+  });
+
+  key.push(["other", scale("xxxx")]);
+
   return key;
 }

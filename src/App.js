@@ -12,7 +12,7 @@ const App = (props) => {
   const { dataRef } = props;
 
   const [vizState, dispatch] = useReducer(
-    globalDispatchReducer,
+    globalDispatchReducer(dataRef),
     dataRef,
     initialiseGlobalState
   );

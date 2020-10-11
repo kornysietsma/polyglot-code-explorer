@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.4.1] - 2020-10-11
+
+### Added
+
+- Experimental code ownership visualisation - a work in progress, currently quite slow on big git histories
 
 ## [0.4.0] - 2020-10-09
 

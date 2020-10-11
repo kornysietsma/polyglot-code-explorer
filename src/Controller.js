@@ -1,7 +1,8 @@
 /* eslint-disable jsx-a11y/no-onchange */
 /* eslint-disable react/forbid-prop-types */
-import React, { useRef } from "react";
+import React, { useRef, useCallback } from "react";
 import _uniqueId from "lodash/uniqueId";
+import _ from "lodash";
 import defaultPropTypes from "./defaultPropTypes";
 import VisualizationData from "./visualizationData";
 import VisColourKey from "./VisColourKey";
@@ -22,6 +23,8 @@ const Controller = (props) => {
   const { current: subVizId } = useRef(_uniqueId("controller-"));
   const { current: codeServerId } = useRef(_uniqueId("controller-"));
   const { current: codeServerPrefixId } = useRef(_uniqueId("controller-"));
+  const { current: ownersThresholdId } = useRef(_uniqueId("controller-"));
+  const { current: ownersLinesNotCommitsId } = useRef(_uniqueId("controller-"));
 
   const sortedVis = Object.entries(VisualizationData).sort(
     ([k1, v1], [k2, v2]) => k2.displayOrder - k1.displayOrder
@@ -37,6 +40,60 @@ const Controller = (props) => {
     : undefined;
 
   const currentVisOrSub = currentSubVisData || currentParentVisData;
+
+  const debouncedDispatch = useCallback(
+    _.debounce((nextValue) => dispatch(nextValue), 250),
+    [] // will be created only once
+  );
+
+  // TODO: move owners stuff into a component (I'm trying to get this out in a rush!)
+  const ownersConfigPanel =
+    state.config.visualization === "owners" ? (
+      <div>
+        <p>Experimental feature - may be slow!</p>
+        <div>
+          <label htmlFor={ownersThresholdId}>
+            Threshold:&nbsp;
+            {config.owners.threshold}%
+            <input
+              id={ownersThresholdId}
+              type="range"
+              min="1"
+              max="100"
+              value={config.owners.threshold}
+              onChange={(evt) => {
+                const value = parseInt(evt.target.value, 10);
+                debouncedDispatch({
+                  type: "setOwnersTheshold",
+                  payload: value,
+                });
+              }}
+              step="1"
+            />
+          </label>
+        </div>
+        <div>
+          <label htmlFor={ownersLinesNotCommitsId}>
+            Order by:&nbsp;
+            <select
+              id={ownersLinesNotCommitsId}
+              value={config.owners.linesNotCommits.toString()}
+              onChange={(evt) =>
+                dispatch({
+                  type: "setOwnerLinesNotCommits",
+                  payload: evt.target.value === "true",
+                })
+              }
+            >
+              <option value="false">Commits</option>
+              <option value="true">Lines</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    ) : (
+      ""
+    );
 
   const themeButton =
     currentTheme === "dark" ? (
@@ -78,7 +135,7 @@ const Controller = (props) => {
               id={depthId}
               value={state.expensiveConfig.depth}
               onChange={(evt) =>
-                dispatch({
+                debouncedDispatch({
                   type: "setDepth",
                   payload: Number.parseInt(evt.target.value, 10),
                 })
@@ -170,7 +227,8 @@ const Controller = (props) => {
       ) : (
         ""
       )}
-      <VisColourKey vis={currentVisOrSub} config={config} metadata={metadata} />
+      {ownersConfigPanel}
+      <VisColourKey vis={currentVisOrSub} state={state} metadata={metadata} />
       {themeButton}
     </aside>
   );

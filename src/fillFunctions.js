@@ -19,8 +19,8 @@ function overrideColourFunction(node, config) {
   return undefined;
 }
 
-// TODO: this could be scrapped as it works for every case!
-export default function standardFillBuilder(config, scale, dataFn, parentFn) {
+export function standardFillBuilder(state, scale, dataFn, parentFn) {
+  const { config } = state;
   const { neutralColour } = config.colours[config.colours.currentTheme];
   const { earliest, latest } = config.dateRange;
   return (d) => {
@@ -29,6 +29,23 @@ export default function standardFillBuilder(config, scale, dataFn, parentFn) {
     const value = d.children
       ? parentFn(d, earliest, latest)
       : dataFn(d, earliest, latest);
+
+    return value === undefined ? neutralColour : scale(value);
+  };
+}
+
+// special case - the ownership fill needs all the state, as it has to get threshold config.
+// for now, parentFn is the same signature
+// TODO: I should refactor to get rid of standardFillBuilder by making all dataFn functions take
+// state as a paramater. But it's a lot of work
+export function fullStateFillBuilder(state, scale, dataFn, parentFn) {
+  const { config } = state;
+  const { neutralColour } = config.colours[config.colours.currentTheme];
+  const { earliest, latest } = config.dateRange;
+  return (d) => {
+    const override = overrideColourFunction(d, config);
+    if (override) return override;
+    const value = d.children ? parentFn(d, earliest, latest) : dataFn(d, state);
 
     return value === undefined ? neutralColour : scale(value);
   };

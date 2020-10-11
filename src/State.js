@@ -1,6 +1,12 @@
 import _ from "lodash";
+import * as d3 from "d3";
 import moment from "moment";
 import VisualizationData from "./visualizationData";
+import {
+  nodeOwners,
+  nodeTopChangers,
+  nodeTopChangersByLines,
+} from "./nodeData";
 
 function initialiseGlobalState(initialDataRef) {
   const {
@@ -97,6 +103,12 @@ function initialiseGlobalState(initialDataRef) {
         precision: 0,
         topChangersCount: 5, // show this many changers in NodeInspector
       },
+      owners: {
+        // see also calculated.ownerData
+        threshold: 90, // percentage of changes used for ownership
+        linesNotCommits: false, // if true, threshold is on lines changed not commit counts
+        topOwnerCount: 30, // only store this many changers. Needs to be as big or bigger than available colours
+      },
       colours: {
         currentTheme: "dark", // also sets css on the body!
         dark: {
@@ -111,6 +123,12 @@ function initialiseGlobalState(initialDataRef) {
           neutralColour: "#808080",
           nonexistentColour: "#111111",
           circlePackBackground: "#111111",
+          ownerColours: {
+            noOwnersColour: "#222222",
+            oneOwnerColours: d3.schemeSet1,
+            moreOwnerColours: d3.schemeSet2,
+            otherColour: "#808080",
+          },
         },
         light: {
           defaultStroke: "#f7f7f7",
@@ -124,6 +142,12 @@ function initialiseGlobalState(initialDataRef) {
           neutralColour: "#808080",
           nonexistentColour: "#f7f7f7",
           circlePackBackground: "#f7f7f7",
+          ownerColours: {
+            noOwnersColour: "#f7f7f7",
+            oneOwnerColours: d3.schemeSet2,
+            moreOwnerColours: d3.schemeSet1,
+            otherColour: "#808080",
+          },
         },
       },
       dateRange: {
@@ -150,7 +174,12 @@ function initialiseGlobalState(initialDataRef) {
     expensiveConfig: {
       depth: maxDepth,
     },
+    calculated: {
+      // this is mostly for state calculated in the postProcessState stage, based on data
+      ownerData: null,
+    },
   };
+  // could precalculate ownerData here - but it isn't needed until you select the 'owners' visualisation
   return defaults;
 }
 
@@ -158,7 +187,106 @@ function themedColours(config) {
   return config.colours[config.colours.currentTheme];
 }
 
-function globalDispatchReducer(state, action) {
+function addOwnersFromNode(
+  ownerData,
+  node,
+  earliest,
+  latest,
+  threshold,
+  linesNotCommits
+) {
+  const owners = nodeOwners(node, earliest, latest, threshold, linesNotCommits);
+  if (owners && owners.users !== "") {
+    const { users, value, totalValue } = owners;
+
+    // I want the scale to show:
+    // - user count and name summary
+    // - actual users as a hover
+    // - global percentage - so % of all commits/lines
+    // so per file, need to store total value, and value aggregated by this set of users.
+    // (each file only has a single set of users, enough to get over the threshold)
+    // So store this data - as:
+    // { users: Set(user ids) - this is the key
+    //   value: value contributed by these users
+    //   totalValue: total value by all users
+    //   file? No, not at this stage.
+    //   fileCount is probably useful.
+    // }
+    if (!ownerData.has(users)) {
+      ownerData.set(users, {
+        value,
+        totalValue,
+        fileCount: 1,
+      });
+    } else {
+      const oldData = ownerData.get(users);
+      ownerData.set(users, {
+        value: value + oldData.value,
+        totalValue: totalValue + oldData.totalValue,
+        fileCount: oldData.fileCount + 1,
+      });
+    }
+  }
+  if (node.children !== undefined) {
+    // eslint-disable-next-line no-restricted-syntax
+    for (const child of node.children) {
+      addOwnersFromNode(
+        ownerData,
+        child,
+        earliest,
+        latest,
+        threshold,
+        linesNotCommits
+      );
+    }
+  }
+}
+
+function aggregateOwnerData(data, newState) {
+  // TODO - could this live in another module?
+  const { threshold, linesNotCommits, topOwnerCount } = newState.config.owners;
+  const { earliest, latest } = newState.config.dateRange;
+
+  const ownerData = new Map();
+  addOwnersFromNode(
+    ownerData,
+    data,
+    earliest,
+    latest,
+    threshold,
+    linesNotCommits
+  );
+
+  const topData = Array.from(ownerData)
+    .sort(([key1, val1], [key2, val2]) => {
+      return val2.value - val1.value;
+    })
+    .slice(0, topOwnerCount);
+
+  return topData; // keep as an array of arrays not a map
+}
+
+// allows state changes that need to access data
+function postprocessState(dataRef, oldState, newState) {
+  if (
+    newState.config.visualization === "owners" &&
+    (oldState.config.visualization !== "owners" ||
+      !_.isEqual(oldState.config.dateRange, newState.config.dateRange) ||
+      !_.isEqual(oldState.config.owners, newState.config.owners))
+  ) {
+    console.log("recalculating owner data on state change");
+    const result = _.cloneDeep(newState);
+    result.calculated.ownerData = aggregateOwnerData(
+      dataRef.current.files,
+      newState
+    );
+    console.log("recalculation complete");
+    return result;
+  }
+  return newState;
+}
+
+function updateStateFromAction(state, action) {
   const { expensiveConfig, couplingConfig, config } = state;
   switch (action.type) {
     case "setVisualization": {
@@ -215,7 +343,6 @@ function globalDispatchReducer(state, action) {
       };
 
     case "setDateRange": {
-      console.log("Setting dates", action.payload);
       const [early, late] = action.payload;
       const result = _.cloneDeep(state);
       result.config.dateRange.earliest = early;
@@ -243,9 +370,28 @@ function globalDispatchReducer(state, action) {
       return result;
     }
 
+    case "setOwnersTheshold": {
+      const result = _.cloneDeep(state);
+      result.config.owners.threshold = action.payload;
+      return result;
+    }
+
+    case "setOwnerLinesNotCommits": {
+      const result = _.cloneDeep(state);
+      result.config.owners.linesNotCommits = action.payload;
+      return result;
+    }
+
     default:
       throw new Error(`Invalid dispatch type ${action.type}`);
   }
+}
+// Note - this takes a binding of the data ref, so App.js can pass in the data and the reducer can update state based on data.
+function globalDispatchReducer(dataRef) {
+  return (state, action) => {
+    const newState = updateStateFromAction(state, action);
+    return postprocessState(dataRef, state, newState);
+  };
 }
 
 export { themedColours, initialiseGlobalState, globalDispatchReducer };
