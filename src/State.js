@@ -2,11 +2,7 @@ import _ from "lodash";
 import * as d3 from "d3";
 import moment from "moment";
 import VisualizationData from "./visualizationData";
-import {
-  nodeOwners,
-  nodeTopChangers,
-  nodeTopChangersByLines,
-} from "./nodeData";
+import { nodeOwners } from "./nodeData";
 
 function initialiseGlobalState(initialDataRef) {
   const {

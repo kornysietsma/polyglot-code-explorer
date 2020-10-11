@@ -474,7 +474,7 @@ const Viz = (props) => {
         updateCoupling(d3Container, files, metadata, state, dispatch);
       }
     }
-  }, [dataRef, state, dispatch, prevState]);
+  }, [dataRef, state, dispatch, debouncedDispatch, prevState]);
 
   return (
     <aside className="Viz">
