@@ -123,8 +123,8 @@ export function ownersColourKeyData(vis, state, metadata) {
   const { ownerColours } = state.config.colours.light; // just using counts so theme isn't important
   const { oneOwnerColours, moreOwnerColours } = ownerColours;
   const maxDifferentOwners = oneOwnerColours.length + moreOwnerColours.length;
-  ownerData.slice(0, maxDifferentOwners).forEach(([ownerStr, { value }]) => {
-    const label = `${shortUserNames(ownerStr, users)} (${value})`;
+  ownerData.slice(0, maxDifferentOwners).forEach(([ownerStr]) => {
+    const label = shortUserNames(ownerStr, users);
     key.push([label, scale(ownerStr)]);
   });
 

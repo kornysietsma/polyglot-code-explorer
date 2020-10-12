@@ -23,6 +23,7 @@ function initialiseGlobalState(initialDataRef) {
       layout: {
         timescaleHeight: 130, // including margins
       },
+      remoteUrlTemplate: "https://{host}/{path}/{project}/blob/{ref}/{file}",
       codeInspector: {
         enabled: false,
         prefix: "http://localhost:8675/",
@@ -255,7 +256,7 @@ function aggregateOwnerData(data, newState) {
 
   const topData = Array.from(ownerData)
     .sort(([key1, val1], [key2, val2]) => {
-      return val2.value - val1.value;
+      return val2.fileCount - val1.fileCount;
     })
     .slice(0, topOwnerCount);
 
@@ -375,6 +376,12 @@ function updateStateFromAction(state, action) {
     case "setOwnerLinesNotCommits": {
       const result = _.cloneDeep(state);
       result.config.owners.linesNotCommits = action.payload;
+      return result;
+    }
+
+    case "setRemoteUrlTemplate": {
+      const result = _.cloneDeep(state);
+      result.config.remoteUrlTemplate = action.payload;
       return result;
     }
 

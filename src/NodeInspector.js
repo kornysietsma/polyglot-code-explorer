@@ -4,6 +4,7 @@ import React from "react";
 import defaultPropTypes from "./defaultPropTypes";
 import PathInspector from "./PathInspector";
 import CouplingInspector from "./CouplingInspector";
+import styles from "./NodeInspector.module.css";
 import {
   nodeAge,
   nodeChurnData,
@@ -20,7 +21,7 @@ import { humanizeDate, humanizeDays } from "./datetimes";
 import ToggleablePanel from "./ToggleablePanel";
 import SourceCodeInspector from "./SourceCodeInspector";
 
-function findGitUrl(node) {
+function findGitUrl(node, remoteUrlTemplate) {
   let suffix = node.data.name;
   let current = node;
   while (!nodeRemoteUrl(current) && current.parent) {
@@ -29,27 +30,41 @@ function findGitUrl(node) {
       suffix = `${current.data.name}/${suffix}`;
     }
   }
-  let remote = nodeRemoteUrl(current);
+  const remote = nodeRemoteUrl(current);
 
-  if (remote) {
-    const sshRemoteRe = /\w+@([^:]+):([a-zA-Z./]+)/; // ssh login not http(s) url
-    if (sshRemoteRe.test(remote)) {
-      remote = remote.replace(sshRemoteRe, "https://$1/$2");
-    }
-    // TODO: these could be regex magic?
-    if (remote.startsWith("git://")) {
-      remote = `https://${remote.substr(6, remote.length)}`;
-    }
-    if (remote.endsWith(".git")) {
-      remote = remote.substr(0, remote.length - 4);
-    }
-    const head = nodeRemoteHead(current);
-    if (head) {
-      return `${remote}/blob/${head}/${suffix}`;
-    }
-    return `${remote}/blob/master/${suffix}`;
+  if (!remote) return undefined;
+
+  // sorry, gentle reader, for this ugly regex. 
+  // TODO: split this, clean it up, make it nicer, add some tests!
+  const remoteRe = /^(\w+:\/\/(?<host>[^/]+)\/(?<path>.+)\/(?<project>[^/.]+)(\.git)?)|(\w+@(?<host2>[^:]+):(?<path2>.+)\/(?<project2>[^/.]+)(\.git)?)$/;
+
+  if (!remoteRe.test(remote)) {
+    console.error(`Can't match remote URL '${remote}'`);
+    return undefined;
   }
-  return undefined;
+
+  const match = remoteRe.exec(remote);
+  const { host, path, project } = match.groups.host
+    ? {
+        // url style
+        host: match.groups.host,
+        path: match.groups.path,
+        project: match.groups.project,
+      }
+    : {
+        // ssh style
+        host: match.groups.host2,
+        path: match.groups.path2,
+        project: match.groups.project2,
+      };
+  const headRef = nodeRemoteHead(current) || "master";
+
+  return remoteUrlTemplate
+    .replace("{host}", host)
+    .replace("{path}", path)
+    .replace("{project}", project)
+    .replace("{ref}", headRef)
+    .replace("{file}", suffix);
 }
 
 function churnReport(churnData) {
@@ -96,10 +111,12 @@ function churnReport(churnData) {
 
 const NodeInspector = (props) => {
   const { node, dispatch, state, metadata } = props;
+  // UGLY - can't work out how to easily mix themes into module CSS?
+  const { currentTheme } = state.config.colours;
   const { stats } = metadata;
   const locData = nodeLocData(node);
   const indentationData = nodeIndentationData(node);
-  const gitUrl = findGitUrl(node);
+  const gitUrl = findGitUrl(node, state.config.remoteUrlTemplate);
   const { earliest, latest } = state.config.dateRange;
   const { topChangersCount } = state.config.numberOfChangers;
   const { couplingAvailable } = state.couplingConfig;
@@ -163,7 +180,15 @@ const NodeInspector = (props) => {
       {gitUrl ? (
         <h3>
           {node.data.name}&nbsp;
-          <a href={gitUrl} target="#">
+          <a
+            className={
+              currentTheme === "dark"
+                ? styles.remoteUrlDark
+                : styles.remoteUrlLight
+            }
+            href={gitUrl}
+            target="#"
+          >
             (remote code)
           </a>
         </h3>

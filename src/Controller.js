@@ -9,6 +9,7 @@ import VisColourKey from "./VisColourKey";
 import CouplingController from "./CouplingController";
 import ToggleablePanel from "./ToggleablePanel";
 import { humanizeDate } from "./datetimes";
+import HelpPanel from "./HelpPanel";
 
 const Controller = (props) => {
   const { dataRef, state, dispatch } = props;
@@ -25,6 +26,7 @@ const Controller = (props) => {
   const { current: codeServerPrefixId } = useRef(_uniqueId("controller-"));
   const { current: ownersThresholdId } = useRef(_uniqueId("controller-"));
   const { current: ownersLinesNotCommitsId } = useRef(_uniqueId("controller-"));
+  const { current: remoteUrlTemplateId } = useRef(_uniqueId("controller-"));
 
   const sortedVis = Object.entries(VisualizationData).sort(
     ([k1, v1], [k2, v2]) => k2.displayOrder - k1.displayOrder
@@ -180,6 +182,55 @@ const Controller = (props) => {
                 })
               }
             />
+          </label>
+        </div>
+        <div>
+          <label htmlFor={remoteUrlTemplateId}>
+            Remote url template:&nbsp;
+            <input
+              type="text"
+              id={codeServerPrefixId}
+              value={state.config.remoteUrlTemplate}
+              onChange={(evt) =>
+                dispatch({
+                  type: "setRemoteUrlTemplate",
+                  payload: evt.target.value,
+                })
+              }
+            />
+            <HelpPanel>
+              <p>
+                Enter a templated URL for browsing files online, similar to: &ldquo;
+                {"https://{host}/{path}/{project}/blob/{ref}/{file}"}&rdquo; (which is the default, for github)
+              </p>
+              <p>
+                Elements are bits of a remote URL - given an example{" "}
+                <pre>git@github.com:foocorp/blah/bat.git</pre> you can map:
+                <ul>
+                  <li>host - the host name e.g. github.com</li>
+                  <li>
+                    path - the url prefix to the actual project name, e.g.
+                    &apos;foocorp/blah
+                  </li>
+                  <li>
+                    project - the last bit of the URL, e.g &apos;bat&apos;
+                    (excluding .git)
+                  </li>
+                  <li>
+                    ref - the name or git hash of the HEAD when the code was
+                    scanned - usually a hex string
+                  </li>
+                  <li>
+                    file - the path within the project of the file you are
+                    browsing, e.g. &apos;src/main/baz.clj
+                  </li>
+                </ul>
+              </p>
+              <p>
+                You can skip any element - if you want to see &apos;master&apos;
+                use &apos;master&apos; in the template, instead of the ref.
+              </p>
+            </HelpPanel>
           </label>
         </div>
         <CouplingController
