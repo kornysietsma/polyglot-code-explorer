@@ -316,6 +316,12 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
   );
 };
 
+function addDays(date, days) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
 function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
   const { config } = state;
   const {
@@ -353,9 +359,13 @@ function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
 
   const yMax = d3.max(timescaleData, valueFn);
 
+  const dateRange = d3.extent(timescaleData, (d) => d.day);
+  dateRange[0] = addDays(dateRange[0], -1);
+  dateRange[1] = addDays(dateRange[1], 1);
+
   const xScale = d3
     .scaleUtc()
-    .domain(d3.extent(timescaleData, (d) => d.day))
+    .domain(dateRange)
     .range([margin.left, width - margin.right, width]);
   const yScale = d3
     .scaleLinear()

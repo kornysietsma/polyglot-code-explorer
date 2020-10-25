@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.4.3] - 2020-10-25
+
+### Changed
+
+- Fixed date scale, so it starts and ends one day earlier/later - otherwise sometimes had problems if commits happened on the very last day in the range.
+
 ## [0.4.2] - 2020-10-13
 
 ### Changed

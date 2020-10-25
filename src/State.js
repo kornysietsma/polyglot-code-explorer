@@ -14,6 +14,7 @@ function initialiseGlobalState(initialDataRef) {
   const twoYearsAgo = moment.unix(latestCommit).subtract(2, "year").unix();
 
   const earliest = twoYearsAgo < earliestCommit ? earliestCommit : twoYearsAgo;
+  const latest = moment.unix(latestCommit).add(1, "day").unix(); // otherwise files committed today get confused
   const couplingAvailable = coupling !== undefined;
 
   const defaults = {
@@ -149,7 +150,7 @@ function initialiseGlobalState(initialDataRef) {
       },
       dateRange: {
         earliest,
-        latest: latestCommit,
+        latest,
       },
       selectedNode: null,
     },
