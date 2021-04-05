@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.5.0] - 2021-04-03
+
+### Changed
+
+- Minor version bump as file format has changed incompatibly - new coupling data is finer grained
+- Changed coupling UI for new fine-grained coupling logic
+
 ## [0.4.3] - 2020-10-25
 
 ### Changed

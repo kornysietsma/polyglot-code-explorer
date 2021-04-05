@@ -352,10 +352,10 @@ export function nodeCouplingFiles(node, earliest, latest) {
     // nothing in current selection
     return [];
   }
-  let totalCommitDays = 0;
+  let totalBursts = 0;
   const files = {};
   buckets.forEach((bucket) => {
-    totalCommitDays += bucket.commit_days;
+    totalBursts += bucket.activity_bursts;
     bucket.coupled_files.forEach(([filename, count]) => {
       if (files[filename] === undefined) {
         files[filename] = count;
@@ -369,7 +369,7 @@ export function nodeCouplingFiles(node, earliest, latest) {
     return {
       source: node,
       targetFile: file,
-      sourceCount: totalCommitDays,
+      sourceCount: totalBursts,
       targetCount: count,
     };
   });
@@ -389,7 +389,6 @@ function commonRoots(file1, file2) {
     if (index >= maxLength) break;
     index += 1;
   }
-  console.log("commonRoots", file1, file2, commonLength);
   return commonLength;
 }
 
@@ -404,14 +403,14 @@ export function nodeCouplingFilesFiltered(
   earliest,
   latest,
   minRatio,
-  minDays,
+  minBursts,
   maxCommonRoots
 ) {
   const files = nodeCouplingFiles(node, earliest, latest);
   if (files === undefined || files.length === 0) return files;
   return files.filter((f) => {
     return (
-      f.sourceCount >= minDays &&
+      f.sourceCount >= minBursts &&
       f.targetCount / f.sourceCount > minRatio &&
       filesHaveMaxCommonRoots(maxCommonRoots, nodePath(f.source), f.targetFile)
     );

@@ -157,7 +157,7 @@ function initialiseGlobalState(initialDataRef) {
     couplingConfig: {
       couplingAvailable,
       shown: false,
-      minDays: 10,
+      minBursts: 10,
       minRatio: 0.9,
       // maxCommonRoots - -1 means show all coupling
       // 0 means only show files who have no roots in common - so /foo/baz.txt and /bar/baz.js
@@ -322,10 +322,10 @@ function updateStateFromAction(state, action) {
         couplingConfig: { ...couplingConfig, minRatio: action.payload },
       };
     }
-    case "setCouplingMinDays": {
+    case "setCouplingMinBursts": {
       return {
         ...state,
-        couplingConfig: { ...couplingConfig, minDays: action.payload },
+        couplingConfig: { ...couplingConfig, minBursts: action.payload },
       };
     }
     case "setCouplingMaxCommonRoots": {

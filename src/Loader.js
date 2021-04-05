@@ -25,10 +25,11 @@ const useFetch = (url) => {
       console.log("postprocessing complete");
       const { users } = json.data.git_meta;
       if (json.data.coupling_meta) {
+        const bucketConfig = json.data.coupling_meta.buckets;
         stats.coupling = {
-          bucketCount: json.data.coupling_meta.bucket_count,
-          bucketSize: json.data.coupling_meta.bucket_size,
-          firstBucketStart: json.data.coupling_meta.first_bucket_start,
+          bucketCount: bucketConfig.bucket_count,
+          bucketSize: bucketConfig.bucket_size,
+          firstBucketStart: bucketConfig.first_bucket_start,
         };
       }
       const metadata = {

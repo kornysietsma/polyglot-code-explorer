@@ -15,12 +15,12 @@ const CouplingController = (props) => {
       couplingAvailable,
       shown,
       minRatio,
-      minDays,
+      minBursts,
       maxCommonRoots,
     },
   } = state;
   const { current: sliderId } = useRef(_uniqueId("coupling-controller-"));
-  const { current: minDaysId } = useRef(_uniqueId("coupling-controller-"));
+  const { current: minBurstsId } = useRef(_uniqueId("coupling-controller-"));
   const { current: maxRootsId } = useRef(_uniqueId("coupling-controller-"));
 
   if (!couplingAvailable) {
@@ -72,8 +72,8 @@ const CouplingController = (props) => {
     </button>
   );
 
-  const minMinDays = 5;
-  const maxMinDays = 30;
+  const minMinBursts = 1;
+  const maxMinBursts = 100;
 
   return (
     <div>
@@ -82,18 +82,31 @@ const CouplingController = (props) => {
         <HelpPanel>
           <p>
             Temporal coupling is based on git history - two files which
-            regularly change on the same day, may well have some kind of
-            coupling - explicit or implicit
+            regularly change at the same time, may well have some kind of
+            coupling - explicit or implicit.
           </p>
           <p>
-            The current calculation is fairly simple:
+            See{" "}
+            <a href="https://polyglot.korny.info/metrics/temporal-coupling">
+              the Docs site for more.
+            </a>
+          </p>
+          <p>
+            The current calculation uses some thresholds to work out what
+            &ldquo;changed at the same time&rdquo; means:
             <br />
-            For each file, find what days it has changed in git.
+            For each file, find when it changed. This is done when scanning, and
+            multiple commits in a short space of time to the same file are
+            counted as a single &ldquo;activity burst&rdquo; - so if a file
+            changed 10 times in a stretch, it counts as one activity. (by
+            default a gap of 2 hours is needed to separate activities)
             <br />
-            Then count any other file which changes on some of those days.
+            Then count any other file which changes near that burst of activity
+            - by default, within an hour of the start or end.
             <br />
-            For example if foo.rs changes on 20 days, and bar.rs changes on 18
-            of those days, it will show up as a coupling of 18/20 or 0.9.
+            For example if foo.rs changes regularly for 5 days in a week, and
+            bar.rs changes within an hour of the foo.rs change on 4 days, then
+            it will show up with a coupling of 4/5 or 0.8
             <br />
           </p>
           <p>
@@ -148,21 +161,21 @@ const CouplingController = (props) => {
             }}
           />
         </label>
-        <label htmlFor={minDaysId}>
-          Minimum days for coupling:
+        <label htmlFor={minBurstsId}>
+          Minimum activity bursts for coupling:
           <select
-            name="minDays"
-            id={minDaysId}
-            value={minDays}
+            name="minBursts"
+            id={minBurstsId}
+            value={minBursts}
             onChange={(evt) =>
               dispatch({
-                type: "setCouplingMinDays",
+                type: "setCouplingMinBursts",
                 payload: Number.parseInt(evt.target.value, 10),
               })
             }
           >
-            {[...Array(maxMinDays - minMinDays + 1).keys()].map((d) => {
-              const days = minMinDays + d;
+            {[...Array(maxMinBursts - minMinBursts + 1).keys()].map((d) => {
+              const days = minMinBursts + d;
               return (
                 <option key={days} value={days}>
                   {days}

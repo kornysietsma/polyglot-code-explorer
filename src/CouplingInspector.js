@@ -23,7 +23,7 @@ const CouplingInspector = (props) => {
     earliest,
     latest,
     couplingConfig.minRatio,
-    couplingConfig.minDays,
+    couplingConfig.minBursts,
     couplingConfig.maxCommonRoots
   );
   // this is ugly - but we can't return early if no coupling data
@@ -45,7 +45,7 @@ const CouplingInspector = (props) => {
     files = files.slice(0, 20);
     title = (
       <h5>
-        Source days: {sourceCount} in range {humanizeDate(couplingStart)} to
+        Source changes: {sourceCount} in range {humanizeDate(couplingStart)} to
         {humanizeDate(couplingEnd)}
       </h5>
     );
@@ -54,7 +54,7 @@ const CouplingInspector = (props) => {
         <thead>
           <tr>
             <td>File</td>
-            <td>Matching days</td>
+            <td>Matching changes</td>
             <td>Ratio</td>
           </tr>
         </thead>

@@ -125,7 +125,7 @@ function normalizedCouplingNodes(rootNode, state) {
             earliest,
             latest,
             couplingConfig.minRatio,
-            couplingConfig.minDays,
+            couplingConfig.minBursts,
             couplingConfig.maxCommonRoots
           )
         )
