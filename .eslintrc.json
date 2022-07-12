@@ -1,15 +1,47 @@
 {
-    "extends": [
-      "react-app",
-      "airbnb",
-      "plugin:jsx-a11y/recommended",
-      "prettier",
-      "prettier/react"],
-    "plugins": ["jsx-a11y","prettier"],
-    "rules": {
-      "prettier/prettier": "error",
-      "react/jsx-filename-extension": [1, { "extensions": [".js", ".jsx"] }],
-      "no-unused-vars": "warn",
-      "no-console": "off"
+  "env": {
+    "browser": true,
+    "es2021": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "plugin:react/recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:react-hooks/recommended",
+    "plugin:prettier/recommended"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaFeatures": {
+      "jsx": true
+    },
+    "ecmaVersion": "latest",
+    "sourceType": "module",
+    "project": "./tsconfig.json"
+  },
+  "plugins": ["react", "@typescript-eslint", "simple-import-sort"],
+  "rules": {
+    "prettier/prettier": [
+      "error",
+      {
+        "trailingComma": "es5",
+        "singleQuote": false,
+        "semi": true
+      }
+    ],
+    "simple-import-sort/imports": "error",
+    "simple-import-sort/exports": "error",
+    "react/react-in-jsx-scope": "off",
+    "react/prop-types": "off",
+    "@typescript-eslint/explicit-module-boundary-types": "off",
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      { "varsIgnorePattern": "^_.*" }
+    ]
+  },
+  "settings": {
+    "react": {
+      "version": "detect"
     }
   }
+}
