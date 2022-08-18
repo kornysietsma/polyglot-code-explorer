@@ -1,8 +1,12 @@
 import React from "react";
-import PropTypes from "prop-types";
 
-const ColourKey = (props) => {
-  const { title, keyData } = props;
+const ColourKey = ({
+  title,
+  keyData,
+}: {
+  title: string;
+  keyData: [string, string][];
+}) => {
   return (
     <div>
       <p>{title}</p>
@@ -16,7 +20,7 @@ const ColourKey = (props) => {
         <tbody>
           {keyData.map(([value, colour]) => {
             return (
-              <tr>
+              <tr key={value}>
                 <td>{value}</td>
                 <td
                   className="colourSample"
@@ -29,9 +33,5 @@ const ColourKey = (props) => {
       </table>
     </div>
   );
-};
-ColourKey.propTypes = {
-  title: PropTypes.string.isRequired,
-  keyData: PropTypes.arrayOf(PropTypes.array).isRequired,
 };
 export default ColourKey;

@@ -1,12 +1,15 @@
 import * as d3 from "d3";
 import _ from "lodash";
 
-export function numberOfChangersScale(state, metadata) {
+import { Config, State } from "./state";
+import { VizMetadata } from "./viz.types";
+
+export function numberOfChangersScale(state: State) {
   const { config } = state;
 
   const { numberOfChangers: conf } = config;
   return d3
-    .scaleLinear()
+    .scaleLinear<string>()
     .domain([
       0,
       1,
@@ -25,37 +28,46 @@ export function numberOfChangersScale(state, metadata) {
     .clamp(true);
 }
 
-export function goodBadUglyScale(config, good, bad, ugly) {
-  const { goodColour, badColour, uglyColour } = config.colours[
-    config.colours.currentTheme
-  ];
+export function goodBadUglyScale(
+  config: Config,
+  {
+    good,
+    bad,
+    ugly,
+  }: {
+    good: number;
+    bad: number;
+    ugly: number;
+  }
+) {
+  const { goodColour, badColour, uglyColour } = themedColours(config);
 
   return d3
-    .scaleLinear()
+    .scaleLinear<string>()
     .domain([good, bad, ugly])
     .range([goodColour, badColour, uglyColour])
     .interpolate(d3.interpolateHcl)
     .clamp(true);
 }
 
-export function goodBadUglyScaleBuilder(configLocation) {
-  return (state, metadata) => {
-    const { config } = state;
-
-    const { good, bad, ugly } = _.get(config, configLocation);
-    return goodBadUglyScale(config, good, bad, ugly);
-  };
+export interface DisplayScale<Input, Output, Unknown> {
+  (value: Input): Output | Unknown;
 }
 
-export function languageScaleBuilder(state, metadata) {
-
+export function languageScaleBuilder(
+  state: State,
+  metadata: VizMetadata
+): DisplayScale<string, string, undefined> {
   const { languageMap } = metadata.languages;
-  return (d) => {
-    return languageMap[d].colour;
+  return (d: string) => {
+    return languageMap.get(d)?.colour;
   };
 }
 
-export function depthScaleBuilder(state, metadata) {
+export function depthScaleBuilder(
+  state: State,
+  metadata: VizMetadata
+): DisplayScale<number, string, never> {
   const { maxDepth } = metadata.stats;
 
   return d3
@@ -64,15 +76,15 @@ export function depthScaleBuilder(state, metadata) {
     .clamp(true);
 }
 
-export function earlyLateScaleBuilder(state, metadata) {
+export function earlyLateScaleBuilder(
+  state: State
+): DisplayScale<number, string, never> {
   const { config } = state;
-  const { earlyColour, lateColour } = config.colours[
-    config.colours.currentTheme
-  ];
+  const { earlyColour, lateColour } = themedColours(config);
   const { earliest, latest } = config.dateRange;
 
   return d3
-    .scaleLinear()
+    .scaleLinear<string>()
     .domain([earliest, latest])
     .range([earlyColour, lateColour])
     .interpolate(d3.interpolateHcl)
@@ -80,11 +92,11 @@ export function earlyLateScaleBuilder(state, metadata) {
 }
 
 // duplicated from state to avoid circular dependency!
-function themedColours(config) {
+function themedColours(config: Config) {
   return config.colours[config.colours.currentTheme];
 }
 
-export function ownersColourScaleBuilder(state, metadata) {
+export function ownersColourScaleBuilder(state: State) {
   const { config, calculated } = state;
   const { ownerData } = calculated;
   // ownerData is a map (actually an array of arrays)
@@ -101,13 +113,9 @@ export function ownersColourScaleBuilder(state, metadata) {
   //
   // so the scale handles oneOwner.length + moreOwners.length values, plus "none" and "other"
 
-  const { ownerColours } = themedColours(config);
-  const {
-    noOwnersColour,
-    oneOwnerColours,
-    moreOwnerColours,
-    otherColour,
-  } = ownerColours;
+  const { ownerColours, errorColour } = themedColours(config);
+  const { noOwnersColour, oneOwnerColours, moreOwnerColours, otherColour } =
+    ownerColours;
 
   const availColours1 = _.cloneDeep(oneOwnerColours);
   const availColours2 = _.cloneDeep(moreOwnerColours);
@@ -136,7 +144,7 @@ export function ownersColourScaleBuilder(state, metadata) {
       }
     }
     domain.push(ownerStr);
-    range.push(nextColour);
+    range.push(nextColour ?? errorColour);
   });
   return d3.scaleOrdinal(domain, range).unknown(otherColour);
 }

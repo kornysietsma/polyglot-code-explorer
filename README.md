@@ -6,6 +6,12 @@ For an overview and more documentation, take a look at <https://polyglot.korny.i
 
 *NOTE* you will need to use other tools, documented on the site above, to create JSON data files that reflect your own projects!
 
+## WORK IN PROGRESS WARNING
+
+I'm doing a lot of changes right now - if you fetch the current code, things may break.
+
+Especially note, I've changed the data file formats created by the explorer etc., so things there will definitely break.
+
 ## Installing and running
 
 You can run with node.js (see below) - or you can grab a compiled static site and run it yourself.

@@ -1,20 +1,50 @@
 /* eslint-disable no-param-reassign */
-import _ from "lodash";
 import * as d3 from "d3";
-import moment from "moment";
-import { nodeGitData, nodeLinesOfCode, nodeLocData } from "./nodeData";
+import _ from "lodash";
+import moment, { unitOfTime } from "moment";
 
-function addLanguagesFromNode(counts, node) {
-  const loc = nodeLocData(node);
+import { nodeGitData, nodeLinesOfCode, nodeLocData } from "./nodeData";
+import {
+  DirectoryNode,
+  isDirectory,
+  isFile,
+  Tree,
+  TreeNode,
+} from "./polyglot_data.types";
+import { LanguagesMetadata, TreeStats } from "./viz.types";
+
+function linkParentRecursively(node: TreeNode, parent: DirectoryNode) {
+  node.parent = parent;
+  if (isDirectory(node)) {
+    for (const child of node.children) {
+      linkParentRecursively(child, node);
+    }
+  }
+}
+
+export function linkParents(data: Tree) {
+  const rootNode = data.tree;
+  if (!isDirectory(rootNode)) {
+    throw Error("Root of tree is not a directory!");
+  }
+  for (const child of rootNode.children) {
+    linkParentRecursively(child, rootNode);
+  }
+}
+
+function addLanguagesFromNode(
+  counts: Map<string, { count: number; loc: number }>,
+  node: TreeNode
+) {
+  const loc = isFile(node) && nodeLocData(node);
   if (loc) {
     const { language, code } = loc;
-    if (!counts[language]) {
-      counts[language] = { count: 0, loc: 0 };
-    }
-    counts[language].count += 1;
-    counts[language].loc += code;
+    const entry = counts.get(language) ?? { count: 0, loc: 0 };
+    entry.count += 1;
+    entry.loc += code;
+    counts.set(language, entry);
   }
-  if (node.children !== undefined) {
+  if (isDirectory(node)) {
     for (const child of node.children) {
       addLanguagesFromNode(counts, child);
     }
@@ -22,20 +52,25 @@ function addLanguagesFromNode(counts, node) {
 }
 
 /* eslint-enable no-param-reassign */
-export function countLanguagesIn(data) {
-  const counts = {};
-  addLanguagesFromNode(counts, data);
-  const countsPairs = [...Object.keys(counts)].map((k) => [k, counts[k]]);
-  const sortedMap = [...countsPairs].sort(
-    ([l1, k1], [l2, k2]) => k2.loc - k1.loc
-  );
+export function countLanguagesIn(data: Tree): LanguagesMetadata {
+  const counts: Map<string, { count: number; loc: number }> = new Map();
+  addLanguagesFromNode(counts, data.tree);
+  const sortedMap = [...counts].sort(([, k1], [, k2]) => k2.loc - k1.loc);
   const colours = d3.schemeTableau10;
   const otherColour = "#303030";
-  const languageMap = {};
-  const languageKey = [];
+  const languageMap: Map<
+    string,
+    { count: number; loc: number; colour: string }
+  > = new Map();
+  const languageKey: Array<{
+    count: number;
+    loc: number;
+    language: string;
+    colour: string;
+  }> = [];
   sortedMap.forEach(([key, val], index) => {
     const colour = index < colours.length ? colours[index] : otherColour;
-    languageMap[key] = { ...val, colour };
+    languageMap.set(key, { ...val, colour });
     if (index < colours.length) {
       languageKey.push({ ...val, language: key, colour });
     }
@@ -43,23 +78,23 @@ export function countLanguagesIn(data) {
   return { languageKey, languageMap, otherColour };
 }
 
-function gatherNodeStats(node, statsSoFar, depth) {
+function gatherNodeStats(node: TreeNode, statsSoFar: TreeStats, depth: number) {
   let stats = _.cloneDeep(statsSoFar);
   if (stats.maxDepth < depth) {
     stats.maxDepth = depth;
   }
-  const loc = nodeLinesOfCode(node);
+  const loc = isFile(node) ? nodeLinesOfCode(node) : undefined;
   if (loc && loc > stats.maxLoc) {
     stats.maxLoc = loc;
   }
-  const gitData = nodeGitData(node);
-  if (gitData && gitData.details && gitData.details.length > 0) {
+  const gitData = isFile(node) ? nodeGitData(node) : undefined;
+  if (gitData && (gitData?.details?.length ?? 0 > 0)) {
     const days = gitData.details.map((d) => d.commit_day);
-    if (gitData.lastUpdate) {
-      days.push(gitData.lastUpdate);
+    if (gitData.last_update) {
+      days.push(gitData.last_update);
     }
-    if (gitData.creationDate) {
-      days.push(gitData.creationDate);
+    if (gitData.creation_date) {
+      days.push(gitData.creation_date);
     }
     days.sort();
     const earliest = days[0];
@@ -71,7 +106,7 @@ function gatherNodeStats(node, statsSoFar, depth) {
       stats.latestCommit = latest;
     }
   }
-  if (node.children !== undefined) {
+  if (isDirectory(node)) {
     stats = node.children.reduce((memo, child) => {
       return gatherNodeStats(child, memo, depth + 1);
     }, stats);
@@ -79,8 +114,8 @@ function gatherNodeStats(node, statsSoFar, depth) {
   return stats;
 }
 
-export function gatherGlobalStats(data) {
-  const statsSoFar = {
+export function gatherGlobalStats(data: Tree) {
+  const statsSoFar: TreeStats = {
     earliestCommit: undefined,
     latestCommit: undefined,
     maxDepth: 0,
@@ -91,13 +126,32 @@ export function gatherGlobalStats(data) {
       maxDays: 0,
     },
   };
-  return gatherNodeStats(data, statsSoFar, 0);
+  return gatherNodeStats(data.tree, statsSoFar, 0);
 }
+
+type TimescaleData = {
+  files: number;
+  commits: number;
+  lines_added: number;
+  lines_deleted: number;
+};
+
+export type TimescaleIntervalData = {
+  day: Date;
+  files: number;
+  commits: number;
+  lines_added: number;
+  lines_deleted: number;
+};
 
 // yes, I'm modifying a parameter, it's hard to avoid in JavaScript with big data structures
 // timeUnit is 'week' or similar, passed to https://momentjs.com/docs/#/manipulating/start-of/
-function addTimescaleData(timescaleData, node, timeUnit) {
-  const gitData = nodeGitData(node);
+function addTimescaleData(
+  timescaleData: Map<number, TimescaleData>,
+  node: TreeNode,
+  timeUnit: unitOfTime.StartOf
+) {
+  const gitData = isFile(node) && nodeGitData(node);
   if (gitData && gitData.details && gitData.details.length > 0) {
     gitData.details.forEach((data) => {
       const startDate = moment.unix(data.commit_day).startOf(timeUnit).unix();
@@ -116,38 +170,41 @@ function addTimescaleData(timescaleData, node, timeUnit) {
       timescaleData.set(startDate, dateData);
     });
   }
-  if (node.children !== undefined) {
+  if (isDirectory(node)) {
     node.children.forEach((child) => {
       addTimescaleData(timescaleData, child, timeUnit);
     });
   }
 }
 
-export function gatherTimescaleData(data, timeUnit) {
-  const timescaleData = new Map();
-  addTimescaleData(timescaleData, data, timeUnit);
+export function gatherTimescaleData(
+  data: Tree,
+  timeUnit: unitOfTime.StartOf
+): TimescaleIntervalData[] {
+  const timescaleData: Map<number, TimescaleData> = new Map();
+  addTimescaleData(timescaleData, data.tree, timeUnit);
   // convert to a simple sorted array, as that's all we need really
   return [...timescaleData]
     .map(([day, dayData]) => {
       // convert to Javascript dates as d3 likes them - sigh.  I could do this on display?
       return { day: moment.unix(day).toDate(), ...dayData };
     })
-    .sort((a, b) => a.day - b.day);
+    .sort((a, b) => a.day.getTime() - b.day.getTime());
 }
 
 // yes, I'm modifying a parameter, it's hard to avoid in JavaScript with big data structures
-function addNodesByPath(nodesByPath, node) {
+function addNodesByPath(nodesByPath: Map<string, TreeNode>, node: TreeNode) {
   // eslint-disable-next-line no-param-reassign
-  nodesByPath[node.path] = node;
-  if (node.children !== undefined) {
+  nodesByPath.set(node.path, node);
+  if (isDirectory(node)) {
     node.children.forEach((child) => {
       addNodesByPath(nodesByPath, child);
     });
   }
 }
 
-export function gatherNodesByPath(data) {
-  const nodesByPath = {};
-  addNodesByPath(nodesByPath, data);
+export function gatherNodesByPath(data: Tree): Map<string, TreeNode> {
+  const nodesByPath = new Map();
+  addNodesByPath(nodesByPath, data.tree);
   return nodesByPath;
 }

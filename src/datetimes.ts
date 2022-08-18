@@ -1,18 +1,18 @@
 import moment from "moment";
 
-export function humanizeDate(unixdate) {
+export function humanizeDate(unixdate: number) {
   return moment.unix(unixdate).format("DD-MMM-YYYY");
 }
 
-export function dateToUnix(jsDate) {
+export function dateToUnix(jsDate: Date): number {
   return moment(jsDate).unix();
 }
 
-export function unixToDate(date) {
+export function unixToDate(date: number): Date {
   return moment.unix(date).toDate();
 }
 
-export function humanizeDays(days) {
+export function humanizeDays(days: number): string {
   let daysRemaining = days;
   let years = 0;
   let weeks = 0; // no months, as they are not really precise

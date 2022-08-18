@@ -1,16 +1,22 @@
-/* eslint-disable react/prop-types */
 import React from "react";
+
 import styles from "./ToggleablePanel.module.css";
 
-const ToggleablePanel = (props) => {
-  const {
-    showInitially,
-    title,
-    children,
-    showText = "show",
-    hideText = "hide",
-    borderlessIfHidden = false,
-  } = props;
+const ToggleablePanel = ({
+  showInitially,
+  title,
+  children,
+  showText = "show",
+  hideText = "hide",
+  borderlessIfHidden = false,
+}: {
+  showInitially: boolean;
+  title: string;
+  children: React.ReactNode;
+  showText?: string;
+  hideText?: string;
+  borderlessIfHidden?: boolean;
+}) => {
   const [showResults, setShowResults] = React.useState(showInitially);
   const onClick = () => setShowResults(!showResults);
   const hiddenBorderStyle = borderlessIfHidden
@@ -29,7 +35,7 @@ const ToggleablePanel = (props) => {
     );
   }
   return (
-    <div className={`${styles.panel} ${styles.shown}`}>
+    <div className={`${styles.panel}`}>
       <h4>
         {title}{" "}
         <button type="button" onClick={onClick}>

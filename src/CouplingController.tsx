@@ -1,15 +1,20 @@
-/* eslint-disable jsx-a11y/no-onchange */
-/* eslint-disable react/forbid-prop-types */
-import React, { useRef } from "react";
 import _uniqueId from "lodash/uniqueId";
-import defaultPropTypes from "./defaultPropTypes";
-import ToggleablePanel from "./ToggleablePanel";
-import HelpPanel from "./HelpPanel";
+import React, { useId } from "react";
+
 import { couplingDateRange } from "./couplingBuckets";
 import { humanizeDate } from "./datetimes";
+import HelpPanel from "./HelpPanel";
+import { Action, State } from "./state";
+import ToggleablePanel from "./ToggleablePanel";
+import { VizMetadata } from "./viz.types";
 
-const CouplingController = (props) => {
-  const { dispatch, state, stats } = props;
+const CouplingController = (props: {
+  state: State;
+  metadata: VizMetadata;
+  dispatch: React.Dispatch<Action>;
+}) => {
+  const { dispatch, state, metadata } = props;
+  const { stats } = metadata;
   const {
     couplingConfig: {
       couplingAvailable,
@@ -19,9 +24,9 @@ const CouplingController = (props) => {
       maxCommonRoots,
     },
   } = state;
-  const { current: sliderId } = useRef(_uniqueId("coupling-controller-"));
-  const { current: minBurstsId } = useRef(_uniqueId("coupling-controller-"));
-  const { current: maxRootsId } = useRef(_uniqueId("coupling-controller-"));
+  const sliderId = useId();
+  const minBurstsId = useId();
+  const maxRootsId = useId();
 
   if (!couplingAvailable) {
     return (
@@ -31,6 +36,9 @@ const CouplingController = (props) => {
     );
   }
 
+  if (stats.coupling === undefined) {
+    throw Error("No coupling config defined");
+  }
   const {
     coupling: { bucketSize },
   } = stats;
@@ -218,7 +226,5 @@ const CouplingController = (props) => {
     </div>
   );
 };
-
-CouplingController.propTypes = defaultPropTypes;
 
 export default CouplingController;

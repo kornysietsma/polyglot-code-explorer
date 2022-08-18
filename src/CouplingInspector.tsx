@@ -1,19 +1,27 @@
-/* eslint-disable react/forbid-prop-types */
-
 import React from "react";
-import defaultPropTypes from "./defaultPropTypes";
-import ToggleablePanel from "./ToggleablePanel";
-import { nodeCouplingFilesFiltered } from "./nodeData";
+
 import { couplingDateRange } from "./couplingBuckets";
 import { humanizeDate } from "./datetimes";
+import { nodeCouplingFilesFiltered } from "./nodeData";
+import { TreeNode } from "./polyglot_data.types";
+import { State } from "./state";
+import ToggleablePanel from "./ToggleablePanel";
+import { CouplingStats } from "./viz.types";
 
-const CouplingInspector = (props) => {
-  const { node, state, stats } = props;
+const CouplingInspector = ({
+  node,
+  state,
+  stats,
+}: {
+  node: TreeNode;
+  state: State;
+  stats: CouplingStats;
+}) => {
   const { earliest, latest } = state.config.dateRange;
   const { couplingConfig } = state;
 
   const { couplingStart, couplingEnd } = couplingDateRange(
-    stats.coupling,
+    stats,
     earliest,
     latest
   );
@@ -62,7 +70,7 @@ const CouplingInspector = (props) => {
           {files.map((file) => {
             const ratio = file.targetCount / file.sourceCount;
             return (
-              <tr>
+              <tr key={file.targetFile}>
                 <td>{file.targetFile}</td>
                 <td>{file.targetCount}</td>
                 {ratio.toFixed(3)}
@@ -81,7 +89,5 @@ const CouplingInspector = (props) => {
     </ToggleablePanel>
   );
 };
-
-CouplingInspector.propTypes = defaultPropTypes;
 
 export default CouplingInspector;

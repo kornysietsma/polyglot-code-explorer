@@ -1,55 +1,388 @@
-import React from "react";
+import { HierarchyNode, interpolatePlasma, scaleSequential } from "d3";
+import { ReactElement } from "react";
+
+import {
+  creationKeyData,
+  depthKey,
+  goodBadUglyColourKeyData,
+  numberOfChangersKeyData,
+  ownersColourKeyData,
+} from "./colourKeys";
+import {
+  earlyLateScaleBuilder,
+  goodBadUglyScale,
+  numberOfChangersScale,
+  ownersColourScaleBuilder,
+} from "./ColourScales";
 import {
   nodeAge,
   nodeChurnCommits,
   nodeChurnDays,
   nodeChurnLines,
+  nodeCreationDate,
   nodeCreationDateClipped,
   nodeCumulativeLinesOfCode,
   nodeDepth,
-  nodeIndentationP99,
-  nodeIndentationStddev,
-  nodeIndentationSum,
+  nodeIndentation,
   nodeLanguage,
   nodeNumberOfChangers,
   nodeOwnersNamesOnly,
 } from "./nodeData";
 import {
-  depthScaleBuilder,
-  earlyLateScaleBuilder,
-  goodBadUglyScaleBuilder,
-  languageScaleBuilder,
-  numberOfChangersScale,
-  ownersColourScaleBuilder,
-} from "./ColourScales";
-import { standardFillBuilder, fullStateFillBuilder } from "./fillFunctions";
-import {
-  creationKeyData,
-  depthKeyData,
-  goodBadUglyColourKeyData,
-  languageColourKeyData,
-  numberOfChangersKeyData,
-  ownersColourKeyData,
-} from "./colourKeys";
+  DirectoryNode,
+  FileNode,
+  isFile,
+  isHierarchyDirectory,
+  TreeNode,
+} from "./polyglot_data.types";
+import { Config, State, themedColours } from "./state";
+import { VizMetadata } from "./viz.types";
 
-const blankParent = () => undefined;
+/**
+ * The public view of a Visualization
+ * basically just enough to define a fill function, and draw a colour key.
+ * Actual visualisation implementations are mostly BaseVisualization implementations
+ * which vary depending on the scale units used.
+ */
+interface Visualization {
+  fillFn: (d: HierarchyNode<TreeNode>) => string;
+  colourKey: () => [string, string][];
+}
 
-const VisualizationData = {
+/**
+ * the base for most visualizations
+ * Based on a ScaleUnit - the unit used for the scale, typically `number` for numeric scales,
+ * or`string` for discrete scales like programming language.
+ *
+ * Note Visualizations are short-lived - typically just for one render function - as
+ * whenever the state or metadata changes, the visualization may change.
+ */
+abstract class BaseVisualization<ScaleUnit> implements Visualization {
+  state: State;
+  metadata: VizMetadata;
+  /**
+   * Constructs a Visualization.  Note these should be short-lived as state and metadata change all the time.
+   */
+  constructor(state: State, metadata: VizMetadata) {
+    this.state = state;
+    this.metadata = metadata;
+  }
+
+  /**
+   * Returns the 'value' of a particular file in the hierarchy, or undefined if for some reason the file has no relevant value
+   * @param d the node being drawn
+   */
+  abstract dataFn(d: HierarchyNode<FileNode>): ScaleUnit | undefined;
+  /**
+   * Returns the 'value' of a directory in the hierarchy - a parent in the tree structure.
+   *
+   * In many cases this returns undefined as it is not always easy to summarise e.g. complexity for a whole directory.
+   * Also directories are currently only shown if you deliberately trim the display depth (this may change)
+   * @param d the parent node being drawn
+   */
+  abstract parentFn(d: HierarchyNode<DirectoryNode>): ScaleUnit | undefined;
+  /** Converts a value in the scale of the visualization into a colour string.
+   *
+   * TODO: should bring in a type for colour strings to make this clearer!
+   *
+   * Note this is a function property, not an object method, as we often assign it in the constructor based on state
+   */
+  abstract scale: (d: ScaleUnit) => string | undefined;
+
+  /**
+   * The colour key as passed to the ColourKey component to show the key
+   */
+  abstract colourKey(): [string, string][];
+
+  /**
+   * For a given node (directory or file), returns the colour used to fill that node.
+   * Note that undefined nodes are converted to a neutral colour,
+   * and some nodes have their colour overridden - the background of the root node when circle packing is always black,
+   * and if the date selection ends before a file is created, it is also shown in black.
+   * @returns a colour string, scaled using `scale()`
+   */
+  fillFn(d: HierarchyNode<TreeNode>): string {
+    const { config } = this.state;
+    const { neutralColour } = themedColours(config);
+    const override = overrideColourFunction(d, config);
+    if (override) return override;
+    const value = isHierarchyDirectory(d)
+      ? this.parentFn(d)
+      : this.dataFn(d as HierarchyNode<FileNode>);
+
+    return value === undefined
+      ? neutralColour
+      : this.scale(value) ?? neutralColour;
+  }
+}
+
+// overrides most other colours - mostly top-level circle packed background, and files that don't exist yet
+// returns a colour, or undefined if there is no override
+function overrideColourFunction(
+  node: HierarchyNode<TreeNode>,
+  config: Config
+): string | undefined {
+  const { nonexistentColour, circlePackBackground } = themedColours(config);
+  const { latest } = config.dateRange;
+
+  if (node.data.layout.algorithm === "circlePack") return circlePackBackground;
+  const creationDate = isFile(node.data) && nodeCreationDate(node.data);
+  if (creationDate && creationDate > latest) return nonexistentColour;
+  return undefined;
+}
+
+/**
+ * The main Visualisations structure holds a mix of VisualizationData and ParentVisualizationData
+ * - this is basically just enough
+ */
+export type VisualizationData = {
+  displayOrder: number;
+  title: string;
+  help: ReactElement;
+  buildVisualization: (state: State, metadata: VizMetadata) => Visualization;
+};
+
+export type ParentVisualizationData = {
+  displayOrder: number;
+  title: string;
+  defaultChild: string;
+  children: { [subname: string]: VisualizationData };
+};
+
+export function isParentVisualization(
+  d: VisualizationData | ParentVisualizationData
+): d is ParentVisualizationData {
+  return (d as ParentVisualizationData).children !== undefined;
+}
+
+class LanguageVisualization extends BaseVisualization<string> {
+  constructor(state: State, metadata: VizMetadata) {
+    super(state, metadata);
+  }
+  dataFn(d: HierarchyNode<FileNode>): string {
+    return nodeLanguage(d.data);
+  }
+  parentFn(): string | undefined {
+    return undefined;
+  }
+
+  scale = (v: string) => this.metadata.languages.languageMap.get(v)?.colour;
+
+  colourKey(): [string, string][] {
+    const { languageKey, otherColour } = this.metadata.languages;
+    return [
+      ...languageKey.map((k) => [k.language, k.colour] as [string, string]),
+      ["Other languages", otherColour],
+    ];
+  }
+}
+
+class LinesOfCodeVisualization extends BaseVisualization<number> {
+  scale: (v: number) => string | undefined;
+  constructor(state: State, metadata: VizMetadata) {
+    super(state, metadata);
+    this.scale = goodBadUglyScale(state.config, state.config.loc);
+  }
+  dataFn(d: HierarchyNode<FileNode>): number {
+    return nodeCumulativeLinesOfCode(d.data);
+  }
+  parentFn(): number | undefined {
+    return undefined;
+  }
+
+  colourKey(): [string, string][] {
+    return goodBadUglyColourKeyData(
+      this.scale,
+      this.state,
+      this.state.config.loc
+    );
+  }
+}
+
+class NestingDepthVisualization extends BaseVisualization<number> {
+  scale: (v: number) => string | undefined;
+  constructor(state: State, metadata: VizMetadata) {
+    super(state, metadata);
+    const { maxDepth } = this.metadata.stats;
+    this.scale = scaleSequential(interpolatePlasma)
+      .domain([0, maxDepth])
+      .clamp(true);
+  }
+  dataFn(d: HierarchyNode<FileNode>): number {
+    return nodeDepth(d);
+  }
+  parentFn(d: HierarchyNode<DirectoryNode>): number | undefined {
+    return nodeDepth(d);
+  }
+
+  colourKey(): [string, string][] {
+    return depthKey(this.scale, this.state, this.metadata);
+  }
+}
+
+type IndentationMetric = "sum" | "p99" | "stddev";
+
+class IndentationVisualization extends BaseVisualization<number> {
+  metric: IndentationMetric;
+  scale: (v: number) => string | undefined;
+  constructor(state: State, metadata: VizMetadata, metric: IndentationMetric) {
+    super(state, metadata);
+    this.metric = metric;
+    this.scale = goodBadUglyScale(
+      state.config,
+      state.config.indentation[metric]
+    );
+  }
+  dataFn(d: HierarchyNode<FileNode>): number | undefined {
+    return nodeIndentation(d.data, this.metric);
+  }
+  parentFn(): number | undefined {
+    return undefined;
+  }
+
+  colourKey(): [string, string][] {
+    return goodBadUglyColourKeyData(
+      this.scale,
+      this.state,
+      this.state.config.indentation[this.metric]
+    );
+  }
+}
+
+class AgeVisualization extends BaseVisualization<number> {
+  scale: (v: number) => string | undefined;
+  constructor(state: State, metadata: VizMetadata) {
+    super(state, metadata);
+    this.scale = goodBadUglyScale(state.config, state.config.age);
+  }
+  dataFn(d: HierarchyNode<FileNode>): number | undefined {
+    const { earliest, latest } = this.state.config.dateRange;
+    if (earliest && latest) {
+      return nodeAge(d.data, earliest, latest);
+    }
+    return undefined;
+  }
+  parentFn(): number | undefined {
+    return undefined;
+  }
+  colourKey(): [string, string][] {
+    return goodBadUglyColourKeyData(
+      this.scale,
+      this.state,
+      this.state.config.age
+    );
+  }
+}
+
+class CreationDateVisualization extends BaseVisualization<number> {
+  scale: (v: number) => string | undefined;
+  constructor(state: State, metadata: VizMetadata) {
+    super(state, metadata);
+    this.scale = earlyLateScaleBuilder(state);
+  }
+  dataFn(d: HierarchyNode<FileNode>): number | undefined {
+    const { earliest, latest } = this.state.config.dateRange;
+    if (earliest && latest) {
+      return nodeCreationDateClipped(d.data, earliest, latest);
+    }
+    return undefined;
+  }
+  parentFn(): number | undefined {
+    return undefined;
+  }
+  colourKey(): [string, string][] {
+    return creationKeyData(this.scale, this.state);
+  }
+}
+
+class NumberOfChangersVisualization extends BaseVisualization<number> {
+  scale: (v: number) => string | undefined;
+  constructor(state: State, metadata: VizMetadata) {
+    super(state, metadata);
+    this.scale = numberOfChangersScale(state);
+  }
+  dataFn(d: HierarchyNode<FileNode>): number | undefined {
+    const { earliest, latest } = this.state.config.dateRange;
+    if (earliest && latest) {
+      return nodeNumberOfChangers(d.data, earliest, latest);
+    }
+    return undefined;
+  }
+  parentFn(): number | undefined {
+    return undefined;
+  }
+  colourKey(): [string, string][] {
+    return numberOfChangersKeyData(this.scale, this.state);
+  }
+}
+
+class OwnersVisualization extends BaseVisualization<string> {
+  scale: (v: string) => string | undefined;
+  constructor(state: State, metadata: VizMetadata) {
+    super(state, metadata);
+    this.scale = ownersColourScaleBuilder(state);
+  }
+  dataFn(d: HierarchyNode<FileNode>): string | undefined {
+    return nodeOwnersNamesOnly(d.data, this.state);
+  }
+  parentFn(): string | undefined {
+    return undefined;
+  }
+  colourKey(): [string, string][] {
+    return ownersColourKeyData(this.scale, this.state, this.metadata);
+  }
+}
+
+type ChurnMetric = "days" | "commits" | "lines";
+
+class ChurnVisualization extends BaseVisualization<number> {
+  metric: ChurnMetric;
+  scale: (v: number) => string | undefined;
+  constructor(state: State, metadata: VizMetadata, metric: ChurnMetric) {
+    super(state, metadata);
+    this.metric = metric;
+    this.scale = goodBadUglyScale(state.config, state.config.churn[metric]);
+  }
+  dataFn(d: HierarchyNode<FileNode>): number | undefined {
+    const { earliest, latest } = this.state.config.dateRange;
+    switch (this.metric) {
+      case "days":
+        return nodeChurnDays(d.data, earliest, latest);
+      case "commits":
+        return nodeChurnCommits(d.data, earliest, latest);
+      case "lines":
+        return nodeChurnLines(d.data, earliest, latest);
+    }
+  }
+  parentFn(): number | undefined {
+    return undefined;
+  }
+
+  colourKey(): [string, string][] {
+    return goodBadUglyColourKeyData(
+      this.scale,
+      this.state,
+      this.state.config.churn[this.metric]
+    );
+  }
+}
+
+export const Visualizations: {
+  [visName: string]: VisualizationData | ParentVisualizationData;
+} = {
   language: {
     displayOrder: 0,
     title: "Programming Language",
-    subVis: false,
     help: <p>Shows the most common programming languages</p>,
-    dataFn: nodeLanguage,
-    parentFn: blankParent,
-    fillFnBuilder: standardFillBuilder,
-    colourScaleBuilder: languageScaleBuilder,
-    colourKeyBuilder: languageColourKeyData,
+    // dataFn: unHierarchyAdapter(nodeLanguage),
+    // parentFn: blankParent,
+    buildVisualization(state, metadata) {
+      return new LanguageVisualization(state, metadata);
+    },
   },
   loc: {
     displayOrder: 1,
     title: "Lines of Code",
-    subVis: false,
     help: (
       <div>
         <p>
@@ -62,27 +395,21 @@ const VisualizationData = {
         </p>
       </div>
     ),
-    dataFn: nodeCumulativeLinesOfCode,
-    parentFn: blankParent,
-    fillFnBuilder: standardFillBuilder,
-    colourScaleBuilder: goodBadUglyScaleBuilder(["loc"]),
-    colourKeyBuilder: goodBadUglyColourKeyData(["loc"]),
+    buildVisualization(state, metadata) {
+      return new LinesOfCodeVisualization(state, metadata);
+    },
   },
   depth: {
     displayOrder: 2,
     title: "Nesting depth",
-    subVis: false,
     help: <p>Shows nesting depth in the directory structure</p>,
-    dataFn: nodeDepth,
-    parentFn: nodeDepth,
-    fillFnBuilder: standardFillBuilder,
-    colourScaleBuilder: depthScaleBuilder,
-    colourKeyBuilder: depthKeyData,
+    buildVisualization(state, metadata) {
+      return new NestingDepthVisualization(state, metadata);
+    },
   },
   indentation: {
     displayOrder: 3,
     title: "Indentation",
-    subVis: true,
     defaultChild: "stddev",
     children: {
       sum: {
@@ -102,11 +429,9 @@ const VisualizationData = {
             </p>
           </div>
         ),
-        dataFn: nodeIndentationSum,
-        parentFn: blankParent,
-        fillFnBuilder: standardFillBuilder,
-        colourScaleBuilder: goodBadUglyScaleBuilder(["indentation", "sum"]),
-        colourKeyBuilder: goodBadUglyColourKeyData(["indentation", "sum"]),
+        buildVisualization(state, metadata) {
+          return new IndentationVisualization(state, metadata, "sum");
+        },
       },
       p99: {
         title: "Worst indentation",
@@ -125,11 +450,9 @@ const VisualizationData = {
             </p>
           </div>
         ),
-        dataFn: nodeIndentationP99,
-        parentFn: blankParent,
-        fillFnBuilder: standardFillBuilder,
-        colourScaleBuilder: goodBadUglyScaleBuilder(["indentation", "p99"]),
-        colourKeyBuilder: goodBadUglyColourKeyData(["indentation", "p99"]),
+        buildVisualization(state, metadata) {
+          return new IndentationVisualization(state, metadata, "p99");
+        },
       },
       stddev: {
         title: "Standard deviation",
@@ -147,18 +470,15 @@ const VisualizationData = {
             </p>
           </div>
         ),
-        dataFn: nodeIndentationStddev,
-        parentFn: blankParent,
-        fillFnBuilder: standardFillBuilder,
-        colourScaleBuilder: goodBadUglyScaleBuilder(["indentation", "stddev"]),
-        colourKeyBuilder: goodBadUglyColourKeyData(["indentation", "stddev"]),
+        buildVisualization(state, metadata) {
+          return new IndentationVisualization(state, metadata, "stddev");
+        },
       },
     },
   },
   age: {
     displayOrder: 4,
     title: "Age of last change",
-    subVis: false,
     help: (
       <div>
         <p>Highlights code which has had no changes for some time.</p>
@@ -173,16 +493,13 @@ const VisualizationData = {
         </p>
       </div>
     ),
-    dataFn: nodeAge,
-    parentFn: blankParent,
-    fillFnBuilder: standardFillBuilder,
-    colourScaleBuilder: goodBadUglyScaleBuilder(["age"]),
-    colourKeyBuilder: goodBadUglyColourKeyData(["age"]),
+    buildVisualization(state, metadata) {
+      return new AgeVisualization(state, metadata);
+    },
   },
   creation: {
     displayOrder: 5,
     title: "Creation date",
-    subVis: false,
     help: (
       <div>
         <p>
@@ -199,16 +516,13 @@ const VisualizationData = {
         </p>
       </div>
     ),
-    dataFn: nodeCreationDateClipped,
-    parentFn: blankParent,
-    fillFnBuilder: standardFillBuilder,
-    colourScaleBuilder: earlyLateScaleBuilder,
-    colourKeyBuilder: creationKeyData,
+    buildVisualization(state, metadata) {
+      return new CreationDateVisualization(state, metadata);
+    },
   },
   numberOfChangers: {
     displayOrder: 6,
     title: "Number of unique changers",
-    subVis: false,
     help: (
       <div>
         <p>
@@ -223,16 +537,13 @@ const VisualizationData = {
         </p>
       </div>
     ),
-    dataFn: nodeNumberOfChangers,
-    parentFn: blankParent,
-    fillFnBuilder: standardFillBuilder,
-    colourScaleBuilder: numberOfChangersScale,
-    colourKeyBuilder: numberOfChangersKeyData,
+    buildVisualization(state, metadata) {
+      return new NumberOfChangersVisualization(state, metadata);
+    },
   },
   owners: {
     displayOrder: 7,
     title: "File ownership",
-    subVis: false,
     help: (
       <div>
         <p>
@@ -248,18 +559,14 @@ const VisualizationData = {
         </p>
       </div>
     ),
-    // TODO: doesn't work yet!
-    dataFn: nodeOwnersNamesOnly,
-    parentFn: blankParent,
-    fillFnBuilder: fullStateFillBuilder,
-    colourScaleBuilder: ownersColourScaleBuilder,
-    colourKeyBuilder: ownersColourKeyData,
+    buildVisualization(state, metadata) {
+      return new OwnersVisualization(state, metadata);
+    },
   },
 
   churn: {
     displayOrder: 8,
     title: "Churn",
-    subVis: true,
     defaultChild: "days",
     children: {
       days: {
@@ -278,11 +585,9 @@ const VisualizationData = {
             </p>
           </div>
         ),
-        dataFn: nodeChurnDays,
-        parentFn: blankParent,
-        fillFnBuilder: standardFillBuilder,
-        colourScaleBuilder: goodBadUglyScaleBuilder(["churn", "days"]),
-        colourKeyBuilder: goodBadUglyColourKeyData(["churn", "days"]),
+        buildVisualization(state, metadata) {
+          return new ChurnVisualization(state, metadata, "days");
+        },
       },
       commits: {
         title: "Commits per day",
@@ -300,11 +605,9 @@ const VisualizationData = {
             </p>
           </div>
         ),
-        dataFn: nodeChurnCommits,
-        parentFn: blankParent,
-        fillFnBuilder: standardFillBuilder,
-        colourScaleBuilder: goodBadUglyScaleBuilder(["churn", "commits"]),
-        colourKeyBuilder: goodBadUglyColourKeyData(["churn", "commits"]),
+        buildVisualization(state, metadata) {
+          return new ChurnVisualization(state, metadata, "commits");
+        },
       },
       lines: {
         title: "Lines per day",
@@ -327,14 +630,30 @@ const VisualizationData = {
             </p>
           </div>
         ),
-        dataFn: nodeChurnLines,
-        parentFn: blankParent,
-        fillFnBuilder: standardFillBuilder,
-        colourScaleBuilder: goodBadUglyScaleBuilder(["churn", "lines"]),
-        colourKeyBuilder: goodBadUglyColourKeyData(["churn", "lines"]),
+        buildVisualization(state, metadata) {
+          return new ChurnVisualization(state, metadata, "lines");
+        },
       },
     },
   },
 };
 
-export default VisualizationData;
+export function getCurrentVis(config: Config) {
+  const vis = Visualizations[config.visualization];
+
+  let selected = vis;
+  if (isParentVisualization(vis)) {
+    if (config.subVis) {
+      selected = vis.children[config.subVis];
+    } else {
+      // can this happen?
+      console.warn("No config.subVis selected - using default");
+      selected = vis.children[vis.defaultChild];
+    }
+  }
+  if (isParentVisualization(selected)) {
+    throw Error("Logic error - selected vis is a parent!");
+  } else {
+    return selected;
+  }
+}

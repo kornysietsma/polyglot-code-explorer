@@ -1,11 +1,9 @@
-/* eslint-disable react/forbid-prop-types */
-
 import React from "react";
-import defaultPropTypes from "./defaultPropTypes";
-import PathInspector from "./PathInspector";
+
 import CouplingInspector from "./CouplingInspector";
-import styles from "./NodeInspector.module.css";
+import { humanizeDate, humanizeDays } from "./datetimes";
 import {
+  ChurnData,
   nodeAge,
   nodeChurnData,
   nodeCreationDate,
@@ -17,26 +15,33 @@ import {
   nodeRemoteUrl,
   nodeTopChangers,
 } from "./nodeData";
-import { humanizeDate, humanizeDays } from "./datetimes";
-import ToggleablePanel from "./ToggleablePanel";
+import styles from "./NodeInspector.module.css";
+import PathInspector from "./PathInspector";
+import { FileNode, isDirectory, TreeNode } from "./polyglot_data.types";
 import SourceCodeInspector from "./SourceCodeInspector";
+import { Action, State } from "./state";
+import ToggleablePanel from "./ToggleablePanel";
+import { VizMetadata } from "./viz.types";
 
-function findGitUrl(node, remoteUrlTemplate) {
-  let suffix = node.data.name;
+function findGitUrl(node: TreeNode, remoteUrlTemplate: string) {
+  let suffix = node.name;
   let current = node;
-  while (!nodeRemoteUrl(current) && current.parent) {
+  while (isDirectory(current) && !nodeRemoteUrl(current) && current.parent) {
     current = current.parent;
     if (!nodeRemoteUrl(current)) {
-      suffix = `${current.data.name}/${suffix}`;
+      suffix = `${current.name}/${suffix}`;
     }
   }
+  if (!isDirectory(current)) return undefined;
+
   const remote = nodeRemoteUrl(current);
 
   if (!remote) return undefined;
 
-  // sorry, gentle reader, for this ugly regex. 
+  // sorry, gentle reader, for this ugly regex.
   // TODO: split this, clean it up, make it nicer, add some tests!
-  const remoteRe = /^(\w+:\/\/(?<host>[^/]+)\/(?<path>.+)\/(?<project>[^/.]+)(\.git)?)|(\w+@(?<host2>[^:]+):(?<path2>.+)\/(?<project2>[^/.]+)(\.git)?)$/;
+  const remoteRe =
+    /^(\w+:\/\/(?<host>[^/]+)\/(?<path>.+)\/(?<project>[^/.]+)(\.git)?)|(\w+@(?<host2>[^:]+):(?<path2>.+)\/(?<project2>[^/.]+)(\.git)?)$/;
 
   if (!remoteRe.test(remote)) {
     console.error(`Can't match remote URL '${remote}'`);
@@ -44,6 +49,11 @@ function findGitUrl(node, remoteUrlTemplate) {
   }
 
   const match = remoteRe.exec(remote);
+  if (match?.groups === undefined) {
+    console.error(`Can't match remote URL with good groups: '${remote}'`);
+    return undefined;
+  }
+
   const { host, path, project } = match.groups.host
     ? {
         // url style
@@ -67,8 +77,8 @@ function findGitUrl(node, remoteUrlTemplate) {
     .replace("{file}", suffix);
 }
 
-function churnReport(churnData) {
-  if (!churnData) return "";
+function churnReport(churnData: ChurnData | undefined) {
+  if (!churnData) return null;
   const {
     totalLines,
     totalCommits,
@@ -109,8 +119,17 @@ function churnReport(churnData) {
   );
 }
 
-const NodeInspector = (props) => {
-  const { node, dispatch, state, metadata } = props;
+const NodeInspector = ({
+  node,
+  dispatch,
+  state,
+  metadata,
+}: {
+  node: FileNode;
+  dispatch: React.Dispatch<Action>;
+  state: State;
+  metadata: VizMetadata;
+}) => {
   // UGLY - can't work out how to easily mix themes into module CSS?
   const { currentTheme } = state.config.colours;
   const { stats } = metadata;
@@ -120,23 +139,28 @@ const NodeInspector = (props) => {
   const { earliest, latest } = state.config.dateRange;
   const { topChangersCount } = state.config.numberOfChangers;
   const { couplingAvailable } = state.couplingConfig;
+
   const age = nodeAge(node, earliest, latest);
   const lastCommit = nodeLastCommitDay(node, earliest, latest);
-  const creationDate = nodeCreationDate(node, earliest, latest);
+  const creationDate = nodeCreationDate(node);
   let creationText = creationDate
     ? `File created on ${humanizeDate(creationDate)}`
     : "";
   if (creationDate && creationDate > latest) {
     creationText += " (after current date selection)";
   }
-  const ageText = age
-    ? `file last changed ${age} days ago on ${humanizeDate(
-        lastCommit
-      )} (${humanizeDays(age)})`
-    : "";
+  const ageText =
+    age && lastCommit
+      ? `file last changed ${age} days ago on ${humanizeDate(
+          lastCommit
+        )} (${humanizeDays(age)})`
+      : "";
   const changerCount = nodeNumberOfChangers(node, earliest, latest);
   const topChangers = nodeTopChangers(node, earliest, latest, topChangersCount);
-  const userName = (userId) => {
+  const userName = (userId: number) => {
+    if (!metadata.users) {
+      return "(no user data)";
+    }
     const { user } = metadata.users[userId];
     if (user.name) {
       if (user.email) {
@@ -160,7 +184,7 @@ const NodeInspector = (props) => {
           <tbody>
             {topChangers.map(([user, count]) => {
               return (
-                <tr>
+                <tr key={user}>
                   <td>{userName(user)}</td>
                   <td>{count}</td>
                 </tr>
@@ -179,7 +203,7 @@ const NodeInspector = (props) => {
     <div>
       {gitUrl ? (
         <h3>
-          {node.data.name}&nbsp;
+          {node.name}&nbsp;
           <a
             className={
               currentTheme === "dark"
@@ -193,10 +217,10 @@ const NodeInspector = (props) => {
           </a>
         </h3>
       ) : (
-        <h3>{node.data.name}</h3>
+        <h3>{node.name}</h3>
       )}
       <PathInspector node={node} dispatch={dispatch} />
-      <SourceCodeInspector node={node} state={state} dispatch={dispatch} />
+      <SourceCodeInspector node={node} state={state} />
       <p>
         Selected date range {humanizeDate(earliest)} to {humanizeDate(latest)}
       </p>
@@ -227,20 +251,13 @@ const NodeInspector = (props) => {
         {topChangerTable}
       </ToggleablePanel>
       {churnReport(churnData)}
-      {couplingAvailable ? (
-        <CouplingInspector
-          node={node}
-          dispatch={dispatch}
-          state={state}
-          stats={stats}
-        />
+      {couplingAvailable && stats.coupling ? (
+        <CouplingInspector node={node} state={state} stats={stats.coupling} />
       ) : (
         ""
       )}
     </div>
   );
 };
-
-NodeInspector.propTypes = defaultPropTypes;
 
 export default NodeInspector;

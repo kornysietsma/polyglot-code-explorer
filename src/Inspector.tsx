@@ -1,25 +1,23 @@
-/* eslint-disable react/forbid-prop-types */
-
 import React from "react";
-import defaultPropTypes from "./defaultPropTypes";
-import NodeInspector from "./NodeInspector";
-import DirectoryNodeInspector from "./DirectoryNodeInspector";
-import { isDirectory } from "./nodeData";
 
-const Inspector = (props) => {
-  // console.log("inspector props", props);
+import { DefaultProps } from "./components.types";
+import DirectoryNodeInspector from "./DirectoryNodeInspector";
+import NodeInspector from "./NodeInspector";
+import { isDirectory } from "./polyglot_data.types";
+
+const Inspector = (props: DefaultProps) => {
   const { state, dispatch, dataRef } = props;
   const { metadata } = dataRef.current;
-  const { selectedNode } = state.config;
+  const { selectedNode: selectedNodePath } = state.config;
+
+  const selectedNode =
+    selectedNodePath === undefined
+      ? undefined
+      : metadata.nodesByPath.get(selectedNodePath);
   const hasSelection = selectedNode != null;
   const showDirectory = hasSelection && isDirectory(selectedNode);
-  const nodeInspector = showDirectory ? (
-    <DirectoryNodeInspector
-      node={selectedNode}
-      state={state}
-      dispatch={dispatch}
-      metadata={metadata}
-    />
+  const nodeInspector = !hasSelection ? undefined : showDirectory ? (
+    <DirectoryNodeInspector node={selectedNode} dispatch={dispatch} />
   ) : (
     <NodeInspector
       node={selectedNode}
@@ -46,5 +44,5 @@ const Inspector = (props) => {
     </aside>
   );
 };
-Inspector.propTypes = defaultPropTypes;
+
 export default Inspector;

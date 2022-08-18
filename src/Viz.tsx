@@ -1,46 +1,42 @@
-/* eslint-disable react/forbid-prop-types */
-
-import React, { useEffect, useRef, useCallback } from "react";
 import * as d3 from "d3";
+import { D3ZoomEvent, HierarchyNode } from "d3";
 import _ from "lodash";
-import defaultPropTypes from "./defaultPropTypes";
+import React, { RefObject, useEffect, useMemo, useRef } from "react";
+
+import { DefaultProps } from "./components.types";
 import { dateToUnix, unixToDate } from "./datetimes";
-import VisualizationData from "./visualizationData";
 import {
-  nodeDescendants,
+  CouplingLink,
   nodeCenter,
-  nodeHasCouplingData,
   nodeCouplingFilesFiltered,
+  nodeDescendants,
+  nodeHasCouplingData,
   nodePath,
 } from "./nodeData";
+import { Point, TreeNode } from "./polyglot_data.types";
+import { TimescaleIntervalData } from "./preprocess";
+import { Action, State, themedColours } from "./state";
+import { getCurrentVis } from "./VisualizationData";
+import { VizMetadata } from "./viz.types";
 
-// TODO: should this live in Visualization.js ?
-function getCurrentVis(config) {
-  const vis = VisualizationData[config.visualization];
-
-  let selected = vis;
-  if (vis.subVis) {
-    if (config.subVis) {
-      selected = vis.children[config.subVis];
-    } else {
-      // can this happen?
-      console.warn("No config.subVis selected - using default");
-      selected = vis.children[vis.defaultChild];
-    }
-  }
-  return selected;
-}
-
-const redrawPolygons = (svgSelection, metadata, state) => {
+const redrawPolygons = (
+  svgSelection: d3.Selection<
+    SVGPathElement,
+    d3.HierarchyNode<TreeNode>,
+    SVGGElement,
+    unknown
+  >,
+  metadata: VizMetadata,
+  state: State
+) => {
   const { config } = state;
 
-  const { fillFnBuilder, colourScaleBuilder, dataFn, parentFn } = getCurrentVis(
-    config
+  const visualization = getCurrentVis(config).buildVisualization(
+    state,
+    metadata
   );
-  const scale = colourScaleBuilder(state, metadata);
-  const fillFn = fillFnBuilder(state, scale, dataFn, parentFn);
 
-  const strokeWidthFn = (d) => {
+  const strokeWidthFn = (d: HierarchyNode<TreeNode>) => {
     if (d.data.layout.algorithm === "circlePack") return 0;
     return d.depth < 4 ? 4 - d.depth : 1;
   };
@@ -49,16 +45,24 @@ const redrawPolygons = (svgSelection, metadata, state) => {
     .attr("d", (d) => {
       return `${d3.line()(d.data.layout.polygon)}z`;
     })
-    .style("fill", fillFn)
-    .style("stroke", config.colours[config.colours.currentTheme].defaultStroke)
+    .style("fill", (d) => visualization.fillFn(d))
+    .style("stroke", themedColours(config).defaultStroke)
     .style("stroke-width", strokeWidthFn)
     .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
 };
 
-const redrawSelection = (svgSelection, state) => {
+const redrawSelection = (
+  svgSelection: d3.Selection<
+    SVGPathElement,
+    d3.HierarchyNode<TreeNode>,
+    SVGGElement,
+    unknown
+  >,
+  state: State
+) => {
   const { config } = state;
 
-  const strokeWidthFn = (d) => {
+  const strokeWidthFn = (d: d3.HierarchyNode<TreeNode>) => {
     if (d.data.layout.algorithm === "circlePack") return 0;
     return d.depth < 4 ? 4 - d.depth : 1;
   };
@@ -68,15 +72,31 @@ const redrawSelection = (svgSelection, state) => {
       return `${d3.line()(d.data.layout.polygon)}z`;
     })
     .style("stroke-width", strokeWidthFn)
-    .style("stroke", config.colours[config.colours.currentTheme].selectedStroke)
+    .style("stroke", themedColours(config).selectedStroke)
     .style("fill", "none")
     .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
 };
 
-function findSelectionPath(data, state) {
+function findSelectionPath(
+  state: State,
+  nodesByPath: Map<string, d3.HierarchyNode<TreeNode>>
+): d3.HierarchyNode<TreeNode>[] {
   if (!state.config.selectedNode) return [];
-  let node = state.config.selectedNode;
-  const results = [];
+
+  // This is where we need to go from a node path to the hierarchy!
+  // or can we store this index elsewhere - when we build the hierarchy,
+  // map paths to d3.HierarchyNode<TreeNode> once and carry that around.
+
+  let node: d3.HierarchyNode<TreeNode> | undefined = nodesByPath.get(
+    state.config.selectedNode
+  );
+  if (node === undefined) {
+    console.error(
+      "Hierarchy data not yet linked while finding selection! Ignoring"
+    );
+    return [];
+  }
+  const results: d3.HierarchyNode<TreeNode>[] = [];
   while (node.parent) {
     results.push(node);
     node = node.parent;
@@ -85,20 +105,38 @@ function findSelectionPath(data, state) {
   return results.reverse();
 }
 
-const update = (d3Container, files, metadata, state) => {
+const update = (
+  d3Container: React.RefObject<SVGSVGElement>,
+  files: TreeNode,
+  metadata: VizMetadata,
+  state: State
+) => {
   if (!d3Container.current) {
     throw Error("No current container");
   }
   const vizEl = d3Container.current;
   const svg = d3.select(vizEl);
+  // if (!svg instanceof SVGElement) {
+  //   throw Error("Invalid root SVG element");
+  // }
   redrawPolygons(svg.selectAll(".cell"), metadata, state);
 
   // TODO: DRY this up - or should selecting just be expensive config?
-  const selectionPath = findSelectionPath(files, state);
-  const group = svg.selectAll(".topGroup");
+  if (!metadata.hierarchyNodesByPath) {
+    throw Error(
+      "update called before draw, so we have no hierarchyNodesByPath!"
+    );
+  }
+  const selectionPath = findSelectionPath(state, metadata.hierarchyNodesByPath);
+  const group: d3.Selection<
+    SVGGElement,
+    d3.HierarchyNode<TreeNode>,
+    SVGSVGElement,
+    unknown
+  > = svg.selectAll(".topGroup");
   const selectionNodes = group
-    .selectAll(".selected")
-    .data(selectionPath, (node) => node.path);
+    .selectAll<SVGPathElement, d3.HierarchyNode<TreeNode>>(".selected")
+    .data(selectionPath, (node) => node.data.path);
 
   const newSelectionNodes = selectionNodes
     .enter()
@@ -110,7 +148,7 @@ const update = (d3Container, files, metadata, state) => {
 };
 
 // flatten out all nodes for coupling line display
-function normalizedCouplingNodes(rootNode, state) {
+function normalizedCouplingNodes(rootNode: TreeNode, state: State) {
   const { config, couplingConfig } = state;
   const {
     dateRange: { earliest, latest },
@@ -119,20 +157,21 @@ function normalizedCouplingNodes(rootNode, state) {
     ? []
     : nodeDescendants(rootNode)
         .filter(nodeHasCouplingData)
-        .map((d) =>
-          nodeCouplingFilesFiltered(
-            d,
-            earliest,
-            latest,
-            couplingConfig.minRatio,
-            couplingConfig.minBursts,
-            couplingConfig.maxCommonRoots
-          )
+        .map(
+          (d) =>
+            nodeCouplingFilesFiltered(
+              d,
+              earliest,
+              latest,
+              couplingConfig.minRatio,
+              couplingConfig.minBursts,
+              couplingConfig.maxCommonRoots
+            ) ?? []
         )
         .flat();
 }
 
-function arcPath(leftHand, source, target) {
+function arcPath(leftHand: boolean, source: Point, target: Point) {
   const x1 = leftHand ? source[0] : target[0];
   const y1 = leftHand ? source[1] : target[1];
   const x2 = leftHand ? target[0] : source[0];
@@ -147,14 +186,23 @@ function arcPath(leftHand, source, target) {
   return `M${x1},${y1}A${dr}, ${dr} ${xRotation}, ${largeArc}, ${sweep} ${x2},${y2}`;
 }
 
-function drawCoupling(group, files, metadata, state, dispatch) {
+function drawCoupling(
+  group: d3.Selection<SVGGElement, CouplingLink, SVGSVGElement, unknown>,
+  files: TreeNode,
+  metadata: VizMetadata,
+  state: State,
+  dispatch: React.Dispatch<Action>
+) {
   const { config } = state;
   const { nodesByPath } = metadata;
   const allCouplingNodes = normalizedCouplingNodes(files, state);
 
   const couplingNodes = group
-    .selectAll(".coupling")
-    .data(allCouplingNodes, (node) => [node.source.path, node.targetFile]);
+    .selectAll<SVGPathElement, CouplingLink>(".coupling")
+    .data(
+      allCouplingNodes,
+      (node) => node.source.path + "->" + node.targetFile
+    );
 
   // TODO - consider reworking this with d3.join which seems to be the new hotness?
   const newCouplingNodes = couplingNodes
@@ -162,32 +210,36 @@ function drawCoupling(group, files, metadata, state, dispatch) {
     .append("path")
     .classed("coupling", true);
 
-  const couplingLine = (d) => {
+  const couplingLine = (d: CouplingLink) => {
     const sourcePos = nodeCenter(d.source);
-    const target = nodesByPath[d.targetFile];
-    const targetPos = nodeCenter(target);
+    const target = nodesByPath.get(d.targetFile);
+    const targetPos = target ? nodeCenter(target) : undefined;
+    if (sourcePos == undefined || targetPos == undefined) {
+      throw Error("Can't find source or target for coupling line");
+    }
 
     return arcPath(true, sourcePos, targetPos);
     // return `${d3.line()([sourcePos, targetPos])}`;
   };
 
-  const couplingLineStroke = (d) => {
-    const colour = d3.color(
-      config.colours[config.colours.currentTheme].couplingStroke
-    );
+  const couplingLineStroke = (d: CouplingLink) => {
+    const colour = d3.color(themedColours(config).couplingStroke);
+    if (colour == null) {
+      throw Error("Invalid colour in theme");
+    }
     const ratio = d.targetCount / d.sourceCount;
     colour.opacity = ratio;
-    return colour;
+    return colour.toString();
   };
 
-  const couplingLineWidth = (d) => {
+  const couplingLineWidth = (d: CouplingLink) => {
     const ratio = d.targetCount / d.sourceCount;
     if (ratio >= 0.95) return "3px";
     if (ratio > 0.8) return "2px";
     return "1px";
   };
 
-  const couplingLabel = (d) => {
+  const couplingLabel = (d: CouplingLink) => {
     const ratio = d.targetCount / d.sourceCount;
     const from = nodePath(d.source);
     return `${from} -> ${d.targetFile} (${ratio.toFixed(3)})`;
@@ -201,27 +253,42 @@ function drawCoupling(group, files, metadata, state, dispatch) {
     .style("stroke-width", couplingLineWidth)
     .style("fill", "none")
     .style("vector-effect", "non-scaling-stroke")
-    .on("click", (node, i, nodeList) => {
-      console.log("onClicked", node, i, nodeList[i]);
-      dispatch({ type: "selectNode", payload: node.source.hierarchNode });
-    })
+    .on(
+      "click",
+      function (this: SVGPathElement, event: PointerEvent, node: CouplingLink) {
+        dispatch({ type: "selectNode", payload: node.source.path });
+      }
+    )
     .append("svg:title")
     .text(couplingLabel); // so zooming doesn't make thick lines
 
   couplingNodes.exit().remove();
 }
 
-const updateCoupling = (d3Container, files, metadata, state, dispatch) => {
+const updateCoupling = (
+  d3Container: React.RefObject<SVGSVGElement>,
+  files: TreeNode,
+  metadata: VizMetadata,
+  state: State,
+  dispatch: React.Dispatch<Action>
+) => {
   if (!d3Container.current) {
     throw Error("No current container");
   }
   const vizEl = d3Container.current;
   const svg = d3.select(vizEl);
-  const group = svg.selectAll(".topGroup");
+  const group: d3.Selection<SVGGElement, CouplingLink, SVGSVGElement, unknown> =
+    svg.selectAll(".topGroup");
   drawCoupling(group, files, metadata, state, dispatch);
 };
 
-const draw = (d3Container, files, metadata, state, dispatch) => {
+const draw = (
+  d3Container: React.RefObject<SVGSVGElement>,
+  files: TreeNode,
+  metadata: VizMetadata,
+  state: State,
+  dispatch: React.Dispatch<Action>
+) => {
   const { config, expensiveConfig } = state;
   const {
     layout: { timescaleHeight },
@@ -236,6 +303,10 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
   const h = vizEl.clientHeight - timescaleHeight;
 
   const { layout } = files;
+  if (!layout.width || !layout.height) {
+    throw Error("Root node has no width or height!");
+  }
+
   const svg = d3
     .select(vizEl)
     .attr("viewBox", [
@@ -244,15 +315,18 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
       layout.width,
       layout.height,
     ]);
-  const group = svg.selectAll(".topGroup");
+  const group: d3.Selection<SVGGElement, CouplingLink, SVGSVGElement, unknown> =
+    svg.selectAll(".topGroup");
   const rootNode = d3.hierarchy(files); // .sum(d => d.value);
 
-  // ugly - we cross-link each node to the hierarchy node, because so much needs hierarchy nodes.
-  // some time this should be fixed properly
+  const hierarchyNodesByPath: Map<
+    string,
+    d3.HierarchyNode<TreeNode>
+  > = new Map();
   rootNode.descendants().forEach((node) => {
-    // eslint-disable-next-line no-param-reassign
-    node.data.hierarchNode = node;
+    hierarchyNodesByPath.set(node.data.path, node);
   });
+  metadata.hierarchyNodesByPath = hierarchyNodesByPath;
 
   // note we filter out nodes that are parents who will be hidden by their children, for speed
   // so only show parent nodes at the clipping level.
@@ -263,26 +337,36 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
       (d) => d.children === undefined || d.depth === expensiveConfig.depth
     );
 
-  const nodes = group.selectAll(".cell").data(allNodes, (node) => node.path);
+  const nodes = group
+    .selectAll<SVGPathElement, d3.HierarchyNode<TreeNode>>(".cell")
+    .data(allNodes, function (node) {
+      return node.data.path;
+    });
 
   // TODO - consider reworking this with d3.join which seems to be the new hotness?
   const newNodes = nodes.enter().append("path").classed("cell", true);
 
   redrawPolygons(nodes.merge(newNodes), metadata, state)
     // eslint-disable-next-line no-unused-vars
-    .on("click", (node, i, nodeList) => {
-      // console.log("onClicked", node, i, nodeList[i]);
-      dispatch({ type: "selectNode", payload: node });
-    })
+    .on(
+      "click",
+      function (
+        this: SVGPathElement,
+        event: PointerEvent,
+        node: d3.HierarchyNode<TreeNode>
+      ) {
+        dispatch({ type: "selectNode", payload: node.data.path });
+      }
+    )
     .append("svg:title")
     .text((n) => n.data.path);
 
   nodes.exit().remove();
 
-  const selectionPath = findSelectionPath(files, state);
+  const selectionPath = findSelectionPath(state, metadata.hierarchyNodesByPath);
   const selectionNodes = group
-    .selectAll(".selected")
-    .data(selectionPath, (node) => node.path);
+    .selectAll<SVGPathElement, d3.HierarchyNode<TreeNode>>(".selected")
+    .data(selectionPath, (node) => node.data.path);
 
   const newSelectionNodes = selectionNodes
     .enter()
@@ -300,13 +384,16 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
   group.selectAll(".coupling").raise();
 
   // zooming - see https://observablehq.com/@d3/zoomable-map-tiles?collection=@d3/d3-zoom
-  const zoomed = () => {
-    group.attr("transform", d3.event.transform);
+  const zoomed = (
+    event: D3ZoomEvent<SVGSVGElement, d3.HierarchyNode<TreeNode>>
+  ) => {
+    group.attr("transform", event.transform.toString());
+    //UPGRADE - does this work? Taken from https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/d3-zoom/d3-zoom-tests.ts
   };
 
   svg.call(
     d3
-      .zoom()
+      .zoom<SVGSVGElement, unknown>()
       .extent([
         [0, 0],
         [w, h],
@@ -316,13 +403,18 @@ const draw = (d3Container, files, metadata, state, dispatch) => {
   );
 };
 
-function addDays(date, days) {
+function addDays(date: Date, days: number) {
   const result = new Date(date);
-  result.setDate(result.getDate() + days);
+  result.setTime(result.getTime() + days * 24 * 60 * 60 * 1000);
   return result;
 }
 
-function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
+function drawTimescale(
+  d3TimescaleContainer: React.RefObject<SVGSVGElement>,
+  timescaleData: TimescaleIntervalData[],
+  state: State,
+  dispatch: React.Dispatch<Action>
+) {
   const { config } = state;
   const {
     dateRange: { earliest, latest },
@@ -343,45 +435,58 @@ function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
     .attr("viewBox", [0, 0, width, height])
     .style("height", `${height}px`);
 
-  const valueFn = (d) => d.commits; // abstracted so we can pick a differnt one
+  const valueFn = (d: TimescaleIntervalData) => d.commits; // abstracted so we can pick a differnt one
 
   // we might simplify these, from an overly generic example
-  const area = (x, y) =>
+  const area = (
+    xScale: d3.ScaleTime<number, number, never>,
+    yScale: d3.ScaleLinear<number, number, never>
+  ) =>
     d3
-      .area()
+      .area<TimescaleIntervalData>()
       // .defined(d => !isNaN(valueFn(d)))
-      .x((d) => x(d.day))
-      .y0(y(0))
+      .x((d) => xScale(d.day))
+      .y0(yScale(0))
       .y1((d) => {
         // console.log("y of", d, valueFn(d), y(valueFn(d)));
-        return y(valueFn(d));
+        return yScale(valueFn(d));
       });
 
   const yMax = d3.max(timescaleData, valueFn);
+  if (yMax == undefined) {
+    throw Error("No maximum timescale");
+  }
 
   const dateRange = d3.extent(timescaleData, (d) => d.day);
+  if (dateRange[0] === undefined || dateRange[1] === undefined) {
+    throw Error("No date range in timescale data");
+  }
   dateRange[0] = addDays(dateRange[0], -1);
   dateRange[1] = addDays(dateRange[1], 1);
 
-  const xScale = d3
+  const xScale: d3.ScaleTime<number, number, never> = d3
     .scaleUtc()
     .domain(dateRange)
     .range([margin.left, width - margin.right, width]);
-  const yScale = d3
+  const yScale: d3.ScaleLinear<number, number, never> = d3
     .scaleLinear()
     .domain([0, yMax])
     .range([height - margin.bottom, margin.top]);
 
-  const xAxis = (g, x, h) =>
-    g.attr("transform", `translate(0,${h - margin.bottom})`).call(
+  const xAxis = (
+    g: d3.Selection<SVGGElement, null, SVGSVGElement, unknown>,
+    xScale: d3.ScaleTime<number, number, never>,
+    height: number
+  ) =>
+    g.attr("transform", `translate(0,${height - margin.bottom})`).call(
       d3
-        .axisBottom(x)
+        .axisBottom(xScale)
         .ticks(width / 80)
         .tickSizeOuter(0)
     );
 
   const brush = d3
-    .brushX()
+    .brushX<TimescaleIntervalData>()
     .extent([
       [margin.left, 0.5],
       [width - margin.right, height - margin.bottom + 0.5],
@@ -389,10 +494,11 @@ function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
     // .on("brush", () => {
     //   console.log("brush ignored");
     // })
-    .on("end", () => {
-      if (d3.event.selection) {
-        const [startDate, endDate] = d3.event.selection
-          .map((x) => xScale.invert(x))
+    .on("end", function ({ selection }: { selection: [number, number] }) {
+      console.log("brush end");
+      if (selection) {
+        const [startDate, endDate] = selection
+          .map((x: number) => xScale.invert(x))
           .map(dateToUnix);
         if (startDate !== earliest || endDate !== latest) {
           dispatch({ type: "setDateRange", payload: [startDate, endDate] });
@@ -418,32 +524,34 @@ function drawTimescale(d3TimescaleContainer, timescaleData, state, dispatch) {
     .attr("d", area(xScale, yScale));
 
   svg
-    .selectAll("g.brush")
-    .data([null])
+    .selectAll<SVGGElement, null>("g.brush")
+    // TODO: UPGRADE: why why why?
+    // examples use [null] but that doesn't type check
+    .data([null] as unknown as TimescaleIntervalData[])
     .join((enter) => enter.append("g").classed("brush", true).call(brush))
     .call(brush.move, selection);
 }
 
 // see https://stackoverflow.com/questions/53446020/how-to-compare-oldvalues-and-newvalues-on-react-hooks-useeffect
-function usePrevious(value) {
-  const ref = useRef();
+function usePrevious<T>(value: T) {
+  const ref = useRef<T>();
   useEffect(() => {
     ref.current = value;
   });
   return ref.current;
 }
 
-const updateBodyTheme = (newTheme) => {
+const updateBodyTheme = (newTheme: string) => {
   document.body.className = newTheme;
 };
 
-const Viz = (props) => {
-  const d3Container = useRef(null);
-  const d3TimescaleContainer = useRef(null);
-  const { dataRef, state, dispatch } = props;
-  const debouncedDispatch = useCallback(
-    _.debounce((nextValue) => dispatch(nextValue), 250),
-    [] // will be created only once
+const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
+  const d3Container: RefObject<SVGSVGElement> = useRef(null);
+  const d3TimescaleContainer: RefObject<SVGSVGElement> = useRef(null);
+
+  const debouncedDispatch = useMemo(
+    () => _.debounce((nextValue) => dispatch(nextValue), 250),
+    [dispatch] // will be created only once
   );
 
   const prevState = usePrevious(state);
@@ -460,7 +568,7 @@ const Viz = (props) => {
       !_.isEqual(prevState.expensiveConfig, expensiveConfig)
     ) {
       console.log("expensive config change - rebuild all");
-      draw(d3Container, files, metadata, state, dispatch);
+      draw(d3Container, files.tree, metadata, state, dispatch);
       drawTimescale(
         d3TimescaleContainer,
         timescaleData,
@@ -471,7 +579,7 @@ const Viz = (props) => {
     } else {
       if (!_.isEqual(prevState.config, config)) {
         console.log("cheap config change - just redraw");
-        update(d3Container, files, metadata, state);
+        update(d3Container, files.tree, metadata, state);
         if (
           prevState.config.colours.currentTheme !==
           state.config.colours.currentTheme
@@ -481,7 +589,7 @@ const Viz = (props) => {
       }
       if (!_.isEqual(prevState.couplingConfig, couplingConfig)) {
         console.log("coupling change");
-        updateCoupling(d3Container, files, metadata, state, dispatch);
+        updateCoupling(d3Container, files.tree, metadata, state, dispatch);
       }
     }
   }, [dataRef, state, dispatch, debouncedDispatch, prevState]);
@@ -499,7 +607,8 @@ const Viz = (props) => {
             markerWidth="5"
             markerHeight="5"
             markerUnits="strokeWidth"
-            xoverflow="visible"
+            // xoverflow="visible"  TODO: this was here and invalid - check
+            overflow="visible"
             orient="auto-start-reverse"
           >
             <path d="M0,0L4,2L0,4z" fill="#ff6300" />
@@ -511,5 +620,5 @@ const Viz = (props) => {
     </aside>
   );
 };
-Viz.propTypes = defaultPropTypes;
+
 export default Viz;

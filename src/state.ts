@@ -1,23 +1,201 @@
-import _ from "lodash";
 import * as d3 from "d3";
+import _ from "lodash";
 import moment from "moment";
-import VisualizationData from "./visualizationData";
-import { nodeOwners } from "./nodeData";
 
-function initialiseGlobalState(initialDataRef) {
+import { nodeOwners } from "./nodeData";
+import { isDirectory, isFile, TreeNode } from "./polyglot_data.types";
+import { isParentVisualization, Visualizations } from "./VisualizationData";
+import { VizDataRef } from "./viz.types";
+
+export type Config = {
+  visualization: string; // could be fixed set
+  subVis?: string;
+  layout: {
+    timescaleHeight: number; // including margins
+  };
+  remoteUrlTemplate: string;
+  codeInspector: {
+    enabled: boolean;
+    prefix: string;
+  };
+  loc: {
+    bad: number;
+    good: number;
+    ugly: number;
+    precision: number; // number of float digits to show
+  };
+  indentation: {
+    // replace indentation when we've refactored everything
+    sum: {
+      bad: number;
+      good: number;
+      ugly: number;
+      precision: number;
+    };
+    p99: {
+      bad: number;
+      good: number;
+      ugly: number;
+      precision: number;
+    };
+    stddev: {
+      bad: number;
+      good: number;
+      ugly: number;
+      precision: number;
+    };
+  };
+  age: {
+    bad: number;
+    good: number;
+    ugly: number;
+    precision: number;
+  };
+  churn: {
+    lines: {
+      bad: number;
+      good: number;
+      ugly: number;
+      precision: number;
+    };
+    days: {
+      bad: number;
+      good: number;
+      ugly: number;
+      precision: number;
+    };
+    commits: {
+      bad: number;
+      good: number;
+      ugly: number;
+      precision: number;
+    };
+  };
+  numberOfChangers: {
+    // more of a colour thing than a scale really
+    noChangersColour: string;
+    oneChangerColour: string;
+    fewChangersMinColour: string;
+    fewChangersMaxColour: string;
+    fewChangersMin: number;
+    fewChangersMax: number; // this is a candidate to configure!
+    manyChangersColour: string;
+    manyChangersMax: number; // starting to feel like a crowd
+    precision: number;
+    topChangersCount: number; // show this many changers in NodeInspector
+  };
+  owners: {
+    // see also calculated.ownerData
+    threshold: number; // percentage of changes used for ownership
+    linesNotCommits: boolean; // if true; threshold is on lines changed not commit counts
+    topOwnerCount: number; // only store this many changers. Needs to be as big or bigger than available colours
+  };
+  colours: {
+    currentTheme: "dark" | "light"; // also sets css on the body!
+    dark: {
+      defaultStroke: string;
+      selectedStroke: string;
+      couplingStroke: string; // need to change the arrow colour as well if you change this!
+      goodColour: string;
+      badColour: string;
+      uglyColour: string;
+      earlyColour: string;
+      lateColour: string;
+      neutralColour: string;
+      nonexistentColour: string;
+      errorColour: string; // used for logic errors - should never appear
+      circlePackBackground: string;
+      ownerColours: {
+        noOwnersColour: string;
+        oneOwnerColours: string[];
+        moreOwnerColours: string[];
+        otherColour: string;
+      };
+    };
+    light: {
+      defaultStroke: string;
+      selectedStroke: string;
+      couplingStroke: string; // need to change the arrow colour as well if you change this!
+      goodColour: string;
+      badColour: string;
+      uglyColour: string;
+      earlyColour: string;
+      lateColour: string;
+      neutralColour: string;
+      nonexistentColour: string;
+      errorColour: string; // used for logic errors - should never appear
+      circlePackBackground: string;
+      ownerColours: {
+        noOwnersColour: string;
+        oneOwnerColours: string[];
+        moreOwnerColours: string[];
+        otherColour: string;
+      };
+    };
+  };
+  dateRange: {
+    earliest: number;
+    latest: number;
+  };
+  // TODO: selectedNode needs to be made serializable - probably as a path - used to be a node
+  selectedNode?: string;
+};
+
+export type CouplingConfig = {
+  couplingAvailable: boolean;
+  shown: boolean;
+  minBursts: number;
+  minRatio: number;
+  // maxCommonRoots - -1 means show all coupling
+  // 0 means only show files who have no roots in common - so /foo/baz.txt and /bar/baz.js
+  // 1 means only show files who have 0 or 1 roots in common - so /foo/bar/baz and /foo/fi/fum can match
+  maxCommonRoots: number;
+  dateRange: {
+    // TODO: use buckets instead!
+    earliest: number;
+    latest: number;
+  };
+};
+
+export type ExpensiveConfig = {
+  depth: number;
+};
+
+export type CalculatedState = {
+  // this is mostly for state calculated in the postProcessState stage; based on data
+  ownerData: OwnerData;
+};
+
+export type State = {
+  config: Config;
+  couplingConfig: CouplingConfig;
+  expensiveConfig: ExpensiveConfig;
+  calculated: CalculatedState;
+};
+
+function initialiseGlobalState(initialDataRef: VizDataRef) {
   const {
     metadata: {
       stats: { maxDepth, earliestCommit, latestCommit, coupling },
     },
   } = initialDataRef.current;
 
-  const twoYearsAgo = moment.unix(latestCommit).subtract(2, "year").unix();
+  const hasDates = earliestCommit !== undefined && latestCommit !== undefined;
 
-  const earliest = twoYearsAgo < earliestCommit ? earliestCommit : twoYearsAgo;
-  const latest = moment.unix(latestCommit).add(1, "day").unix(); // otherwise files committed today get confused
+  let earliest: number;
+  let latest: number;
+  if (hasDates) {
+    const twoYearsAgo = moment.unix(latestCommit).subtract(2, "year").unix();
+
+    earliest = twoYearsAgo < earliestCommit ? earliestCommit : twoYearsAgo;
+    latest = moment.unix(latestCommit).add(1, "day").unix(); // otherwise files committed today get confused
+  } else {
+    earliest = moment().subtract(2, "year").unix();
+    latest = moment().add(1, "day").unix();
+  }
   const couplingAvailable = coupling !== undefined;
 
-  const defaults = {
+  const defaults: State = {
     config: {
       visualization: "language",
       subVis: undefined,
@@ -60,12 +238,6 @@ function initialiseGlobalState(initialDataRef) {
         bad: 365,
         good: 0,
         ugly: 365 * 4,
-        precision: 0,
-      },
-      creation: {
-        // these are not needed - using selection!
-        low: 0,
-        high: Math.floor((latestCommit - earliestCommit) / (24 * 60 * 60)),
         precision: 0,
       },
       churn: {
@@ -120,11 +292,12 @@ function initialiseGlobalState(initialDataRef) {
           lateColour: "green",
           neutralColour: "#808080",
           nonexistentColour: "#111111",
+          errorColour: "#ff0000",
           circlePackBackground: "#111111",
           ownerColours: {
             noOwnersColour: "#222222",
-            oneOwnerColours: d3.schemeSet1,
-            moreOwnerColours: d3.schemeSet2,
+            oneOwnerColours: [...d3.schemeSet1],
+            moreOwnerColours: [...d3.schemeSet2],
             otherColour: "#808080",
           },
         },
@@ -139,11 +312,12 @@ function initialiseGlobalState(initialDataRef) {
           lateColour: "green",
           neutralColour: "#808080",
           nonexistentColour: "#f7f7f7",
+          errorColour: "#ff0000",
           circlePackBackground: "#f7f7f7",
           ownerColours: {
             noOwnersColour: "#f7f7f7",
-            oneOwnerColours: d3.schemeSet2,
-            moreOwnerColours: d3.schemeSet1,
+            oneOwnerColours: [...d3.schemeSet2],
+            moreOwnerColours: [...d3.schemeSet1],
             otherColour: "#808080",
           },
         },
@@ -152,7 +326,7 @@ function initialiseGlobalState(initialDataRef) {
         earliest,
         latest,
       },
-      selectedNode: null,
+      selectedNode: undefined,
     },
     couplingConfig: {
       couplingAvailable,
@@ -166,7 +340,7 @@ function initialiseGlobalState(initialDataRef) {
       dateRange: {
         // TODO: use buckets instead!
         earliest,
-        latest: latestCommit,
+        latest: latestCommit || latest,
       },
     },
     expensiveConfig: {
@@ -174,62 +348,84 @@ function initialiseGlobalState(initialDataRef) {
     },
     calculated: {
       // this is mostly for state calculated in the postProcessState stage, based on data
-      ownerData: null,
+      ownerData: [],
     },
   };
   // could precalculate ownerData here - but it isn't needed until you select the 'owners' visualisation
   return defaults;
 }
 
-function themedColours(config) {
+function themedColours(config: Config) {
   return config.colours[config.colours.currentTheme];
 }
 
-function addOwnersFromNode(
-  ownerData,
-  node,
-  earliest,
-  latest,
-  threshold,
-  linesNotCommits
-) {
-  const owners = nodeOwners(node, earliest, latest, threshold, linesNotCommits);
-  if (owners && owners.users !== "") {
-    const { users, value, totalValue } = owners;
+export function themedErrorColour(config: Config) {
+  return themedColours(config).errorColour;
+}
 
-    // I want the scale to show:
-    // - user count and name summary
-    // - actual users as a hover
-    // - global percentage - so % of all commits/lines
-    // so per file, need to store total value, and value aggregated by this set of users.
-    // (each file only has a single set of users, enough to get over the threshold)
-    // So store this data - as:
-    // { users: Set(user ids) - this is the key
-    //   value: value contributed by these users
-    //   totalValue: total value by all users
-    //   file? No, not at this stage.
-    //   fileCount is probably useful.
-    // }
-    if (!ownerData.has(users)) {
-      ownerData.set(users, {
-        value,
-        totalValue,
-        fileCount: 1,
-      });
-    } else {
-      const oldData = ownerData.get(users);
-      ownerData.set(users, {
-        value: value + oldData.value,
-        totalValue: totalValue + oldData.totalValue,
-        fileCount: oldData.fileCount + 1,
-      });
+type OwnerMap = Map<
+  string,
+  { value: number; totalValue: number; fileCount: number }
+>;
+
+export type OwnerData = [
+  owners: string,
+  data: { value: number; totalValue: number; fileCount: number }
+][];
+
+function addOwnersFromNode(
+  ownerMap: OwnerMap,
+  node: TreeNode,
+  earliest: number,
+  latest: number,
+  threshold: number,
+  linesNotCommits: boolean
+) {
+  if (isFile(node)) {
+    const owners = nodeOwners(
+      node,
+      earliest,
+      latest,
+      threshold,
+      linesNotCommits
+    );
+    if (owners && owners.users !== "") {
+      const { users, value, totalValue } = owners;
+
+      // I want the scale to show:
+      // - user count and name summary
+      // - actual users as a hover
+      // - global percentage - so % of all commits/lines
+      // so per file, need to store total value, and value aggregated by this set of users.
+      // (each file only has a single set of users, enough to get over the threshold)
+      // So store this data - as:
+      // { users: Set(user ids) - this is the key
+      //   value: value contributed by these users
+      //   totalValue: total value by all users
+      //   file? No, not at this stage.
+      //   fileCount is probably useful.
+      // }
+      const oldData = ownerMap.get(users);
+      if (!oldData) {
+        ownerMap.set(users, {
+          value,
+          totalValue,
+          fileCount: 1,
+        });
+      } else {
+        ownerMap.set(users, {
+          value: value + oldData.value,
+          totalValue: totalValue + oldData.totalValue,
+          fileCount: oldData.fileCount + 1,
+        });
+      }
     }
   }
-  if (node.children !== undefined) {
+  if (isDirectory(node)) {
     // eslint-disable-next-line no-restricted-syntax
     for (const child of node.children) {
       addOwnersFromNode(
-        ownerData,
+        ownerMap,
         child,
         earliest,
         latest,
@@ -240,14 +436,14 @@ function addOwnersFromNode(
   }
 }
 
-function aggregateOwnerData(data, newState) {
+function aggregateOwnerData(data: TreeNode, newState: State): OwnerData {
   // TODO - could this live in another module?
   const { threshold, linesNotCommits, topOwnerCount } = newState.config.owners;
   const { earliest, latest } = newState.config.dateRange;
 
-  const ownerData = new Map();
+  const ownerMap: OwnerMap = new Map();
   addOwnersFromNode(
-    ownerData,
+    ownerMap,
     data,
     earliest,
     latest,
@@ -255,8 +451,8 @@ function aggregateOwnerData(data, newState) {
     linesNotCommits
   );
 
-  const topData = Array.from(ownerData)
-    .sort(([key1, val1], [key2, val2]) => {
+  const topData = Array.from(ownerMap)
+    .sort(([, val1], [, val2]) => {
       return val2.fileCount - val1.fileCount;
     })
     .slice(0, topOwnerCount);
@@ -265,7 +461,11 @@ function aggregateOwnerData(data, newState) {
 }
 
 // allows state changes that need to access data
-function postprocessState(dataRef, oldState, newState) {
+function postprocessState(
+  dataRef: VizDataRef,
+  oldState: State,
+  newState: State
+) {
   if (
     newState.config.visualization === "owners" &&
     (oldState.config.visualization !== "owners" ||
@@ -275,7 +475,7 @@ function postprocessState(dataRef, oldState, newState) {
     console.log("recalculating owner data on state change");
     const result = _.cloneDeep(newState);
     result.calculated.ownerData = aggregateOwnerData(
-      dataRef.current.files,
+      dataRef.current.files.tree,
       newState
     );
     console.log("recalculation complete");
@@ -284,13 +484,100 @@ function postprocessState(dataRef, oldState, newState) {
   return newState;
 }
 
-function updateStateFromAction(state, action) {
+type VisualizationKey = Extract<keyof typeof Visualizations, string>;
+interface SetVisualization {
+  type: "setVisualization";
+  payload: VisualizationKey;
+}
+
+interface SetSubVisualization {
+  type: "setSubVisualization";
+  payload: string;
+}
+
+interface SetDepth {
+  type: "setDepth";
+  payload: number;
+}
+
+interface SetShowCoupling {
+  type: "setShowCoupling";
+  payload: boolean;
+}
+
+interface SetMinCouplingRatio {
+  type: "setMinCouplingRatio";
+  payload: number;
+}
+
+interface SetCouplingMinBursts {
+  type: "setCouplingMinBursts";
+  payload: number;
+}
+
+interface SetCouplingMaxCommonRoots {
+  type: "setCouplingMaxCommonRoots";
+  payload: number;
+}
+
+interface SelectNode {
+  type: "selectNode";
+  payload: string;
+}
+
+interface SetDateRange {
+  type: "setDateRange";
+  payload: [number, number];
+}
+interface SetTheme {
+  type: "setTheme";
+  payload: "dark" | "light";
+}
+interface EnableCodeServer {
+  type: "enableCodeServer";
+  payload: boolean;
+}
+interface SetCodeServerPrefix {
+  type: "setCodeServerPrefix";
+  payload: string;
+}
+interface SetOwnersThreshold {
+  type: "setOwnersTheshold";
+  payload: number;
+}
+interface SetOwnerLinesNotCommits {
+  type: "setOwnerLinesNotCommits";
+  payload: boolean;
+}
+interface SetRemoteUrlTemplate {
+  type: "setRemoteUrlTemplate";
+  payload: string;
+}
+
+export type Action =
+  | SetVisualization
+  | SetSubVisualization
+  | SetDepth
+  | SetShowCoupling
+  | SetMinCouplingRatio
+  | SetCouplingMinBursts
+  | SetCouplingMaxCommonRoots
+  | SelectNode
+  | SetDateRange
+  | SetTheme
+  | EnableCodeServer
+  | SetCodeServerPrefix
+  | SetOwnersThreshold
+  | SetOwnerLinesNotCommits
+  | SetRemoteUrlTemplate;
+
+function updateStateFromAction(state: State, action: Action): State {
   const { expensiveConfig, couplingConfig, config } = state;
   switch (action.type) {
     case "setVisualization": {
       const visualization = action.payload;
-      const visData = VisualizationData[visualization];
-      if (visData.subVis) {
+      const visData = Visualizations[visualization];
+      if (isParentVisualization(visData)) {
         const subVis = visData.defaultChild;
         return {
           ...state,
@@ -386,16 +673,20 @@ function updateStateFromAction(state, action) {
       return result;
     }
 
-    default:
-      throw new Error(`Invalid dispatch type ${action.type}`);
+    default: {
+      const impossible: never = action; // this will cause an error if an Action type isn't handled above
+      return impossible;
+    }
   }
 }
+
 // Note - this takes a binding of the data ref, so App.js can pass in the data and the reducer can update state based on data.
-function globalDispatchReducer(dataRef) {
-  return (state, action) => {
+// TODO: use immer? Needs a change from my base sample as `produce()` doesn't quite fit with `postprocessState`
+function globalDispatchReducer(dataRef: VizDataRef) {
+  return (state: State, action: Action) => {
     const newState = updateStateFromAction(state, action);
     return postprocessState(dataRef, state, newState);
   };
 }
 
-export { themedColours, initialiseGlobalState, globalDispatchReducer };
+export { globalDispatchReducer, initialiseGlobalState, themedColours };

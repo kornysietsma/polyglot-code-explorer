@@ -1,51 +1,57 @@
-/* eslint-disable jsx-a11y/no-onchange */
-/* eslint-disable react/forbid-prop-types */
-import React, { useRef, useCallback } from "react";
-import _uniqueId from "lodash/uniqueId";
 import _ from "lodash";
-import defaultPropTypes from "./defaultPropTypes";
-import VisualizationData from "./visualizationData";
-import VisColourKey from "./VisColourKey";
+import _uniqueId from "lodash/uniqueId";
+import React, { useId, useMemo } from "react";
+
+import { DefaultProps } from "./components.types";
 import CouplingController from "./CouplingController";
-import ToggleablePanel from "./ToggleablePanel";
 import { humanizeDate } from "./datetimes";
 import HelpPanel from "./HelpPanel";
+import ToggleablePanel from "./ToggleablePanel";
+import VisColourKey from "./VisColourKey";
+import {
+  isParentVisualization,
+  VisualizationData,
+  Visualizations,
+} from "./VisualizationData";
 
-const Controller = (props) => {
+const Controller = (props: DefaultProps) => {
   const { dataRef, state, dispatch } = props;
   const { metadata } = dataRef.current;
   const { maxDepth } = metadata.stats;
   const { config } = state;
   const { currentTheme } = config.colours;
   const { earliest, latest } = state.config.dateRange;
-  // ID logic from https://stackoverflow.com/questions/29420835/how-to-generate-unique-ids-for-form-labels-in-react
-  const { current: vizId } = useRef(_uniqueId("controller-"));
-  const { current: depthId } = useRef(_uniqueId("controller-"));
-  const { current: subVizId } = useRef(_uniqueId("controller-"));
-  const { current: codeServerId } = useRef(_uniqueId("controller-"));
-  const { current: codeServerPrefixId } = useRef(_uniqueId("controller-"));
-  const { current: ownersThresholdId } = useRef(_uniqueId("controller-"));
-  const { current: ownersLinesNotCommitsId } = useRef(_uniqueId("controller-"));
-  const { current: remoteUrlTemplateId } = useRef(_uniqueId("controller-"));
+  // updated ID logic: https://stackoverflow.com/questions/29420835/how-to-generate-unique-ids-for-form-labels-in-react/71681435#71681435
+  const vizId = useId();
+  const depthId = useId();
+  const subVizId = useId();
+  const codeServerId = useId();
+  const codeServerPrefixId = useId();
+  const ownersThresholdId = useId();
+  const ownersLinesNotCommitsId = useId();
+  const remoteUrlTemplateId = useId();
 
-  const sortedVis = Object.entries(VisualizationData).sort(
-    ([k1, v1], [k2, v2]) => k2.displayOrder - k1.displayOrder
+  const sortedVis = Object.entries(Visualizations).sort(
+    ([, v1], [, v2]) => v2.displayOrder - v1.displayOrder
   );
-  const currentParentVisData = VisualizationData[state.config.visualization];
-  const currentSubVisData = currentParentVisData.subVis
-    ? currentParentVisData.children[state.config.subVis]
-    : undefined;
-  const sortedSubVis = currentParentVisData.subVis
+  const currentParentVisData = Visualizations[state.config.visualization];
+  const currentVisOrSub: VisualizationData = isParentVisualization(
+    currentParentVisData
+  )
+    ? currentParentVisData.children[
+        state.config.subVis ?? currentParentVisData.defaultChild
+      ]
+    : currentParentVisData;
+
+  const sortedSubVis = isParentVisualization(currentParentVisData)
     ? Object.entries(currentParentVisData.children).sort(
-        ([k1, v1], [k2, v2]) => k2.displayOrder - k1.displayOrder
+        ([, v1], [, v2]) => v2.displayOrder - v1.displayOrder
       )
     : undefined;
 
-  const currentVisOrSub = currentSubVisData || currentParentVisData;
-
-  const debouncedDispatch = useCallback(
-    _.debounce((nextValue) => dispatch(nextValue), 250),
-    [] // will be created only once
+  const debouncedDispatch = useMemo(
+    () => _.debounce((nextValue) => dispatch(nextValue), 250),
+    [dispatch] // will be created only once
   );
 
   // TODO: move owners stuff into a component (I'm trying to get this out in a rush!)
@@ -200,8 +206,10 @@ const Controller = (props) => {
             />
             <HelpPanel>
               <p>
-                Enter a templated URL for browsing files online, similar to: &ldquo;
-                {"https://{host}/{path}/{project}/blob/{ref}/{file}"}&rdquo; (which is the default, for github)
+                Enter a templated URL for browsing files online, similar to:
+                &ldquo;
+                {"https://{host}/{path}/{project}/blob/{ref}/{file}"}&rdquo;
+                (which is the default, for github)
               </p>
               <p>
                 Elements are bits of a remote URL - given an example{" "}
@@ -236,7 +244,7 @@ const Controller = (props) => {
         <CouplingController
           dispatch={dispatch}
           state={state}
-          stats={metadata.stats}
+          metadata={metadata}
         />
       </ToggleablePanel>
       <div>
@@ -250,12 +258,14 @@ const Controller = (props) => {
             }
           >
             {sortedVis.map(([key, vis]) => (
-              <option value={key}>{vis.title}</option>
+              <option key={key} value={key}>
+                {vis.title}
+              </option>
             ))}
           </select>
         </label>
       </div>
-      {currentParentVisData.subVis ? (
+      {isParentVisualization(currentParentVisData) ? (
         <div>
           <label htmlFor={subVizId}>
             Sub-visualisation:
@@ -269,9 +279,14 @@ const Controller = (props) => {
                 })
               }
             >
-              {sortedSubVis.map(([key, vis]) => (
-                <option value={key}>{vis.title}</option>
-              ))}
+              {
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                sortedSubVis!.map(([key, vis]) => (
+                  <option key={key} value={key}>
+                    {vis.title}
+                  </option>
+                ))
+              }
             </select>
           </label>
         </div>
@@ -284,7 +299,5 @@ const Controller = (props) => {
     </aside>
   );
 };
-
-Controller.propTypes = defaultPropTypes;
 
 export default Controller;

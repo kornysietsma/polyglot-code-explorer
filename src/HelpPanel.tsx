@@ -1,10 +1,8 @@
 import React from "react";
-import PropTypes from "prop-types";
 
 import ToggleablePanel from "./ToggleablePanel";
 
-const HelpPanel = (props) => {
-  const { children } = props;
+const HelpPanel = ({ children }: { children: React.ReactNode }) => {
   return (
     <ToggleablePanel
       title=""
@@ -15,10 +13,6 @@ const HelpPanel = (props) => {
       {children}
     </ToggleablePanel>
   );
-};
-
-HelpPanel.propTypes = {
-  children: PropTypes.node.isRequired,
 };
 
 export default HelpPanel;

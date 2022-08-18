@@ -5,12 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [0.6.0-alpha.1] - 2022-08-??
+## [0.6.0-alpha.1] - 2022-08-18
 
 ### Changed
 
 - Moved to Typescript, more recent versions of all dependencies
-
+- Changed data file formats to make them work better with typescript
 
 ## [0.5.0] - 2021-04-03
 

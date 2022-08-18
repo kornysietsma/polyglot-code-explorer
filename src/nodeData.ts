@@ -1,110 +1,82 @@
+import { HierarchyNode } from "d3";
 import _ from "lodash";
 
-/* Note most functions here work on both:
-- a data node, the data from the raw JSON file, which is roughly
-{
-  data: metadata like lines of code
-  children: optional list of children (only for directories)
-  layout: pre-generated layout data
-  name: filename/folder name
-  path: full path from root
-  value: pre-calculated lines of code (calculated in preprocessor, cumulative of all children)
-  }
+import {
+  DirectoryNode,
+  FileNode,
+  GitData,
+  GitDetails,
+  IndentationData,
+  isDirectory,
+  isFile,
+  LocData,
+  TreeNode,
+} from "./polyglot_data.types";
+import { State } from "./state";
 
-  - a hierarchy node, from d3 hierarchy magic, which has:
-  {
-    data: the dataNode above
-    children: optional list of children (only for directories) but each child is a hierarchy node
-    depth: depth from the rood
-    height: height from leaves?
-    parent: parent hierarchy node
-    value: same as data.value, calculated cumulative size
-   }
-
-   We get hierarchy nodes from viz things, but in some cases (like caching initial data)
-   we only have raw data.  For ease of reuse, functions here will detect the kind of node they have.
- */
-
-export function isHierarchyNode(node) {
-  return node.parent !== undefined; // parent is defined but null for the root node
+// TODO: inline me
+export function nodePath(node: TreeNode): string {
+  return node.path;
+}
+export function nodeName(node: TreeNode): string {
+  return node.name;
 }
 
-export function isDirectory(node) {
-  // both kinds of nodes have or don't have children!
-  return node.children !== undefined && node.children !== null;
-}
-
-export function dataNode(node) {
-  return isHierarchyNode(node) ? node.data : node;
-}
-
-export function nodePath(node) {
-  return dataNode(node).path;
-}
-export function nodeName(node) {
-  return dataNode(node).name;
-}
-
-function addDescendants(nodes, node) {
+function addDescendants(nodes: TreeNode[], node: TreeNode): void {
   nodes.push(node);
-  if (node.children) {
+  if (isDirectory(node)) {
     node.children.forEach((child) => addDescendants(nodes, child));
   }
 }
-// simulate d3.descendants but works for non-hierarchy nodes (so we don't need to build a hierarchy)
-export function nodeDescendants(node) {
-  if (isHierarchyNode(node)) {
-    return node.descendants();
+// like d3.descendants but for tree nodes
+export function nodeDescendants(node: TreeNode): TreeNode[] {
+  const nodes: TreeNode[] = [];
+  if (isDirectory(node)) {
+    node.children.forEach((child) => addDescendants(nodes, child));
   }
-  const nodes = [];
-  node.children.forEach((child) => addDescendants(nodes, child));
-
   return nodes;
 }
 
-export function nodeLocData(node) {
-  const { data } = dataNode(node);
-
-  if (!data || !data.loc) return undefined;
-  return data.loc;
+export function nodeLocData(node: FileNode): LocData {
+  return node.data.loc;
 }
 
-export function nodeLanguage(node) {
+export function nodeLanguage(node: FileNode): string {
   const loc = nodeLocData(node);
-  if (!loc) return undefined;
   return loc.language;
 }
 
-export function nodeLinesOfCode(node) {
-  const loc = nodeLocData(node);
-  if (!loc) return undefined;
-  return loc.code;
+export function nodeLinesOfCode(node: FileNode): number {
+  return node.data.loc.code;
 }
 
-export function nodeCumulativeLinesOfCode(node) {
-  return dataNode(node).value;
+export function nodeCumulativeLinesOfCode(node: TreeNode): number {
+  return node.value;
 }
 
-export function nodeDepth(d) {
-  if (!isHierarchyNode(d)) throw Error("Can't get depth for data node");
+export function nodeDepth(
+  d: HierarchyNode<FileNode> | HierarchyNode<DirectoryNode>
+): number {
   return d.depth;
 }
 
-export function nodeGitData(node) {
-  const { data } = dataNode(node);
-
-  if (!data || !data.git) return undefined;
-  return data.git;
+// TODO: inline this
+export function nodeGitData(node: FileNode): GitData | undefined {
+  return node.data.git;
 }
 
-export function nodeCreationDate(node) {
+export function nodeCreationDate(node: FileNode): number | undefined {
   const git = nodeGitData(node);
   if (!git) return undefined;
 
   return git.creation_date;
 }
 
-export function nodeCreationDateClipped(node, earliest, latest) {
+export function nodeCreationDateClipped(
+  node: FileNode,
+  earliest: number,
+  latest: number
+): number | undefined {
   const creationDate = nodeCreationDate(node);
   if (!creationDate) return undefined;
   if (creationDate > latest) return undefined;
@@ -112,97 +84,94 @@ export function nodeCreationDateClipped(node, earliest, latest) {
   return creationDate;
 }
 
-export function nodeRemoteUrl(node) {
-  const git = nodeGitData(node);
-  if (!git) return undefined;
-
-  return git.remote_url;
+export function nodeRemoteUrl(node: DirectoryNode): string | undefined {
+  return node.data?.git.remote_url;
 }
 
-export function nodeRemoteHead(node) {
-  const git = nodeGitData(node);
-  if (!git) return undefined;
-
-  return git.head;
+export function nodeRemoteHead(node: DirectoryNode): string | undefined {
+  return node.data?.git.head;
 }
 
-export function nodeIndentationData(node) {
-  const { data } = dataNode(node);
-  if (!data || !data.indentation) return undefined;
-  return data.indentation;
+export function nodeIndentationData(
+  node: FileNode
+): IndentationData | undefined {
+  return node.data.indentation;
 }
 
-export function nodeIndentation(node, metric) {
-  const { data } = dataNode(node);
-  if (!data || !data.indentation) return undefined;
-  return data.indentation[metric];
-}
-
-export function nodeIndentationSum(node) {
-  const { data } = dataNode(node);
-  if (!data || !data.indentation) return undefined;
-  return data.indentation.sum;
-}
-
-export function nodeIndentationP99(node) {
-  const { data } = dataNode(node);
-  if (!data || !data.indentation) return undefined;
-  return data.indentation.p99;
-}
-
-export function nodeIndentationStddev(node) {
-  const { data } = dataNode(node);
-  if (!data || !data.indentation) return undefined;
-  return data.indentation.stddev;
+export function nodeIndentation(
+  node: FileNode,
+  metric: "sum" | "p99" | "stddev"
+) {
+  if (!node.data.indentation) return undefined;
+  return node.data.indentation[metric];
 }
 
 // Date range based data, mostly git details
 
-function nodeChangeDetails(node, earliest, latest) {
+function nodeChangeDetails(
+  node: FileNode,
+  earliest?: number,
+  latest?: number
+): GitDetails[] | undefined {
   const git = nodeGitData(node);
   if (!git) return undefined;
   const { details } = git;
   if (!details) return undefined;
-  if (earliest === undefined && latest === undefined) return details;
+  if (earliest === undefined || latest === undefined) return details;
   return details.filter(
     (d) => d.commit_day >= earliest && d.commit_day <= latest
   );
 }
 
-export function nodeLastCommitDay(node, earliest, latest) {
+export function nodeLastCommitDay(
+  node: FileNode,
+  earliest: number,
+  latest: number
+) {
   const details = nodeChangeDetails(node, earliest, latest);
   if (!details || details.length === 0) return undefined; // TODO: distinguish no history from undefined!
   return details[details.length - 1].commit_day;
 }
 
-export function nodeAge(node, earliest, latest) {
+export function nodeAge(node: FileNode, earliest: number, latest: number) {
   const lastCommit = nodeLastCommitDay(node, earliest, latest);
   if (!lastCommit) return undefined;
   return Math.ceil((latest - lastCommit) / (24 * 60 * 60));
 }
 
-export function nodeTopChangers(node, earliest, latest, maxPeople) {
+export function nodeTopChangers(
+  node: FileNode,
+  earliest: number,
+  latest: number,
+  maxPeople: number
+): [number, number][] | undefined {
   const details = nodeChangeDetails(node, earliest, latest);
   if (!details) return undefined;
-  const changerStats = new Map();
+  const changerStats: Map<number, number> = new Map();
   details.forEach(({ users, commits }) => {
     users.forEach((user) => {
-      if (!changerStats.has(user)) {
+      const prev = changerStats.get(user);
+      if (!prev) {
         changerStats.set(user, commits);
       } else {
-        changerStats.set(user, changerStats.get(user) + commits);
+        changerStats.set(user, prev + commits);
       }
     });
   });
 
   return [...changerStats.entries()]
-    .sort(([au, ac], [bu, bc]) => {
+    .sort(([, ac], [, bc]) => {
       return bc - ac;
     })
     .slice(0, maxPeople);
 }
 
-export function nodeTopChangersByLines(node, earliest, latest, maxPeople) {
+export function nodeTopChangersByLines(
+  node: FileNode,
+  earliest: number,
+  latest: number,
+  maxPeople: number
+): [number, number][] | undefined {
   const details = nodeChangeDetails(node, earliest, latest);
   if (!details) return undefined;
   const changerStats = new Map();
@@ -220,13 +189,13 @@ export function nodeTopChangersByLines(node, earliest, latest, maxPeople) {
   });
 
   return [...changerStats.entries()]
-    .sort(([au, ac], [bu, bc]) => {
+    .sort(([, ac], [, bc]) => {
       return bc - ac;
     })
     .slice(0, maxPeople);
 }
 
-function setAsString(set) {
+function setAsString<T>(set: Set<T>): string {
   // only works for sets of sortable things, needed as stupid es6 maps are broken with non-primitive keys
   return Array.from(set)
     .sort()
@@ -234,13 +203,19 @@ function setAsString(set) {
     .join("_");
 }
 
+export type Owners = {
+  users: string;
+  value: number;
+  totalValue: number;
+};
+
 export function nodeOwners(
-  node,
-  earliest,
-  latest,
-  thresholdPercent,
-  linesNotCommits
-) {
+  node: FileNode,
+  earliest: number,
+  latest: number,
+  threshold: number,
+  linesNotCommits: boolean
+): Owners | undefined {
   const details = linesNotCommits
     ? nodeTopChangersByLines(node, earliest, latest, 9999)
     : nodeTopChangers(node, earliest, latest, 9999);
@@ -248,10 +223,10 @@ export function nodeOwners(
   if (!details) return undefined;
 
   if (details.length > 0) {
-    const totalValue = _.sumBy(details, ([_user, value]) => value);
+    const totalValue = _.sumBy(details, ([, value]) => value);
     // OK, want to say "we have total value, we want to aggregate users until we have over the threshold percentage of the total"
-    const thresholdValue = (thresholdPercent / 100.0) * totalValue;
-    const users = new Set();
+    const thresholdValue = (threshold / 100.0) * totalValue;
+    const users: Set<number> = new Set();
     let aggregatedValue = 0.0;
     // eslint-disable-next-line no-restricted-syntax
     for (const [user, value] of details) {
@@ -267,28 +242,39 @@ export function nodeOwners(
   return { users: "", value: 0, totalValue: 0 };
 }
 
-export function nodeOwnersNamesOnly(node, state) {
+export function nodeOwnersNamesOnly(node: FileNode, state: State) {
   const { config } = state;
   const { earliest, latest } = config.dateRange;
-  const { thresholdPercent, linesNotCommits } = config.owners;
-  const owners = nodeOwners(
-    node,
-    earliest,
-    latest,
-    thresholdPercent,
-    linesNotCommits
-  );
+  const { threshold, linesNotCommits } = config.owners;
+  const owners = nodeOwners(node, earliest, latest, threshold, linesNotCommits);
   return owners ? owners.users : undefined;
 }
 
-export function nodeNumberOfChangers(node, earliest, latest) {
+export function nodeNumberOfChangers(
+  node: FileNode,
+  earliest: number,
+  latest: number
+) {
   const details = nodeChangeDetails(node, earliest, latest);
   if (!details) return undefined;
   const changers = _.uniq(details.flatMap((d) => d.users));
   return changers.length;
 }
 
-export function nodeChurnData(node, earliest, latest) {
+export type ChurnData = {
+  totalLines: number;
+  totalCommits: number;
+  totalDays: number;
+  fractionalLines: number;
+  fractionalCommits: number;
+  fractionalDays: number;
+};
+
+export function nodeChurnData(
+  node: FileNode,
+  earliest: number,
+  latest: number
+): ChurnData | undefined {
   const details = nodeChangeDetails(node, earliest, latest);
   if (!details) return undefined;
   let totalLines = 0;
@@ -311,36 +297,59 @@ export function nodeChurnData(node, earliest, latest) {
   };
 }
 
-export function nodeChurnDays(node, earliest, latest) {
+export function nodeChurnDays(
+  node: FileNode,
+  earliest: number,
+  latest: number
+) {
   const data = nodeChurnData(node, earliest, latest);
   if (!data) return undefined;
   return data.fractionalDays;
 }
 
-export function nodeChurnCommits(node, earliest, latest) {
+export function nodeChurnCommits(
+  node: FileNode,
+  earliest: number,
+  latest: number
+) {
   const data = nodeChurnData(node, earliest, latest);
   if (!data) return undefined;
   return data.fractionalCommits;
 }
 
-export function nodeChurnLines(node, earliest, latest) {
+export function nodeChurnLines(
+  node: FileNode,
+  earliest: number,
+  latest: number
+) {
   const data = nodeChurnData(node, earliest, latest);
   if (!data) return undefined;
   return data.fractionalLines;
 }
 
-export function nodeCouplingData(node) {
-  const { data } = dataNode(node);
-
-  if (!data || !data.coupling) return undefined;
-  return data.coupling;
+export function nodeCouplingData(node: FileNode) {
+  return node.data.coupling;
 }
 
-export function nodeHasCouplingData(node) {
-  return nodeCouplingData(node) !== undefined;
+export function nodeHasCouplingData(node: TreeNode) {
+  return isFile(node) && nodeCouplingData(node) !== undefined;
 }
 
-export function nodeCouplingFiles(node, earliest, latest) {
+export type CouplingLink = {
+  source: TreeNode;
+  targetFile: string;
+  sourceCount: number;
+  targetCount: number;
+};
+
+export function nodeCouplingFiles(
+  node: TreeNode,
+  earliest: number,
+  latest: number
+): CouplingLink[] | undefined {
+  if (isDirectory(node)) {
+    return undefined;
+  }
   const couplingData = nodeCouplingData(node);
   if (!couplingData) return undefined;
   const buckets = couplingData.buckets.filter((bucket) => {
@@ -353,19 +362,15 @@ export function nodeCouplingFiles(node, earliest, latest) {
     return [];
   }
   let totalBursts = 0;
-  const files = {};
+  const files: Map<string, number> = new Map();
   buckets.forEach((bucket) => {
     totalBursts += bucket.activity_bursts;
     bucket.coupled_files.forEach(([filename, count]) => {
-      if (files[filename] === undefined) {
-        files[filename] = count;
-      } else {
-        files[filename] += count;
-      }
+      files.set(filename, (files.get(filename) ?? 0) + count);
     });
   });
   // convert to array so vis.js can render each coupling line
-  return Object.entries(files).map(([file, count]) => {
+  return [...files].map(([file, count]) => {
     return {
       source: node,
       targetFile: file,
@@ -375,7 +380,7 @@ export function nodeCouplingFiles(node, earliest, latest) {
   });
 }
 
-function commonRoots(file1, file2) {
+function commonRoots(file1: string, file2: string) {
   const f1bits = file1.split("/");
   const f2bits = file2.split("/");
   let maxLength = f1bits.length;
@@ -392,19 +397,23 @@ function commonRoots(file1, file2) {
   return commonLength;
 }
 
-function filesHaveMaxCommonRoots(maxCommonRoots, file1, file2) {
+function filesHaveMaxCommonRoots(
+  maxCommonRoots: number,
+  file1: string,
+  file2: string
+) {
   if (maxCommonRoots < 0) return true;
   const common = commonRoots(file1, file2);
   return common <= maxCommonRoots;
 }
 
 export function nodeCouplingFilesFiltered(
-  node,
-  earliest,
-  latest,
-  minRatio,
-  minBursts,
-  maxCommonRoots
+  node: TreeNode,
+  earliest: number,
+  latest: number,
+  minRatio: number,
+  minBursts: number,
+  maxCommonRoots: number
 ) {
   const files = nodeCouplingFiles(node, earliest, latest);
   if (files === undefined || files.length === 0) return files;
@@ -417,15 +426,13 @@ export function nodeCouplingFilesFiltered(
   });
 }
 
-export function nodeLayoutData(node) {
-  const theNode = dataNode(node); // not in nested 'data' part!
-
-  if (!theNode || !theNode.layout) return undefined;
-  return theNode.layout;
+export function nodeLayoutData(node: TreeNode) {
+  if (isDirectory(node)) {
+    return undefined;
+  }
+  return node.layout;
 }
 
-export function nodeCenter(node) {
-  const layoutData = nodeLayoutData(node);
-  if (!layoutData) return undefined;
-  return layoutData.center;
+export function nodeCenter(node: TreeNode) {
+  return nodeLayoutData(node)?.center;
 }

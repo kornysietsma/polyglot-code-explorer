@@ -1,18 +1,26 @@
-/* eslint-disable react/forbid-prop-types */
-
 import React from "react";
-import defaultPropTypes from "./defaultPropTypes";
-import ToggleablePanel from "./ToggleablePanel";
-import HelpPanel from "./HelpPanel";
-import { humanizeDate } from "./datetimes";
-import ColourKey from "./ColourKey";
 
-const VisColourKey = (props) => {
-  const { vis, state, metadata } = props;
+import ColourKey from "./ColourKey";
+import { humanizeDate } from "./datetimes";
+import HelpPanel from "./HelpPanel";
+import { State } from "./state";
+import ToggleablePanel from "./ToggleablePanel";
+import { VisualizationData } from "./VisualizationData";
+import { VizMetadata } from "./viz.types";
+
+const VisColourKey = ({
+  vis,
+  state,
+  metadata,
+}: {
+  vis: VisualizationData;
+  state: State;
+  metadata: VizMetadata;
+}) => {
   const { config } = state;
   const earliestDate = humanizeDate(config.dateRange.earliest);
   const latestDate = humanizeDate(config.dateRange.latest);
-  const keyData = vis.colourKeyBuilder(vis, state, metadata);
+  const keyData = vis.buildVisualization(state, metadata).colourKey();
   return (
     <div>
       <HelpPanel>{vis.help}</HelpPanel>
@@ -25,5 +33,5 @@ const VisColourKey = (props) => {
     </div>
   );
 };
-VisColourKey.propTypes = defaultPropTypes;
+
 export default VisColourKey;

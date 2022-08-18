@@ -1,31 +1,40 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
+
 import App from "./App";
+import { Tree } from "./polyglot_data.types";
 import {
   countLanguagesIn,
-  gatherTimescaleData,
   gatherGlobalStats,
   gatherNodesByPath,
+  gatherTimescaleData,
+  linkParents,
 } from "./preprocess";
+import { VizData, VizDataRefMaybe } from "./viz.types";
 
-const useFetch = (url) => {
-  const [data, setData] = useState(null);
+const useFetch = (url: string) => {
+  const [data, setData] = useState<VizData>();
 
   useEffect(() => {
     async function fetchData() {
       const response = await fetch(url);
       const json = await response.json();
+      //TODO: create a typed data structure from json
+      // const cleanData: Array<DataEntry>  = ...
+      const tree = json as Tree;
+      console.log("linking parents");
+      linkParents(tree);
       console.log("postprocessing languages");
-      const languages = countLanguagesIn(json);
+      const languages = countLanguagesIn(tree);
       console.log("postprocessing global stats");
-      const stats = gatherGlobalStats(json);
+      const stats = gatherGlobalStats(tree);
       console.log("building node index");
-      const nodesByPath = gatherNodesByPath(json);
+      const nodesByPath = gatherNodesByPath(tree);
       console.log("building date scale data");
-      const timescaleData = gatherTimescaleData(json, "week");
+      const timescaleData = gatherTimescaleData(tree, "week");
       console.log("postprocessing complete");
-      const { users } = json.data.git_meta;
-      if (json.data.coupling_meta) {
-        const bucketConfig = json.data.coupling_meta.buckets;
+      const users = tree.metadata.git?.users;
+      if (tree.metadata.coupling) {
+        const bucketConfig = tree.metadata.coupling.buckets;
         stats.coupling = {
           bucketCount: bucketConfig.bucket_count,
           bucketSize: bucketConfig.bucket_size,
@@ -39,7 +48,7 @@ const useFetch = (url) => {
         nodesByPath,
         timescaleData,
       };
-      setData({ files: json, metadata });
+      setData({ files: tree, metadata });
     }
     fetchData();
   }, [url]);
@@ -51,12 +60,16 @@ const Loader = () => {
   const dataFile = process.env.REACT_APP_EXPLORER_DATA || "default";
   const url = `${process.env.PUBLIC_URL}/data/${dataFile}.json`;
 
-  const dataRef = useRef(null);
+  const dataRefEventually: VizDataRefMaybe = useRef<VizData>();
 
   const data = useFetch(url);
-  dataRef.current = data;
+  dataRefEventually.current = data;
 
-  return data == null ? <div>Loading...</div> : <App dataRef={dataRef} />;
+  return dataRefEventually.current === undefined ? (
+    <div>Loading...</div>
+  ) : (
+    <App dataRefMaybe={dataRefEventually} />
+  );
 };
 
 export default Loader;

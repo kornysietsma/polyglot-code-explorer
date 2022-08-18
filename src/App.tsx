@@ -1,15 +1,21 @@
-/* eslint-disable react/forbid-prop-types */
-import React, { useReducer } from "react";
-import PropTypes from "prop-types";
 import "./App.css";
+
+import React, { useReducer, useRef } from "react";
+
 import Controller from "./Controller";
 import Inspector from "./Inspector";
+import { globalDispatchReducer, initialiseGlobalState } from "./state";
 import Viz from "./Viz";
-import { globalDispatchReducer, initialiseGlobalState } from "./State";
+import { VizDataRef, VizDataRefMaybe } from "./viz.types";
 
-const App = (props) => {
-  // eslint-disable-next-line react/prop-types
-  const { dataRef } = props;
+/**
+ * The main App component - note, this should be loaded from a `<Loader>` which handles fetching data first!
+ * @param dataRefMaybe - the data to view, by the time App is rendered the data should be loaded so cannot be undefined.  (sadly due to the way hooks work I can't check this in `Loader`)
+ */
+const App = ({ dataRefMaybe }: { dataRefMaybe: VizDataRefMaybe }) => {
+  // The App can only be shown if the data ref has been loaded - see Loader.tsx - so this is safe
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  const dataRef: VizDataRef = useRef(dataRefMaybe.current!);
 
   const [vizState, dispatch] = useReducer(
     globalDispatchReducer(dataRef),
@@ -27,10 +33,6 @@ const App = (props) => {
       <Inspector dataRef={dataRef} state={vizState} dispatch={dispatch} />
     </div>
   );
-};
-
-App.propTypes = {
-  dataRef: PropTypes.shape({ current: PropTypes.any }).isRequired,
 };
 
 export default App;

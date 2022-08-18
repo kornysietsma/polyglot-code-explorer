@@ -1,16 +1,20 @@
-/* eslint-disable react/forbid-prop-types */
-
 import React from "react";
-import defaultPropTypes from "./defaultPropTypes";
+
 import styles from "./PathInspector.module.css";
+import { TreeNode } from "./polyglot_data.types";
+import { Action } from "./state";
 import ToggleablePanel from "./ToggleablePanel";
 
-const PathInspector = (props) => {
-  const { node, dispatch } = props;
-
+const PathInspector = ({
+  node,
+  dispatch,
+}: {
+  node: TreeNode;
+  dispatch: React.Dispatch<Action>;
+}) => {
   let parents = [];
   let currentNode = node.parent;
-  while (currentNode.parent) {
+  while (currentNode && currentNode.parent) {
     // deliberately don't show root
     parents.push(currentNode);
     currentNode = currentNode.parent;
@@ -21,17 +25,17 @@ const PathInspector = (props) => {
     <ToggleablePanel title="Path" showInitially>
       <ul className={styles.pathlist}>
         {parents.map((parent) => (
-          <li key={parent.data.path}>
+          <li key={parent.path}>
             <button
               type="button"
               onClick={() =>
                 dispatch({
                   type: "selectNode",
-                  payload: parent,
+                  payload: parent.path,
                 })
               }
             >
-              {parent.data.name}
+              {parent.name}
             </button>
           </li>
         ))}
@@ -39,5 +43,5 @@ const PathInspector = (props) => {
     </ToggleablePanel>
   );
 };
-PathInspector.propTypes = defaultPropTypes;
+
 export default PathInspector;

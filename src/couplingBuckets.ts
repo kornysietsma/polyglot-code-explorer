@@ -1,6 +1,8 @@
 // bucket calculations needed all over the place
 
-export function allBuckets(couplingStats) {
+import { CouplingStats } from "./viz.types";
+
+function allBuckets(couplingStats: CouplingStats) {
   const { bucketCount, bucketSize, firstBucketStart } = couplingStats;
 
   const results = [];
@@ -10,7 +12,11 @@ export function allBuckets(couplingStats) {
   }
   return results;
 }
-export function bucketsSelected(couplingStats, earliest, latest) {
+function bucketsSelected(
+  couplingStats: CouplingStats,
+  earliest: number,
+  latest: number
+) {
   return allBuckets(couplingStats).filter((bucket) => {
     if (bucket.start > latest) return false;
     if (bucket.end < earliest) return false;
@@ -18,7 +24,11 @@ export function bucketsSelected(couplingStats, earliest, latest) {
   });
 }
 
-export function couplingDateRange(couplingStats, earliest, latest) {
+export function couplingDateRange(
+  couplingStats: CouplingStats,
+  earliest: number,
+  latest: number
+) {
   const buckets = bucketsSelected(couplingStats, earliest, latest);
   const couplingStart = buckets[0].start;
   const couplingEnd = buckets[buckets.length - 1].end;
