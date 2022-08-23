@@ -37,7 +37,7 @@ const CouplingController = (props: {
   }
 
   if (stats.coupling === undefined) {
-    throw Error("No coupling config defined");
+    throw new Error("No coupling config defined");
   }
   const {
     coupling: { bucketSize },

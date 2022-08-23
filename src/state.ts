@@ -166,11 +166,18 @@ export type CalculatedState = {
   ownerData: OwnerData;
 };
 
+export type Message = {
+  severity: "info" | "warn" | "error";
+  lines: string[];
+  timestamp: Date;
+};
+
 export type State = {
   config: Config;
   couplingConfig: CouplingConfig;
   expensiveConfig: ExpensiveConfig;
   calculated: CalculatedState;
+  messages: Message[];
 };
 
 function initialiseGlobalState(initialDataRef: VizDataRef) {
@@ -178,6 +185,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
     metadata: {
       stats: { maxDepth, earliestCommit, latestCommit, coupling },
     },
+    files,
   } = initialDataRef.current;
 
   const hasDates = earliestCommit !== undefined && latestCommit !== undefined;
@@ -350,7 +358,13 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
       // this is mostly for state calculated in the postProcessState stage, based on data
       ownerData: [],
     },
+    messages: [],
   };
+  defaults.messages.push({
+    timestamp: new Date(),
+    severity: "info",
+    lines: [`Loaded data file: ${files.id} version ${files.version}`],
+  });
   // could precalculate ownerData here - but it isn't needed until you select the 'owners' visualisation
   return defaults;
 }
@@ -553,6 +567,13 @@ interface SetRemoteUrlTemplate {
   type: "setRemoteUrlTemplate";
   payload: string;
 }
+interface AddMessage {
+  type: "addMessage";
+  payload: Message;
+}
+interface ClearMessages {
+  type: "clearMessages";
+}
 
 export type Action =
   | SetVisualization
@@ -569,7 +590,9 @@ export type Action =
   | SetCodeServerPrefix
   | SetOwnersThreshold
   | SetOwnerLinesNotCommits
-  | SetRemoteUrlTemplate;
+  | SetRemoteUrlTemplate
+  | AddMessage
+  | ClearMessages;
 
 function updateStateFromAction(state: State, action: Action): State {
   const { expensiveConfig, couplingConfig, config } = state;
@@ -671,6 +694,14 @@ function updateStateFromAction(state: State, action: Action): State {
       const result = _.cloneDeep(state);
       result.config.remoteUrlTemplate = action.payload;
       return result;
+    }
+
+    case "addMessage": {
+      return { ...state, messages: [...state.messages, action.payload] };
+    }
+
+    case "clearMessages": {
+      return { ...state, messages: [] };
     }
 
     default: {

@@ -652,7 +652,7 @@ export function getCurrentVis(config: Config) {
     }
   }
   if (isParentVisualization(selected)) {
-    throw Error("Logic error - selected vis is a parent!");
+    throw new Error("Logic error - selected vis is a parent!");
   } else {
     return selected;
   }

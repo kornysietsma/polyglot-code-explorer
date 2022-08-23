@@ -112,18 +112,18 @@ const update = (
   state: State
 ) => {
   if (!d3Container.current) {
-    throw Error("No current container");
+    throw new Error("No current container");
   }
   const vizEl = d3Container.current;
   const svg = d3.select(vizEl);
   // if (!svg instanceof SVGElement) {
-  //   throw Error("Invalid root SVG element");
+  //   throw new Error("Invalid root SVG element");
   // }
   redrawPolygons(svg.selectAll(".cell"), metadata, state);
 
   // TODO: DRY this up - or should selecting just be expensive config?
   if (!metadata.hierarchyNodesByPath) {
-    throw Error(
+    throw new Error(
       "update called before draw, so we have no hierarchyNodesByPath!"
     );
   }
@@ -215,7 +215,7 @@ function drawCoupling(
     const target = nodesByPath.get(d.targetFile);
     const targetPos = target ? nodeCenter(target) : undefined;
     if (sourcePos == undefined || targetPos == undefined) {
-      throw Error("Can't find source or target for coupling line");
+      throw new Error("Can't find source or target for coupling line");
     }
 
     return arcPath(true, sourcePos, targetPos);
@@ -225,7 +225,7 @@ function drawCoupling(
   const couplingLineStroke = (d: CouplingLink) => {
     const colour = d3.color(themedColours(config).couplingStroke);
     if (colour == null) {
-      throw Error("Invalid colour in theme");
+      throw new Error("Invalid colour in theme");
     }
     const ratio = d.targetCount / d.sourceCount;
     colour.opacity = ratio;
@@ -273,7 +273,7 @@ const updateCoupling = (
   dispatch: React.Dispatch<Action>
 ) => {
   if (!d3Container.current) {
-    throw Error("No current container");
+    throw new Error("No current container");
   }
   const vizEl = d3Container.current;
   const svg = d3.select(vizEl);
@@ -304,7 +304,7 @@ const draw = (
 
   const { layout } = files;
   if (!layout.width || !layout.height) {
-    throw Error("Root node has no width or height!");
+    throw new Error("Root node has no width or height!");
   }
 
   const svg = d3
@@ -454,12 +454,12 @@ function drawTimescale(
 
   const yMax = d3.max(timescaleData, valueFn);
   if (yMax == undefined) {
-    throw Error("No maximum timescale");
+    throw new Error("No maximum timescale");
   }
 
   const dateRange = d3.extent(timescaleData, (d) => d.day);
   if (dateRange[0] === undefined || dateRange[1] === undefined) {
-    throw Error("No date range in timescale data");
+    throw new Error("No date range in timescale data");
   }
   dateRange[0] = addDays(dateRange[0], -1);
   dateRange[1] = addDays(dateRange[1], 1);

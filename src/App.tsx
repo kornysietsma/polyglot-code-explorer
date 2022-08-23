@@ -4,6 +4,7 @@ import React, { useReducer, useRef } from "react";
 
 import Controller from "./Controller";
 import Inspector from "./Inspector";
+import Messages from "./Messages";
 import { globalDispatchReducer, initialiseGlobalState } from "./state";
 import Viz from "./Viz";
 import { VizDataRef, VizDataRefMaybe } from "./viz.types";
@@ -28,6 +29,7 @@ const App = ({ dataRefMaybe }: { dataRefMaybe: VizDataRefMaybe }) => {
       <header className="App-header">
         <h1>Polyglot Code Explorer v{process.env.REACT_APP_VERSION}</h1>
       </header>
+      <Messages messages={vizState.messages} dispatch={dispatch} />
       <Viz dataRef={dataRef} state={vizState} dispatch={dispatch} />
       <Controller dataRef={dataRef} state={vizState} dispatch={dispatch} />
       <Inspector dataRef={dataRef} state={vizState} dispatch={dispatch} />

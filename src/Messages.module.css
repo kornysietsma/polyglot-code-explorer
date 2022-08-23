@@ -1,0 +1,16 @@
+.list {
+  list-style-type: none;  
+}
+
+.list > li.info {
+
+}
+
+.list > li.warn {
+ background-color: yellow;
+}
+
+.list > li.error {
+    font-weight: bold;
+    background-color: red;
+}

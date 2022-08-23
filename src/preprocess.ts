@@ -25,7 +25,7 @@ function linkParentRecursively(node: TreeNode, parent: DirectoryNode) {
 export function linkParents(data: Tree) {
   const rootNode = data.tree;
   if (!isDirectory(rootNode)) {
-    throw Error("Root of tree is not a directory!");
+    throw new Error("Root of tree is not a directory!");
   }
   for (const child of rootNode.children) {
     linkParentRecursively(child, rootNode);
