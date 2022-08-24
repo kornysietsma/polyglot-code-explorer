@@ -1,6 +1,7 @@
+import "./PathInspector.css";
+
 import React from "react";
 
-import styles from "./PathInspector.module.css";
 import { TreeNode } from "./polyglot_data.types";
 import { Action } from "./state";
 import ToggleablePanel from "./ToggleablePanel";
@@ -22,8 +23,8 @@ const PathInspector = ({
   parents = parents.reverse();
 
   return (
-    <ToggleablePanel title="Path" showInitially>
-      <ul className={styles.pathlist}>
+    <ToggleablePanel title="Path" extraClass="PathInspector" showInitially>
+      <ul>
         {parents.map((parent) => (
           <li key={parent.path}>
             <button

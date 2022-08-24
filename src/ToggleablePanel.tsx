@@ -1,6 +1,6 @@
-import React from "react";
+import "./ToggleablePanel.css";
 
-import styles from "./ToggleablePanel.module.css";
+import React from "react";
 
 const ToggleablePanel = ({
   showInitially,
@@ -9,6 +9,7 @@ const ToggleablePanel = ({
   showText = "show",
   hideText = "hide",
   borderlessIfHidden = false,
+  extraClass,
 }: {
   showInitially: boolean;
   title: string;
@@ -16,15 +17,14 @@ const ToggleablePanel = ({
   showText?: string;
   hideText?: string;
   borderlessIfHidden?: boolean;
+  extraClass?: string;
 }) => {
   const [showResults, setShowResults] = React.useState(showInitially);
   const onClick = () => setShowResults(!showResults);
-  const hiddenBorderStyle = borderlessIfHidden
-    ? styles.borderless
-    : styles.hidden;
+  const hiddenBorderStyle = borderlessIfHidden ? "borderless" : "hidden";
   if (!showResults) {
     return (
-      <div className={`${styles.panel} ${hiddenBorderStyle}`}>
+      <div className={`ToggleablePanel ${hiddenBorderStyle}`}>
         <h4>
           {title}{" "}
           <button type="button" onClick={onClick}>
@@ -35,7 +35,7 @@ const ToggleablePanel = ({
     );
   }
   return (
-    <div className={`${styles.panel}`}>
+    <div className={`ToggleablePanel ${extraClass}`}>
       <h4>
         {title}{" "}
         <button type="button" onClick={onClick}>

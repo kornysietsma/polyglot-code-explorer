@@ -8,7 +8,7 @@ const HelpPanel = ({ children }: { children: React.ReactNode }) => {
       title=""
       showInitially={false}
       showText="help"
-      borderlessIfHidden
+      borderlessIfHidden={true}
     >
       {children}
     </ToggleablePanel>

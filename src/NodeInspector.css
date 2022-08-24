@@ -1,0 +1,7 @@
+[data-theme="light"] .remoteUrl  {
+    color: olive;
+}
+
+[data-theme="dark"] .remoteUrl  {
+    color: beige;
+}

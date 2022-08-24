@@ -542,7 +542,7 @@ function usePrevious<T>(value: T) {
 }
 
 const updateBodyTheme = (newTheme: string) => {
-  document.body.className = newTheme;
+  document.body.dataset.theme = newTheme;
 };
 
 const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {

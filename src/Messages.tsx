@@ -1,16 +1,6 @@
-import styles from "./Messages.module.css";
-import { Action, Message } from "./state";
+import "./Messages.css";
 
-function severityClass(severity: "info" | "warn" | "error"): string {
-  switch (severity) {
-    case "info":
-      return styles.info;
-    case "warn":
-      return styles.warn;
-    case "error":
-      return styles.error;
-  }
-}
+import { Action, Message } from "./state";
 
 const Messages = ({
   messages,
@@ -23,12 +13,12 @@ const Messages = ({
     return <></>;
   }
   return (
-    <div className="messages">
+    <div className="Messages">
       <h3>Messages:</h3>
-      <ul className={`${styles.list}`}>
+      <ul>
         {messages.map((message, ix) => (
-          <li key={ix} className={severityClass(message.severity)}>
-            {message.lines.join("<br/>")}
+          <li key={ix} className={message.severity}>
+            {message.message}
           </li>
         ))}
       </ul>

@@ -1,3 +1,5 @@
+import "./NodeInspector.css";
+
 import React from "react";
 
 import CouplingInspector from "./CouplingInspector";
@@ -15,7 +17,6 @@ import {
   nodeRemoteUrl,
   nodeTopChangers,
 } from "./nodeData";
-import styles from "./NodeInspector.module.css";
 import PathInspector from "./PathInspector";
 import { FileNode, isDirectory, TreeNode } from "./polyglot_data.types";
 import SourceCodeInspector from "./SourceCodeInspector";
@@ -26,7 +27,7 @@ import { VizMetadata } from "./viz.types";
 function findGitUrl(node: TreeNode, remoteUrlTemplate: string) {
   let suffix = node.name;
   let current = node;
-  while (isDirectory(current) && !nodeRemoteUrl(current) && current.parent) {
+  while ((!isDirectory(current) || !nodeRemoteUrl(current)) && current.parent) {
     current = current.parent;
     if (!nodeRemoteUrl(current)) {
       suffix = `${current.name}/${suffix}`;
@@ -130,8 +131,6 @@ const NodeInspector = ({
   state: State;
   metadata: VizMetadata;
 }) => {
-  // UGLY - can't work out how to easily mix themes into module CSS?
-  const { currentTheme } = state.config.colours;
   const { stats } = metadata;
   const locData = nodeLocData(node);
   const indentationData = nodeIndentationData(node);
@@ -204,15 +203,7 @@ const NodeInspector = ({
       {gitUrl ? (
         <h3>
           {node.name}&nbsp;
-          <a
-            className={
-              currentTheme === "dark"
-                ? styles.remoteUrlDark
-                : styles.remoteUrlLight
-            }
-            href={gitUrl}
-            target="#"
-          >
+          <a className={"remoteUrl"} href={gitUrl} target="#">
             (remote code)
           </a>
         </h3>

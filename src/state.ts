@@ -168,7 +168,7 @@ export type CalculatedState = {
 
 export type Message = {
   severity: "info" | "warn" | "error";
-  lines: string[];
+  message: string;
   timestamp: Date;
 };
 
@@ -363,7 +363,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
   defaults.messages.push({
     timestamp: new Date(),
     severity: "info",
-    lines: [`Loaded data file: ${files.id} version ${files.version}`],
+    message: `Loaded data file: ${files.id} version ${files.version}`,
   });
   // could precalculate ownerData here - but it isn't needed until you select the 'owners' visualisation
   return defaults;
@@ -569,7 +569,7 @@ interface SetRemoteUrlTemplate {
 }
 interface AddMessage {
   type: "addMessage";
-  payload: Message;
+  payload: { severity: "info" | "warn" | "error"; message: string };
 }
 interface ClearMessages {
   type: "clearMessages";
@@ -697,7 +697,11 @@ function updateStateFromAction(state: State, action: Action): State {
     }
 
     case "addMessage": {
-      return { ...state, messages: [...state.messages, action.payload] };
+      const message: Message = {
+        ...action.payload,
+        timestamp: new Date(),
+      };
+      return { ...state, messages: [...state.messages, message] };
     }
 
     case "clearMessages": {

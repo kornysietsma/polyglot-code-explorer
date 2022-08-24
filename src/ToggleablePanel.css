@@ -1,19 +1,19 @@
-.panel {
+.ToggleablePanel {
     border-style: solid;
     border-width: 1px;
-    border-color: #505050;
+    border-color: var(--color-borders);
     padding: 2px;
     margin: 2px;
 }
-.panel.hidden {
+.ToggleablePanel.hidden {
     border-style: dotted;
 }
 
-.panel h4 {
+.ToggleablePanel h4 {
     margin-top: 0px;
     margin-bottom: 0px;
 }
-.panel.borderless {
+.ToggleablePanel.borderless {
     border-style: none;
     padding: 0;
     margin: 0;

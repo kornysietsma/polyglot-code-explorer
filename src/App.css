@@ -12,12 +12,8 @@
   move these bits to component CSS files if they get to be non-trivial
 */
 
-body.light .Viz {
-  background-color: #ffffff;
-}
-
-body.dark .Viz {
-  background-color: #010e35;
+.Viz {
+  background-color: var(--color-viz-bg);
 }
 
 /* TODO: fix the grid so we can scale svg area responsively again? */
@@ -37,14 +33,10 @@ body.dark .Viz {
   font-size: 0.75em;
 }
 
-.cell {
-  stroke: white;
-  stroke-width: 1px;
-}
-
 /* Layout stuff */
 
 .App-header { grid-area: header; }
+.Messages { grid-area: messages; }
 .Viz { grid-area: main; }
 .Controller { grid-area: controls; }
 .Inspector { grid-area: inspect; }

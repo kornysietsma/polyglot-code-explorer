@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import "./SourceCodeInspector.css";
+
+import { useEffect, useState } from "react";
 
 import { nodePath } from "./nodeData";
 import { FileNode } from "./polyglot_data.types";
-import styles from "./SourceCodeInspector.module.css";
 import { State } from "./state";
 import ToggleablePanel from "./ToggleablePanel";
 
@@ -50,7 +51,7 @@ const SourceCodePanel = ({ node, state }: { node: FileNode; state: State }) => {
   }, [path, url]);
 
   return code ? (
-    <pre className={styles.code}>
+    <pre className="SourceCodeInspector">
       <code>{code}</code>
     </pre>
   ) : (

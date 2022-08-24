@@ -1,0 +1,22 @@
+.Messages {
+  border-style: solid;
+  border-color: var(--color-borders);
+  padding: 2px;
+  margin-bottom: 5px;
+}
+.Messages ul {
+  list-style-type: none;  
+}
+
+.Messages ul > li.info {
+  color: var(--color-text);
+}
+
+.Messages ul > li.warn {
+  color: var(--color-text-warn);
+}
+
+.Messages ul > li.error {
+    font-weight: bold;
+    color: var(--color-text-error);
+}
