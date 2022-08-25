@@ -2,6 +2,7 @@ import { HierarchyNode } from "d3";
 
 export type Tree = {
   version: string;
+  name: string;
   id: string;
   tree: TreeNode;
   metadata: {

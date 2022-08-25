@@ -363,7 +363,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
   defaults.messages.push({
     timestamp: new Date(),
     severity: "info",
-    message: `Loaded data file: ${files.id} version ${files.version}`,
+    message: `Loaded data file: ${files.name} version ${files.version} ID ${files.id}`,
   });
   // could precalculate ownerData here - but it isn't needed until you select the 'owners' visualisation
   return defaults;
