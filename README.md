@@ -10,7 +10,7 @@ For an overview and more documentation, take a look at <https://polyglot.korny.i
 
 I'm doing a lot of changes right now - if you fetch the current code, things may break.
 
-Especially note, I've changed the data file formats created by the explorer etc., so things there will definitely break.
+Especially note, I'm changed the data file formats created by the explorer and used by the scanner - I've added version number checks, but data files from the Scanner must match expectations of the Explorer, so for now it's a bit of "make sure you pull changes often" or things will break.
 
 ## Installing and running
 
