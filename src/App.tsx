@@ -1,6 +1,6 @@
 import "./App.css";
 
-import React, { useReducer, useRef } from "react";
+import { useReducer, useRef } from "react";
 
 import Controller from "./Controller";
 import Inspector from "./Inspector";

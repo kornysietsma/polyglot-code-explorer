@@ -1,12 +1,12 @@
 import _ from "lodash";
-import _uniqueId from "lodash/uniqueId";
-import React, { useId, useMemo } from "react";
+import { useId, useMemo } from "react";
 
 import { DefaultProps } from "./components.types";
 import CouplingController from "./CouplingController";
 import { humanizeDate } from "./datetimes";
 import HelpPanel from "./HelpPanel";
 import ToggleablePanel from "./ToggleablePanel";
+import UsersAndTeams from "./UsersAndTeams";
 import VisColourKey from "./VisColourKey";
 import {
   isParentVisualization,
@@ -137,6 +137,7 @@ const Controller = (props: DefaultProps) => {
       </p>
       <ToggleablePanel title="advanced settings" showInitially={false}>
         <div>
+          <UsersAndTeams></UsersAndTeams>
           <label htmlFor={depthId}>
             Display maximum depth:
             <select

@@ -1,13 +1,21 @@
-import "./css/normalize.css";
 import "./css/custom.css";
+import "./css/normalize.css";
 
-import React from "react";
-import ReactDOM from "react-dom";
+import { createRoot } from "react-dom/client";
+import ReactModal from "react-modal";
 
 import Loader from "./Loader";
 import reportWebVitals from "./reportWebVitals";
 
-ReactDOM.render(<Loader />, document.getElementById("root"));
+const container = document.getElementById("root");
+if (!container) {
+  throw new Error("No root container element!");
+}
+const root = createRoot(container);
+
+root.render(<Loader />);
+
+ReactModal.setAppElement("#root");
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))

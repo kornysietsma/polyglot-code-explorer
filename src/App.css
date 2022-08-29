@@ -33,6 +33,29 @@
   font-size: 0.75em;
 }
 
+.ModalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--color-modal-bg);
+}
+.ModalContent {
+  position: absolute;
+  top: 40px;
+  left: 40px;
+  right: 40px;
+  bottom: 40px;
+  border: 1px solid #ccc;
+  background-color: var(--color-bg);
+  overflow: auto;
+  border-radius: 4px;
+  outline: none;
+  padding: 20px;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Layout stuff */
 
 .App-header { grid-area: header; }
