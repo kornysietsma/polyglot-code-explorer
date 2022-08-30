@@ -55,12 +55,22 @@ export function isHierarchyFile(
 }
 
 // Tree types
+
+// raw git user
 export type GitUser = {
   id: number;
   user: {
     name?: string;
     email?: string;
   };
+};
+
+export type UserData = {
+  id: number;
+  name?: string;
+  email?: string;
+  // pseudo users are added to the main list for when we alias users together
+  isAlias: boolean;
 };
 
 export type CouplingMetadata = {

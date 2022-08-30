@@ -1,0 +1,27 @@
+/* the main top-level areas */
+
+.App-header {
+  text-align: center;
+  h1 {
+    font-size: 2rem;
+    margin: 0.3em 0;
+  }
+}
+
+.Viz {
+  background-color: var(--color-viz-bg);
+
+  > svg.chart {
+    width: 100%;
+    height: 1024px;
+  }
+
+  > svg.timescale {
+    width: 100%;
+    height: 130px;
+  }
+}
+
+.Inspector {
+  font-size: 0.75em;
+}

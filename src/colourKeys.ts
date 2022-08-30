@@ -1,8 +1,7 @@
 import * as d3 from "d3";
-import _ from "lodash";
 
 import { humanizeDate } from "./datetimes";
-import { GitUser } from "./polyglot_data.types";
+import { UserData } from "./polyglot_data.types";
 import { State, themedColours, themedErrorColour } from "./state";
 import { VizMetadata } from "./viz.types";
 
@@ -101,11 +100,11 @@ export function numberOfChangersKeyData(
   return key;
 }
 
-function shortName(user: GitUser) {
-  return user.user.name ?? user.user.email ?? "invalid_user";
+function shortName(user: UserData) {
+  return user.name ?? user.email ?? "invalid_user";
 }
 
-function shortUserNames(ownerStr: string, users: GitUser[] | undefined) {
+function shortUserNames(ownerStr: string, users: UserData[]) {
   if (ownerStr === "") return "(none)";
   const userIds = ownerStr.split("_").map((s) => parseInt(s, 10));
   if (userIds.length > 5) {

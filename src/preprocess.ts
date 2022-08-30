@@ -6,10 +6,12 @@ import moment, { unitOfTime } from "moment";
 import { nodeGitData, nodeLinesOfCode, nodeLocData } from "./nodeData";
 import {
   DirectoryNode,
+  GitUser,
   isDirectory,
   isFile,
   Tree,
   TreeNode,
+  UserData,
 } from "./polyglot_data.types";
 import { LanguagesMetadata, TreeStats } from "./viz.types";
 
@@ -207,4 +209,18 @@ export function gatherNodesByPath(data: Tree): Map<string, TreeNode> {
   const nodesByPath = new Map();
   addNodesByPath(nodesByPath, data.tree);
   return nodesByPath;
+}
+
+export function postprocessUsers(users: GitUser[] | undefined): UserData[] {
+  if (users === undefined) {
+    return [];
+  }
+  return users.map((user) => {
+    return {
+      id: user.id,
+      name: user.user.name,
+      email: user.user.email,
+      isAlias: false,
+    };
+  });
 }

@@ -1,0 +1,84 @@
+/* top level grid */
+
+.App-header {
+  grid-area: header;
+}
+.Messages {
+  grid-area: messages;
+}
+.Viz {
+  grid-area: main;
+}
+.Controller {
+  grid-area: controls;
+}
+.Inspector {
+  grid-area: inspect;
+}
+
+/* The goal is to have a 1024x1024 chart in the middle.
+  Plus 130px for the timescale.
+  If you have room, the inspect and control panels
+  will be left and right,
+  If not they will be below, on the left and right.
+  If you don't have 1024px then it'll be a single column,
+  scaled.
+
+  My laptop has 1920 pixels width, but with scrollbars seems to be 1776 available
+  removing 1024 for the graph gives 752 or 2x376 pixel panels.
+
+  Note padding on the bottom just so the main area isn't always bottom-aligned
+*/
+
+.App {
+  display: grid;
+  grid-template-areas:
+    "header header header"
+    "messages messages messages"
+    "controls main inspect"
+    "padding padding padding";
+  grid-template-columns: 376px 1024px 376px;
+  grid-template-rows:
+    auto
+    auto
+    1154px
+    auto;
+  min-height: 100vh;
+  justify-content: center;
+}
+
+/* pushes columns to left/right, graph still 1024x1154 */
+@media screen and (max-width: 1791px) {
+  .App {
+    grid-template-areas:
+      "header header header"
+      "messages messages messages"
+      "main main main"
+      "controls . inspect";
+    grid-template-columns: 376px 272px 376px;
+    grid-template-rows:
+      auto
+      auto
+      1154px
+      auto
+      auto;
+  }
+}
+
+@media screen and (max-width: 1024px) {
+  .App {
+    grid-template-areas:
+      "header"
+      "messages"
+      "main"
+      "controls"
+      "inspect";
+    grid-template-columns: 100%;
+    grid-template-rows:
+      auto
+      auto
+      auto
+      auto
+      auto;
+  }
+}

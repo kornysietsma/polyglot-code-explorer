@@ -1,6 +1,6 @@
 import { MutableRefObject } from "react";
 
-import { GitUser, Tree, TreeNode } from "./polyglot_data.types";
+import { Tree, TreeNode, UserData } from "./polyglot_data.types";
 import { TimescaleIntervalData } from "./preprocess";
 
 export type LanguagesMetadata = {
@@ -36,7 +36,7 @@ export type TreeStats = {
 export type VizMetadata = {
   languages: LanguagesMetadata;
   stats: TreeStats;
-  users?: GitUser[];
+  users: UserData[];
   nodesByPath: Map<string, TreeNode>;
   hierarchyNodesByPath?: Map<string, d3.HierarchyNode<TreeNode>>;
   timescaleData: TimescaleIntervalData[];

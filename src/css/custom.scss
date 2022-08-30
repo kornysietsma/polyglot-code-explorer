@@ -1,0 +1,67 @@
+/*
+Note I'm mostly using sass for the handy nesting of classes.
+
+I'm not using sass variables as css variables are actually more useful
+as they exist at runtime and can be read and manipulated in JavaScript.
+
+I also tried modules and per-component CSS, but frankly for a project this small
+it's easier to have all the styling in a small number of files using classes
+to keep things separate, old-school.  Modules are possibly useful for big
+projects with lots of teams, but not worth it here.
+*/
+
+@use "variables.scss";
+
+@use "main_areas.scss";
+
+@use "main_grid.scss";
+
+body {
+  font-family: "Helvetica Neue", "Helvetica", "Arial", sans-serif;
+  font-size: 1em;
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  line-height: 1.6;
+}
+
+.ModalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--color-modal-bg);
+}
+.ModalContent {
+  position: absolute;
+  top: 40px;
+  left: 40px;
+  right: 40px;
+  bottom: 40px;
+  border: 1px solid #ccc;
+  background-color: var(--color-bg);
+  overflow: auto;
+  border-radius: 4px;
+  outline: none;
+  padding: 20px;
+  -webkit-overflow-scrolling: touch;
+}
+
+table.sortable {
+  th {
+    cursor: pointer;
+  }
+
+  th:hover::after {
+    content: "\25bc";
+    color: red;
+  }
+
+  th.sortAscending::after {
+    content: "\25bc";
+  }
+
+  th.sortDescending::after {
+    content: "\25b2";
+  }
+}

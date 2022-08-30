@@ -8458,6 +8458,15 @@ sass@^1.32.13:
     immutable "^4.0.0"
     source-map-js ">=0.6.2 <2.0.0"
 
+sass@^1.54.6:
+  version "1.54.6"
+  resolved "https://registry.yarnpkg.com/sass/-/sass-1.54.6.tgz#5a12c268db26555c335028e355d6b7b1a5b9b4c8"
+  integrity sha512-DUqJjR2WxXBcZjRSZX5gCVyU+9fuC2qDfFzoKX9rV4rCOcec5mPtEafTcfsyL3YJuLONjWylBne+uXVh5rrmFw==
+  dependencies:
+    chokidar ">=3.0.0 <4.0.0"
+    immutable "^4.0.0"
+    source-map-js ">=0.6.2 <2.0.0"
+
 sax@^1.2.4, sax@~1.2.4:
   version "1.2.4"
   resolved "https://registry.yarnpkg.com/sax/-/sax-1.2.4.tgz#2816234e2378bddc4e5354fab5caa895df7100d9"

@@ -1,5 +1,3 @@
-import "./App.css";
-
 import { useReducer, useRef } from "react";
 
 import Controller from "./Controller";

@@ -160,7 +160,7 @@ const NodeInspector = ({
     if (!metadata.users) {
       return "(no user data)";
     }
-    const { user } = metadata.users[userId];
+    const user = metadata.users[userId];
     if (user.name) {
       if (user.email) {
         return `${user.name} / ${user.email}`;

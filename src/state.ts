@@ -7,6 +7,8 @@ import { isDirectory, isFile, TreeNode } from "./polyglot_data.types";
 import { isParentVisualization, Visualizations } from "./VisualizationData";
 import { VizDataRef } from "./viz.types";
 
+export type UserAliases = Map<number, number>;
+
 export type Config = {
   visualization: string; // could be fixed set
   subVis?: string;
@@ -89,6 +91,9 @@ export type Config = {
     threshold: number; // percentage of changes used for ownership
     linesNotCommits: boolean; // if true; threshold is on lines changed not commit counts
     topOwnerCount: number; // only store this many changers. Needs to be as big or bigger than available colours
+  };
+  userData: {
+    aliases: UserAliases;
   };
   colours: {
     currentTheme: "dark" | "light"; // also sets css on the body!
@@ -286,6 +291,9 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
         threshold: 90, // percentage of changes used for ownership
         linesNotCommits: false, // if true, threshold is on lines changed not commit counts
         topOwnerCount: 30, // only store this many changers. Needs to be as big or bigger than available colours
+      },
+      userData: {
+        aliases: new Map(),
       },
       colours: {
         currentTheme: "dark", // also sets css on the body!

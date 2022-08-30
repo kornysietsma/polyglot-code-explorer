@@ -12,7 +12,7 @@ import {
   LocData,
   TreeNode,
 } from "./polyglot_data.types";
-import { State } from "./state";
+import { State, UserAliases } from "./state";
 
 // TODO: inline me
 export function nodePath(node: TreeNode): string {
@@ -435,4 +435,101 @@ export function nodeLayoutData(node: TreeNode) {
 
 export function nodeCenter(node: TreeNode) {
   return nodeLayoutData(node)?.center;
+}
+
+type UserStatsAccumulator = {
+  commits: number;
+  lines: number;
+  days: Set<number>;
+  files: number;
+};
+export type UserStats = {
+  commits: number;
+  lines: number;
+  days: number;
+  files: number;
+};
+
+// accumulates all changes within a date range by user
+export function nodeChangers(
+  node: FileNode,
+  aliases: UserAliases,
+  earliest: number,
+  latest: number
+): Map<number, UserStatsAccumulator> | undefined {
+  const details = nodeChangeDetails(node, earliest, latest);
+  if (!details) return undefined;
+  const changerStats: Map<number, UserStatsAccumulator> = new Map();
+
+  details.forEach(
+    ({ users, commits, lines_added, lines_deleted, commit_day }) => {
+      users.forEach((user) => {
+        const realUser = aliases.get(user) ?? user;
+        let myStats = changerStats.get(realUser);
+        if (!myStats) {
+          myStats = { commits: 0, lines: 0, days: new Set(), files: 1 };
+        }
+        myStats.commits += commits;
+        myStats.lines += lines_added + lines_deleted;
+        myStats.days.add(commit_day);
+        changerStats.set(realUser, myStats);
+      });
+    }
+  );
+
+  return changerStats;
+}
+
+export function addUserStats(
+  userStats: Map<number, UserStatsAccumulator>,
+  node: TreeNode,
+  aliases: UserAliases,
+  earliest: number,
+  latest: number
+) {
+  if (isFile(node)) {
+    const changers = nodeChangers(node, aliases, earliest, latest);
+    if (changers) {
+      for (const [userId, { commits, lines, days }] of changers) {
+        const stats = userStats.get(userId);
+        if (stats === undefined) {
+          userStats.set(userId, {
+            commits,
+            lines,
+            days,
+            files: 1,
+          });
+        } else {
+          stats.commits += commits;
+          stats.lines += lines;
+          days.forEach(function (d) {
+            stats.days.add(d);
+          });
+          stats.files += 1;
+        }
+      }
+    }
+  }
+  if (isDirectory(node)) {
+    node.children.forEach((child) => {
+      addUserStats(userStats, child, aliases, earliest, latest);
+    });
+  }
+}
+
+export function aggregateUserStats(
+  node: TreeNode,
+  state: State
+): Map<number, UserStats> {
+  const { config } = state;
+  const { earliest, latest } = config.dateRange;
+  const { aliases } = config.userData;
+  const userStats: Map<number, UserStatsAccumulator> = new Map();
+  addUserStats(userStats, node, aliases, earliest, latest);
+  return new Map(
+    [...userStats].map(([userId, { commits, files, lines, days }]) => [
+      userId,
+      { commits, files, lines, days: days.size },
+    ])
+  );
 }

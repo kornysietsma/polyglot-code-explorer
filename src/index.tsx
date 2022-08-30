@@ -1,5 +1,5 @@
-import "./css/custom.css";
 import "./css/normalize.css";
+import "./css/custom.scss";
 
 import { createRoot } from "react-dom/client";
 import ReactModal from "react-modal";

@@ -137,7 +137,7 @@ const Controller = (props: DefaultProps) => {
       </p>
       <ToggleablePanel title="advanced settings" showInitially={false}>
         <div>
-          <UsersAndTeams></UsersAndTeams>
+          <UsersAndTeams dataRef={dataRef} state={state} dispatch={dispatch} />
           <label htmlFor={depthId}>
             Display maximum depth:
             <select

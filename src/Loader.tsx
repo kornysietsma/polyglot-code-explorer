@@ -9,6 +9,7 @@ import {
   gatherNodesByPath,
   gatherTimescaleData,
   linkParents,
+  postprocessUsers,
 } from "./preprocess";
 import { VizData, VizDataRefMaybe } from "./viz.types";
 
@@ -48,7 +49,7 @@ const useFetch = (
         console.log("building date scale data");
         const timescaleData = gatherTimescaleData(tree, "week");
         console.log("postprocessing complete");
-        const users = tree.metadata.git?.users;
+        const users = postprocessUsers(tree.metadata.git?.users);
         if (tree.metadata.coupling) {
           const bucketConfig = tree.metadata.coupling.buckets;
           stats.coupling = {
