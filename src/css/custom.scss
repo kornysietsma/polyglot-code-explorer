@@ -48,17 +48,20 @@ body {
 }
 
 table.sortable {
-  th {
+  th.sortable {
     cursor: pointer;
   }
 
-  th:hover::after {
+  th.sortable:hover::after {
     content: "\25bc";
     color: red;
   }
 
   th.sortAscending::after {
     content: "\25bc";
+  }
+  th.sortAscending:hover::after {
+    content: "\25b2";
   }
 
   th.sortDescending::after {

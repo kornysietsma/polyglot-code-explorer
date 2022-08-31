@@ -10,6 +10,7 @@ type UserAndStats = UserData & UserStats;
 type PageState = {
   users: UserAndStats[];
   usersSort: { key: string; ascending: boolean };
+  checkedUsers: Set<number>;
 };
 
 function sortUsers(
@@ -65,6 +66,7 @@ const UsersAndTeams = (props: DefaultProps) => {
   const [pageState, setPageState] = React.useState<PageState>({
     users: [],
     usersSort: { key: "files", ascending: true },
+    checkedUsers: new Set(),
   });
 
   const tree = dataRef.current.files.tree;
@@ -92,6 +94,7 @@ const UsersAndTeams = (props: DefaultProps) => {
     setPageState({
       users: usersWithStats,
       usersSort: { key: "files", ascending: true },
+      checkedUsers: new Set(),
     });
 
     setIsOpen(true);
@@ -115,10 +118,25 @@ const UsersAndTeams = (props: DefaultProps) => {
 
   const sortHeaderStyle = (key: string): string | undefined => {
     if (key == pageState.usersSort.key) {
-      return pageState.usersSort.ascending ? "sortAscending" : "sortDescending";
+      return pageState.usersSort.ascending
+        ? "sortable sortAscending"
+        : "sortable sortDescending";
     }
-    return undefined;
+    return "sortable unsorted";
   };
+
+  function handleUserCheck(event: React.ChangeEvent<HTMLInputElement>) {
+    const user = parseInt(event.target.value);
+    const checked = event.target.checked;
+    const checkedUsers = pageState.checkedUsers;
+
+    if (checked) {
+      checkedUsers.add(user);
+    } else {
+      checkedUsers.delete(user);
+    }
+    setPageState({ ...pageState, checkedUsers });
+  }
 
   return (
     <div>
@@ -141,6 +159,7 @@ const UsersAndTeams = (props: DefaultProps) => {
         <table className="sortable">
           <thead>
             <tr>
+              <th>select</th>
               <th
                 onClick={() => setSort("id")}
                 className={sortHeaderStyle("id")}
@@ -189,6 +208,14 @@ const UsersAndTeams = (props: DefaultProps) => {
             {pageState.users.map((user) => {
               return (
                 <tr key={user.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      value={user.id}
+                      onChange={handleUserCheck}
+                      checked={pageState.checkedUsers.has(user.id)}
+                    ></input>
+                  </td>
                   <td>{user.id}</td>
                   <td>{user.name}</td>
                   <td>{user.email}</td>
