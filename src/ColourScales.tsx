@@ -81,7 +81,7 @@ export function earlyLateScaleBuilder(
 ): DisplayScale<number, string, never> {
   const { config } = state;
   const { earlyColour, lateColour } = themedColours(config);
-  const { earliest, latest } = config.dateRange;
+  const { earliest, latest } = config.filters.dateRange;
 
   return d3
     .scaleLinear<string>()

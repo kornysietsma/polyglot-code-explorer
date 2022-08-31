@@ -8,6 +8,11 @@ import { isParentVisualization, Visualizations } from "./VisualizationData";
 import { VizDataRef } from "./viz.types";
 
 export type UserAliases = Map<number, number>;
+export type Team = {
+  users: number[];
+  colour: string;
+};
+export type Teams = Map<string, Team>;
 
 export type Config = {
   visualization: string; // could be fixed set
@@ -93,6 +98,7 @@ export type Config = {
     topOwnerCount: number; // only store this many changers. Needs to be as big or bigger than available colours
   };
   userData: {
+    teams: Teams;
     aliases: UserAliases;
   };
   colours: {
@@ -138,9 +144,12 @@ export type Config = {
       };
     };
   };
-  dateRange: {
-    earliest: number;
-    latest: number;
+  filters: {
+    dateRange: {
+      earliest: number;
+      latest: number;
+    };
+    teams?: Set<string>;
   };
   // TODO: selectedNode needs to be made serializable - probably as a path - used to be a node
   selectedNode?: string;
@@ -293,6 +302,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
         topOwnerCount: 30, // only store this many changers. Needs to be as big or bigger than available colours
       },
       userData: {
+        teams: new Map(),
         aliases: new Map(),
       },
       colours: {
@@ -338,9 +348,11 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
           },
         },
       },
-      dateRange: {
-        earliest,
-        latest,
+      filters: {
+        dateRange: {
+          earliest,
+          latest,
+        },
       },
       selectedNode: undefined,
     },
@@ -461,7 +473,7 @@ function addOwnersFromNode(
 function aggregateOwnerData(data: TreeNode, newState: State): OwnerData {
   // TODO - could this live in another module?
   const { threshold, linesNotCommits, topOwnerCount } = newState.config.owners;
-  const { earliest, latest } = newState.config.dateRange;
+  const { earliest, latest } = newState.config.filters.dateRange;
 
   const ownerMap: OwnerMap = new Map();
   addOwnersFromNode(
@@ -491,7 +503,10 @@ function postprocessState(
   if (
     newState.config.visualization === "owners" &&
     (oldState.config.visualization !== "owners" ||
-      !_.isEqual(oldState.config.dateRange, newState.config.dateRange) ||
+      !_.isEqual(
+        oldState.config.filters.dateRange,
+        newState.config.filters.dateRange
+      ) ||
       !_.isEqual(oldState.config.owners, newState.config.owners))
   ) {
     console.log("recalculating owner data on state change");
@@ -661,8 +676,8 @@ function updateStateFromAction(state: State, action: Action): State {
     case "setDateRange": {
       const [early, late] = action.payload;
       const result = _.cloneDeep(state);
-      result.config.dateRange.earliest = early;
-      result.config.dateRange.latest = late;
+      result.config.filters.dateRange.earliest = early;
+      result.config.filters.dateRange.latest = late;
       result.couplingConfig.dateRange.earliest = early;
       result.couplingConfig.dateRange.latest = late;
       return result;

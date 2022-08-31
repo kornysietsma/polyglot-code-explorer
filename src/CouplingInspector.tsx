@@ -17,7 +17,7 @@ const CouplingInspector = ({
   state: State;
   stats: CouplingStats;
 }) => {
-  const { earliest, latest } = state.config.dateRange;
+  const { earliest, latest } = state.config.filters.dateRange;
   const { couplingConfig } = state;
 
   const { couplingStart, couplingEnd } = couplingDateRange(

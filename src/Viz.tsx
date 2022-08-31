@@ -152,7 +152,7 @@ function normalizedCouplingNodes(rootNode: TreeNode, state: State) {
   const { config, couplingConfig } = state;
   const {
     dateRange: { earliest, latest },
-  } = config;
+  } = config.filters;
   return couplingConfig.shown === false
     ? []
     : nodeDescendants(rootNode)
@@ -416,11 +416,10 @@ function drawTimescale(
   dispatch: React.Dispatch<Action>
 ) {
   const { config } = state;
+  const { timescaleHeight } = config.layout;
   const {
     dateRange: { earliest, latest },
-    layout: { timescaleHeight },
-  } = config;
-
+  } = config.filters;
   const margin = { left: 5, right: 5, bottom: 20, top: 10 };
   const height = timescaleHeight - (margin.bottom + margin.top);
 

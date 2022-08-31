@@ -42,7 +42,7 @@ const CouplingController = (props: {
   const {
     coupling: { bucketSize },
   } = stats;
-  const { earliest, latest } = state.config.dateRange;
+  const { earliest, latest } = state.config.filters.dateRange;
 
   // TODO: debounce slider?  Tried using 'onInput' but 'onChange' fires on every change anyway
 

@@ -1,5 +1,3 @@
-import React from "react";
-
 import ColourKey from "./ColourKey";
 import { humanizeDate } from "./datetimes";
 import HelpPanel from "./HelpPanel";
@@ -17,9 +15,9 @@ const VisColourKey = ({
   state: State;
   metadata: VizMetadata;
 }) => {
-  const { config } = state;
-  const earliestDate = humanizeDate(config.dateRange.earliest);
-  const latestDate = humanizeDate(config.dateRange.latest);
+  const { earliest, latest } = state.config.filters.dateRange;
+  const earliestDate = humanizeDate(earliest);
+  const latestDate = humanizeDate(latest);
   const keyData = vis.buildVisualization(state, metadata).colourKey();
   return (
     <div>

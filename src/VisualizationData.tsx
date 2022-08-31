@@ -123,7 +123,7 @@ function overrideColourFunction(
   config: Config
 ): string | undefined {
   const { nonexistentColour, circlePackBackground } = themedColours(config);
-  const { latest } = config.dateRange;
+  const { latest } = config.filters.dateRange;
 
   if (node.data.layout.algorithm === "circlePack") return circlePackBackground;
   const creationDate = isFile(node.data) && nodeCreationDate(node.data);
@@ -256,7 +256,7 @@ class AgeVisualization extends BaseVisualization<number> {
     this.scale = goodBadUglyScale(state.config, state.config.age);
   }
   dataFn(d: HierarchyNode<FileNode>): number | undefined {
-    const { earliest, latest } = this.state.config.dateRange;
+    const { earliest, latest } = this.state.config.filters.dateRange;
     if (earliest && latest) {
       return nodeAge(d.data, earliest, latest);
     }
@@ -281,7 +281,7 @@ class CreationDateVisualization extends BaseVisualization<number> {
     this.scale = earlyLateScaleBuilder(state);
   }
   dataFn(d: HierarchyNode<FileNode>): number | undefined {
-    const { earliest, latest } = this.state.config.dateRange;
+    const { earliest, latest } = this.state.config.filters.dateRange;
     if (earliest && latest) {
       return nodeCreationDateClipped(d.data, earliest, latest);
     }
@@ -302,7 +302,7 @@ class NumberOfChangersVisualization extends BaseVisualization<number> {
     this.scale = numberOfChangersScale(state);
   }
   dataFn(d: HierarchyNode<FileNode>): number | undefined {
-    const { earliest, latest } = this.state.config.dateRange;
+    const { earliest, latest } = this.state.config.filters.dateRange;
     if (earliest && latest) {
       return nodeNumberOfChangers(d.data, earliest, latest);
     }
@@ -344,7 +344,7 @@ class ChurnVisualization extends BaseVisualization<number> {
     this.scale = goodBadUglyScale(state.config, state.config.churn[metric]);
   }
   dataFn(d: HierarchyNode<FileNode>): number | undefined {
-    const { earliest, latest } = this.state.config.dateRange;
+    const { earliest, latest } = this.state.config.filters.dateRange;
     switch (this.metric) {
       case "days":
         return nodeChurnDays(d.data, earliest, latest);

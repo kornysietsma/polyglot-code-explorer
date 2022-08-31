@@ -135,7 +135,7 @@ const NodeInspector = ({
   const locData = nodeLocData(node);
   const indentationData = nodeIndentationData(node);
   const gitUrl = findGitUrl(node, state.config.remoteUrlTemplate);
-  const { earliest, latest } = state.config.dateRange;
+  const { earliest, latest } = state.config.filters.dateRange;
   const { topChangersCount } = state.config.numberOfChangers;
   const { couplingAvailable } = state.couplingConfig;
 

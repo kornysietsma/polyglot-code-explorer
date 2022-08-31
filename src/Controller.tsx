@@ -20,7 +20,7 @@ const Controller = (props: DefaultProps) => {
   const { maxDepth } = metadata.stats;
   const { config } = state;
   const { currentTheme } = config.colours;
-  const { earliest, latest } = state.config.dateRange;
+  const { earliest, latest } = state.config.filters.dateRange;
   // updated ID logic: https://stackoverflow.com/questions/29420835/how-to-generate-unique-ids-for-form-labels-in-react/71681435#71681435
   const vizId = useId();
   const depthId = useId();

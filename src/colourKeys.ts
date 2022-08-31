@@ -53,9 +53,7 @@ export function creationKeyData(
   state: State
 ): [string, string][] {
   const { config } = state;
-  const {
-    dateRange: { earliest, latest },
-  } = config;
+  const { earliest, latest } = config.filters.dateRange;
   const dateRange = latest - earliest;
 
   const keyText = (value: number) => `${humanizeDate(value)}`;

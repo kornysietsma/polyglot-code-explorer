@@ -244,7 +244,7 @@ export function nodeOwners(
 
 export function nodeOwnersNamesOnly(node: FileNode, state: State) {
   const { config } = state;
-  const { earliest, latest } = config.dateRange;
+  const { earliest, latest } = config.filters.dateRange;
   const { threshold, linesNotCommits } = config.owners;
   const owners = nodeOwners(node, earliest, latest, threshold, linesNotCommits);
   return owners ? owners.users : undefined;
@@ -522,7 +522,7 @@ export function aggregateUserStats(
   state: State
 ): Map<number, UserStats> {
   const { config } = state;
-  const { earliest, latest } = config.dateRange;
+  const { earliest, latest } = config.filters.dateRange;
   const { aliases } = config.userData;
   const userStats: Map<number, UserStatsAccumulator> = new Map();
   addUserStats(userStats, node, aliases, earliest, latest);
