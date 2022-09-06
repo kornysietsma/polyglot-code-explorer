@@ -48,7 +48,7 @@ const CouplingInspector = ({
     );
     couplingDetails = <div />;
   } else {
-    const { sourceCount } = files[0];
+    const { sourceCount } = files[0]!;
     files.sort((f1, f2) => f2.targetCount - f1.targetCount);
     files = files.slice(0, 20);
     title = (

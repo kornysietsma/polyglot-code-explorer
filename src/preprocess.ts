@@ -71,7 +71,7 @@ export function countLanguagesIn(data: Tree): LanguagesMetadata {
     colour: string;
   }> = [];
   sortedMap.forEach(([key, val], index) => {
-    const colour = index < colours.length ? colours[index] : otherColour;
+    const colour = colours[index] ?? otherColour;
     languageMap.set(key, { ...val, colour });
     if (index < colours.length) {
       languageKey.push({ ...val, language: key, colour });
@@ -98,9 +98,12 @@ function gatherNodeStats(node: TreeNode, statsSoFar: TreeStats, depth: number) {
     if (gitData.creation_date) {
       days.push(gitData.creation_date);
     }
+    if (days.length == 0) {
+      throw new Error("No days in git data");
+    }
     days.sort();
-    const earliest = days[0];
-    const latest = days[days.length - 1];
+    const earliest = days[0]!;
+    const latest = days[days.length - 1]!;
     if (stats.earliestCommit === undefined || earliest < stats.earliestCommit) {
       stats.earliestCommit = earliest;
     }

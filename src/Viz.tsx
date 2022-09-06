@@ -499,7 +499,11 @@ function drawTimescale(
         const [startDate, endDate] = selection
           .map((x: number) => xScale.invert(x))
           .map(dateToUnix);
-        if (startDate !== earliest || endDate !== latest) {
+        if (
+          startDate !== undefined &&
+          endDate !== undefined &&
+          (startDate !== earliest || endDate !== latest)
+        ) {
           dispatch({ type: "setDateRange", payload: [startDate, endDate] });
         }
       }

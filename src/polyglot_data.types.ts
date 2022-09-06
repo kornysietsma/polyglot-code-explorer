@@ -73,6 +73,16 @@ export type UserData = {
   isAlias: boolean;
 };
 
+export function displayUser(user: UserData): string {
+  if (user.name && user.email) {
+    return `${user.name}<${user.email}>`;
+  } else if (user.name) {
+    return user.name;
+  } else if (user.email) {
+    return `<${user.email}>`;
+  } else throw new Error("Invalid username");
+}
+
 export type CouplingMetadata = {
   buckets: {
     bucket_size: number;

@@ -17,6 +17,7 @@
     "jsx": "react-jsx",
     "noImplicitAny": true,
     "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
     "plugins": [{ "name": "typescript-plugin-css-modules" }]
   },
   "include": ["src"]

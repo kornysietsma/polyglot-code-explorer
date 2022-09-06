@@ -30,7 +30,10 @@ export function couplingDateRange(
   latest: number
 ) {
   const buckets = bucketsSelected(couplingStats, earliest, latest);
-  const couplingStart = buckets[0].start;
-  const couplingEnd = buckets[buckets.length - 1].end;
+  if (buckets.length == 0) {
+    throw new Error("No buckets!");
+  }
+  const couplingStart = buckets[0]!.start;
+  const couplingEnd = buckets[buckets.length - 1]!.end;
   return { couplingStart, couplingEnd };
 }

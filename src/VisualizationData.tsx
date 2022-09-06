@@ -640,8 +640,11 @@ export const Visualizations: {
 
 export function getCurrentVis(config: Config) {
   const vis = Visualizations[config.visualization];
+  if (!vis) {
+    throw new Error("invalid visualization");
+  }
 
-  let selected = vis;
+  let selected: VisualizationData | ParentVisualizationData | undefined = vis;
   if (isParentVisualization(vis)) {
     if (config.subVis) {
       selected = vis.children[config.subVis];
@@ -651,8 +654,8 @@ export function getCurrentVis(config: Config) {
       selected = vis.children[vis.defaultChild];
     }
   }
-  if (isParentVisualization(selected)) {
-    throw new Error("Logic error - selected vis is a parent!");
+  if (selected == undefined || isParentVisualization(selected)) {
+    throw new Error("Logic error - selected vis is undefined or a parent!");
   } else {
     return selected;
   }

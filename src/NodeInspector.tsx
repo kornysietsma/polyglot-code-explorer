@@ -59,14 +59,14 @@ function findGitUrl(node: TreeNode, remoteUrlTemplate: string) {
     ? {
         // url style
         host: match.groups.host,
-        path: match.groups.path,
-        project: match.groups.project,
+        path: match.groups.path!,
+        project: match.groups.project!,
       }
     : {
         // ssh style
-        host: match.groups.host2,
-        path: match.groups.path2,
-        project: match.groups.project2,
+        host: match.groups.host2!,
+        path: match.groups.path2!,
+        project: match.groups.project2!,
       };
   const headRef = nodeRemoteHead(current) || "master";
 
@@ -161,6 +161,9 @@ const NodeInspector = ({
       return "(no user data)";
     }
     const user = metadata.users[userId];
+    if (user == undefined) {
+      throw new Error(`Invalid user ${userId}`);
+    }
     if (user.name) {
       if (user.email) {
         return `${user.name} / ${user.email}`;

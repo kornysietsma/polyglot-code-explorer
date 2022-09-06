@@ -110,7 +110,7 @@ function shortUserNames(ownerStr: string, users: UserData[]) {
   }
   return userIds
     .map((userId) => {
-      return users ? shortName(users[userId]) : `{userId}`;
+      return users ? shortName(users[userId]!) : `{userId}`;
     })
     .join(", ");
 }

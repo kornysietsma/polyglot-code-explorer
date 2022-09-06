@@ -83,3 +83,44 @@ REACT_APP_EXPLORER_DATA=big BROWSER=none yarn start
 For a discussion of how I use React and D3 together, take a look at [my blog post](https://blog.korny.info/2020/07/19/better-d3-with-react.html) and [demo code](https://github.com/kornysietsma/d3-react-demo)
 
 This was created using Create-React-App and hasn't been "ejected" yet so you can upgrade react versions and the like.  You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+
+## A note on typescript and eslint checks
+
+I found, after some digging, that Typescript by default doesn't check or warn you
+if you access an array with a possibly out-of-range index:
+
+```js
+function last(days: number[]): number {
+    return days.sort((a, b) => b - a)[0];
+}
+last([]); // undefined!
+```
+
+There's a lot of discussion [here](https://stackoverflow.com/questions/50647399/typescript-accessing-an-array-element-does-not-account-for-the-possibility-of-u)
+
+I have enabled the new-ish flag `noUncheckedIndexedAccess` (see tsconfig.json) so that this is checked.  But, sadly, typescript doesn't then like code like:
+
+```js
+ if (index < bigColourRange.length) {
+        team.colour = bigColourRange[index];
+```
+
+So, I'm using a lot of non-null-assertion `!` operators:
+
+```js
+ if (index < bigColourRange.length) {
+        team.colour = bigColourRange[index]!;
+```
+
+and I had to disable the `@typescript-eslint/no-non-null-assertion` check to avoid lots of eslint warnings.  I feel this is a valid place for the non-null assertion!
+
+In cases where I'm not confident that the index can never be out of range, I throw an error for clarity:
+
+```js
+    const colour = bigColourRange[index];
+    if (colour == undefined) {
+        throw new Error("Logic error: invalid colour index");
+    }
+```
+
+For me, this feels like a lesser evil - I'd prefer to be told "hey, this array access might be out of range, please confirm it's OK!" than not.  YMMV.

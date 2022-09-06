@@ -35,13 +35,20 @@ const Controller = (props: DefaultProps) => {
     ([, v1], [, v2]) => v2.displayOrder - v1.displayOrder
   );
   const currentParentVisData = Visualizations[state.config.visualization];
-  const currentVisOrSub: VisualizationData = isParentVisualization(
+  if (currentParentVisData == undefined) {
+    throw new Error("invalid visualization");
+  }
+  const currentVisOrSub: VisualizationData | undefined = isParentVisualization(
     currentParentVisData
   )
     ? currentParentVisData.children[
         state.config.subVis ?? currentParentVisData.defaultChild
       ]
     : currentParentVisData;
+
+  if (currentVisOrSub == undefined) {
+    throw new Error("invalid subvisualization");
+  }
 
   const sortedSubVis = isParentVisualization(currentParentVisData)
     ? Object.entries(currentParentVisData.children).sort(
@@ -280,14 +287,11 @@ const Controller = (props: DefaultProps) => {
                 })
               }
             >
-              {
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                sortedSubVis!.map(([key, vis]) => (
-                  <option key={key} value={key}>
-                    {vis.title}
-                  </option>
-                ))
-              }
+              {sortedSubVis!.map(([key, vis]) => (
+                <option key={key} value={key}>
+                  {vis.title}
+                </option>
+              ))}
             </select>
           </label>
         </div>

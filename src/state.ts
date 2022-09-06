@@ -9,7 +9,7 @@ import { VizDataRef } from "./viz.types";
 
 export type UserAliases = Map<number, number>;
 export type Team = {
-  users: number[];
+  users: Set<number>;
   colour: string;
 };
 export type Teams = Map<string, Team>;
@@ -175,9 +175,17 @@ export type ExpensiveConfig = {
   depth: number;
 };
 
+export type UserTeamData = {
+  teams: string[];
+  aliasedTo?: number;
+};
+
 export type CalculatedState = {
-  // this is mostly for state calculated in the postProcessState stage; based on data
+  // owner state, calculated in postprocessing
   ownerData: OwnerData;
+  // team lookup for each (aliased) user, calculated whenever teams or aliases change
+  // stored as an array as userids are sequential
+  userTeams: UserTeamData[];
 };
 
 export type Message = {
@@ -377,6 +385,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
     calculated: {
       // this is mostly for state calculated in the postProcessState stage, based on data
       ownerData: [],
+      userTeams: [],
     },
     messages: [],
   };
@@ -623,6 +632,9 @@ function updateStateFromAction(state: State, action: Action): State {
     case "setVisualization": {
       const visualization = action.payload;
       const visData = Visualizations[visualization];
+      if (visData == undefined) {
+        throw new Error("Logic error, invalid visualization");
+      }
       if (isParentVisualization(visData)) {
         const subVis = visData.defaultChild;
         return {

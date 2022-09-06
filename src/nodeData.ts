@@ -130,7 +130,7 @@ export function nodeLastCommitDay(
 ) {
   const details = nodeChangeDetails(node, earliest, latest);
   if (!details || details.length === 0) return undefined; // TODO: distinguish no history from undefined!
-  return details[details.length - 1].commit_day;
+  return details[details.length - 1]?.commit_day;
 }
 
 export function nodeAge(node: FileNode, earliest: number, latest: number) {
@@ -448,6 +448,7 @@ export type UserStats = {
   lines: number;
   days: number;
   files: number;
+  lastCommitDay?: number;
 };
 
 // accumulates all changes within a date range by user
@@ -479,6 +480,41 @@ export function nodeChangers(
 
   return changerStats;
 }
+
+// accumulates all changes within a date range by team
+// Note we can't just sum results of nodeChangers() because a single change by
+// multiple members of the same team would be added multiple times.
+/* TODO
+export function nodeChangersByTeam(
+  node: FileNode,
+  aliases: UserAliases,
+  teams: Teams,
+  earliest: number,
+  latest: number
+): Map<number, UserStatsAccumulator> | undefined {
+  const details = nodeChangeDetails(node, earliest, latest);
+  if (!details) return undefined;
+  const changerStats: Map<number, UserStatsAccumulator> = new Map();
+
+  details.forEach(
+    ({ users, commits, lines_added, lines_deleted, commit_day }) => {
+      users.forEach((user) => {
+        const realUser = aliases.get(user) ?? user;
+        let myStats = changerStats.get(realUser);
+        if (!myStats) {
+          myStats = { commits: 0, lines: 0, days: new Set(), files: 1 };
+        }
+        myStats.commits += commits;
+        myStats.lines += lines_added + lines_deleted;
+        myStats.days.add(commit_day);
+        changerStats.set(realUser, myStats);
+      });
+    }
+  );
+
+  return changerStats;
+}
+*/
 
 export function addUserStats(
   userStats: Map<number, UserStatsAccumulator>,
@@ -517,6 +553,10 @@ export function addUserStats(
   }
 }
 
+function lastDay(days: number[]): number | undefined {
+  return days.sort((a, b) => b - a)[0];
+}
+
 export function aggregateUserStats(
   node: TreeNode,
   state: State
@@ -529,7 +569,13 @@ export function aggregateUserStats(
   return new Map(
     [...userStats].map(([userId, { commits, files, lines, days }]) => [
       userId,
-      { commits, files, lines, days: days.size },
+      {
+        commits,
+        files,
+        lines,
+        days: days.size,
+        lastCommitDay: lastDay([...days]),
+      },
     ])
   );
 }
