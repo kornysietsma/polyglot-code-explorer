@@ -12,7 +12,7 @@ import {
   LocData,
   TreeNode,
 } from "./polyglot_data.types";
-import { State, UserAliases } from "./state";
+import { possiblyAlias, State, UserAliases } from "./state";
 
 // TODO: inline me
 export function nodePath(node: TreeNode): string {
@@ -141,6 +141,7 @@ export function nodeAge(node: FileNode, earliest: number, latest: number) {
 
 export function nodeTopChangers(
   node: FileNode,
+  aliases: UserAliases,
   earliest: number,
   latest: number,
   maxPeople: number
@@ -150,11 +151,12 @@ export function nodeTopChangers(
   const changerStats: Map<number, number> = new Map();
   details.forEach(({ users, commits }) => {
     users.forEach((user) => {
-      const prev = changerStats.get(user);
+      const realUser = possiblyAlias(aliases, user);
+      const prev = changerStats.get(realUser);
       if (!prev) {
-        changerStats.set(user, commits);
+        changerStats.set(realUser, commits);
       } else {
-        changerStats.set(user, prev + commits);
+        changerStats.set(realUser, prev + commits);
       }
     });
   });
@@ -195,69 +197,17 @@ export function nodeTopChangersByLines(
     .slice(0, maxPeople);
 }
 
-function setAsString<T>(set: Set<T>): string {
-  // only works for sets of sortable things, needed as stupid es6 maps are broken with non-primitive keys
-  return Array.from(set)
-    .sort()
-    .map((v) => `${v}`)
-    .join("_");
-}
-
-export type Owners = {
-  users: string;
-  value: number;
-  totalValue: number;
-};
-
-export function nodeOwners(
-  node: FileNode,
-  earliest: number,
-  latest: number,
-  threshold: number,
-  linesNotCommits: boolean
-): Owners | undefined {
-  const details = linesNotCommits
-    ? nodeTopChangersByLines(node, earliest, latest, 9999)
-    : nodeTopChangers(node, earliest, latest, 9999);
-
-  if (!details) return undefined;
-
-  if (details.length > 0) {
-    const totalValue = _.sumBy(details, ([, value]) => value);
-    // OK, want to say "we have total value, we want to aggregate users until we have over the threshold percentage of the total"
-    const thresholdValue = (threshold / 100.0) * totalValue;
-    const users: Set<number> = new Set();
-    let aggregatedValue = 0.0;
-    // eslint-disable-next-line no-restricted-syntax
-    for (const [user, value] of details) {
-      aggregatedValue += value;
-      users.add(user);
-      if (aggregatedValue > thresholdValue) {
-        break;
-      }
-    }
-
-    return { users: setAsString(users), value: aggregatedValue, totalValue };
-  }
-  return { users: "", value: 0, totalValue: 0 };
-}
-
-export function nodeOwnersNamesOnly(node: FileNode, state: State) {
-  const { config } = state;
-  const { earliest, latest } = config.filters.dateRange;
-  const { threshold, linesNotCommits } = config.owners;
-  const owners = nodeOwners(node, earliest, latest, threshold, linesNotCommits);
-  return owners ? owners.users : undefined;
-}
-
 export function nodeNumberOfChangers(
   node: FileNode,
+  aliases: UserAliases,
   earliest: number,
   latest: number
 ) {
   const details = nodeChangeDetails(node, earliest, latest);
   if (!details) return undefined;
-  const changers = _.uniq(details.flatMap((d) => d.users));
+  const changers = _.uniq(
+    details.flatMap((d) => d.users.map((u) => possiblyAlias(aliases, u)))
+  );
   return changers.length;
 }
 
@@ -465,7 +415,7 @@ export function nodeChangers(
   details.forEach(
     ({ users, commits, lines_added, lines_deleted, commit_day }) => {
       users.forEach((user) => {
-        const realUser = aliases.get(user) ?? user;
+        const realUser = possiblyAlias(aliases, user);
         let myStats = changerStats.get(realUser);
         if (!myStats) {
           myStats = { commits: 0, lines: 0, days: new Set(), files: 1 };
@@ -484,37 +434,7 @@ export function nodeChangers(
 // accumulates all changes within a date range by team
 // Note we can't just sum results of nodeChangers() because a single change by
 // multiple members of the same team would be added multiple times.
-/* TODO
-export function nodeChangersByTeam(
-  node: FileNode,
-  aliases: UserAliases,
-  teams: Teams,
-  earliest: number,
-  latest: number
-): Map<number, UserStatsAccumulator> | undefined {
-  const details = nodeChangeDetails(node, earliest, latest);
-  if (!details) return undefined;
-  const changerStats: Map<number, UserStatsAccumulator> = new Map();
-
-  details.forEach(
-    ({ users, commits, lines_added, lines_deleted, commit_day }) => {
-      users.forEach((user) => {
-        const realUser = aliases.get(user) ?? user;
-        let myStats = changerStats.get(realUser);
-        if (!myStats) {
-          myStats = { commits: 0, lines: 0, days: new Set(), files: 1 };
-        }
-        myStats.commits += commits;
-        myStats.lines += lines_added + lines_deleted;
-        myStats.days.add(commit_day);
-        changerStats.set(realUser, myStats);
-      });
-    }
-  );
-
-  return changerStats;
-}
-*/
+// export function nodeChangersByTeam(
 
 export function addUserStats(
   userStats: Map<number, UserStatsAccumulator>,

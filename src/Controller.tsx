@@ -27,8 +27,6 @@ const Controller = (props: DefaultProps) => {
   const subVizId = useId();
   const codeServerId = useId();
   const codeServerPrefixId = useId();
-  const ownersThresholdId = useId();
-  const ownersLinesNotCommitsId = useId();
   const remoteUrlTemplateId = useId();
 
   const sortedVis = Object.entries(Visualizations).sort(
@@ -60,55 +58,6 @@ const Controller = (props: DefaultProps) => {
     () => _.debounce((nextValue) => dispatch(nextValue), 250),
     [dispatch] // will be created only once
   );
-
-  // TODO: move owners stuff into a component (I'm trying to get this out in a rush!)
-  const ownersConfigPanel =
-    state.config.visualization === "owners" ? (
-      <div>
-        <p>Experimental feature - may be slow!</p>
-        <div>
-          <label htmlFor={ownersThresholdId}>
-            Threshold:&nbsp;
-            {config.owners.threshold}%
-            <input
-              id={ownersThresholdId}
-              type="range"
-              min="1"
-              max="100"
-              value={config.owners.threshold}
-              onChange={(evt) => {
-                const value = parseInt(evt.target.value, 10);
-                debouncedDispatch({
-                  type: "setOwnersTheshold",
-                  payload: value,
-                });
-              }}
-              step="1"
-            />
-          </label>
-        </div>
-        <div>
-          <label htmlFor={ownersLinesNotCommitsId}>
-            Order by:&nbsp;
-            <select
-              id={ownersLinesNotCommitsId}
-              value={config.owners.linesNotCommits.toString()}
-              onChange={(evt) =>
-                dispatch({
-                  type: "setOwnerLinesNotCommits",
-                  payload: evt.target.value === "true",
-                })
-              }
-            >
-              <option value="false">Commits</option>
-              <option value="true">Lines</option>
-            </select>
-          </label>
-        </div>
-      </div>
-    ) : (
-      ""
-    );
 
   const themeButton =
     currentTheme === "dark" ? (
@@ -298,7 +247,6 @@ const Controller = (props: DefaultProps) => {
       ) : (
         ""
       )}
-      {ownersConfigPanel}
       <VisColourKey vis={currentVisOrSub} state={state} metadata={metadata} />
       {themeButton}
     </aside>

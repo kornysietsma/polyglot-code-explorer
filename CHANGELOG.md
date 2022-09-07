@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Moved to Typescript, more recent versions of all dependencies
 - Changed data file formats to make them work better with typescript
+- added Teams and Aliases for users - many changes including new modal dialogs
+- removed code ownership entirely - it didn't work well, will replace with something more team oriented
+- moved styling to simpler non-component model, using css variables and some SASS for nested selectors
 
 ## [0.5.0] - 2021-04-03
 

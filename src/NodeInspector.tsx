@@ -20,7 +20,7 @@ import {
 import PathInspector from "./PathInspector";
 import { FileNode, isDirectory, TreeNode } from "./polyglot_data.types";
 import SourceCodeInspector from "./SourceCodeInspector";
-import { Action, State } from "./state";
+import { Action, getUserData, State } from "./state";
 import ToggleablePanel from "./ToggleablePanel";
 import { VizMetadata } from "./viz.types";
 
@@ -131,13 +131,14 @@ const NodeInspector = ({
   state: State;
   metadata: VizMetadata;
 }) => {
-  const { stats } = metadata;
+  const { stats, users } = metadata;
   const locData = nodeLocData(node);
   const indentationData = nodeIndentationData(node);
   const gitUrl = findGitUrl(node, state.config.remoteUrlTemplate);
   const { earliest, latest } = state.config.filters.dateRange;
   const { topChangersCount } = state.config.numberOfChangers;
   const { couplingAvailable } = state.couplingConfig;
+  const { aliases } = state.config.userData;
 
   const age = nodeAge(node, earliest, latest);
   const lastCommit = nodeLastCommitDay(node, earliest, latest);
@@ -154,13 +155,16 @@ const NodeInspector = ({
           lastCommit
         )} (${humanizeDays(age)})`
       : "";
-  const changerCount = nodeNumberOfChangers(node, earliest, latest);
-  const topChangers = nodeTopChangers(node, earliest, latest, topChangersCount);
+  const changerCount = nodeNumberOfChangers(node, aliases, earliest, latest);
+  const topChangers = nodeTopChangers(
+    node,
+    aliases,
+    earliest,
+    latest,
+    topChangersCount
+  );
   const userName = (userId: number) => {
-    if (!metadata.users) {
-      return "(no user data)";
-    }
-    const user = metadata.users[userId];
+    const user = getUserData(users, state, userId);
     if (user == undefined) {
       throw new Error(`Invalid user ${userId}`);
     }

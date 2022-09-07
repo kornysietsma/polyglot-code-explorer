@@ -1,7 +1,6 @@
 import * as d3 from "d3";
 
 import { humanizeDate } from "./datetimes";
-import { UserData } from "./polyglot_data.types";
 import { State, themedColours, themedErrorColour } from "./state";
 import { VizMetadata } from "./viz.types";
 
@@ -95,46 +94,5 @@ export function numberOfChangersKeyData(
   ) {
     key.push([`${Math.round(n)}`, scale(n) ?? errorColour]);
   }
-  return key;
-}
-
-function shortName(user: UserData) {
-  return user.name ?? user.email ?? "invalid_user";
-}
-
-function shortUserNames(ownerStr: string, users: UserData[]) {
-  if (ownerStr === "") return "(none)";
-  const userIds = ownerStr.split("_").map((s) => parseInt(s, 10));
-  if (userIds.length > 5) {
-    return `${userIds.length} different users`;
-  }
-  return userIds
-    .map((userId) => {
-      return users ? shortName(users[userId]!) : `{userId}`;
-    })
-    .join(", ");
-}
-
-export function ownersColourKeyData(
-  scale: (v: string) => string | undefined,
-  state: State,
-  metadata: VizMetadata
-) {
-  const { errorColour } = themedColours(state.config);
-  const { ownerData } = state.calculated;
-  const { users } = metadata;
-
-  // for now, just give owners - later it'd be nice to have counts as well?
-  const key: [string, string][] = [["No commits", scale("") ?? errorColour]];
-  const { ownerColours } = state.config.colours.light; // just using counts so theme isn't important
-  const { oneOwnerColours, moreOwnerColours, otherColour } = ownerColours;
-  const maxDifferentOwners = oneOwnerColours.length + moreOwnerColours.length;
-  ownerData.slice(0, maxDifferentOwners).forEach(([ownerStr]) => {
-    const label = shortUserNames(ownerStr, users);
-    key.push([label, scale(ownerStr) ?? errorColour]);
-  });
-
-  key.push(["other", otherColour]);
-
   return key;
 }

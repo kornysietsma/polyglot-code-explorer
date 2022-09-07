@@ -2,8 +2,7 @@ import * as d3 from "d3";
 import _ from "lodash";
 import moment from "moment";
 
-import { nodeOwners } from "./nodeData";
-import { isDirectory, isFile, TreeNode, UserData } from "./polyglot_data.types";
+import { UserData } from "./polyglot_data.types";
 import { isParentVisualization, Visualizations } from "./VisualizationData";
 import { VizDataRef } from "./viz.types";
 
@@ -92,12 +91,6 @@ export type Config = {
     precision: number;
     topChangersCount: number; // show this many changers in NodeInspector
   };
-  owners: {
-    // see also calculated.ownerData
-    threshold: number; // percentage of changes used for ownership
-    linesNotCommits: boolean; // if true; threshold is on lines changed not commit counts
-    topOwnerCount: number; // only store this many changers. Needs to be as big or bigger than available colours
-  };
   userData: {
     teams: Teams;
     aliases: UserAliases;
@@ -163,8 +156,26 @@ export type Config = {
   selectedNode?: string;
 };
 
-export function isAlias(state: State, user: number): boolean {
-  return user >= state.config.userData.firstAliasNumber;
+export function isAlias(state: State, userId: number): boolean {
+  return userId >= state.config.userData.firstAliasNumber;
+}
+
+export function possiblyAlias(aliases: UserAliases, userId: number): number {
+  return aliases.get(userId) ?? userId;
+}
+
+export function getUserData(
+  users: UserData[],
+  state: State,
+  userId: number
+): UserData {
+  const user = isAlias(state, userId)
+    ? state.config.userData.aliasData.get(userId)
+    : users[userId];
+  if (user == undefined) {
+    throw new Error(`Invalid user id #{userId}`);
+  }
+  return user;
 }
 
 export type CouplingConfig = {
@@ -193,8 +204,6 @@ export type UserTeamData = {
 };
 
 export type CalculatedState = {
-  // owner state, calculated in postprocessing
-  ownerData: OwnerData;
   // team lookup for each (aliased) user, calculated whenever teams or aliases change
   // stored as an array as userids are sequential
   userTeams: UserTeamData[];
@@ -316,12 +325,6 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
         precision: 0,
         topChangersCount: 5, // show this many changers in NodeInspector
       },
-      owners: {
-        // see also calculated.ownerData
-        threshold: 90, // percentage of changes used for ownership
-        linesNotCommits: false, // if true, threshold is on lines changed not commit counts
-        topOwnerCount: 30, // only store this many changers. Needs to be as big or bigger than available colours
-      },
       userData: {
         teams: new Map(),
         aliases: new Map(),
@@ -401,7 +404,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
     },
     calculated: {
       // this is mostly for state calculated in the postProcessState stage, based on data
-      ownerData: [],
+      // TODO: is this being calculated?
       userTeams: [],
     },
     messages: [],
@@ -423,127 +426,14 @@ export function themedErrorColour(config: Config) {
   return themedColours(config).errorColour;
 }
 
-type OwnerMap = Map<
-  string,
-  { value: number; totalValue: number; fileCount: number }
->;
-
-export type OwnerData = [
-  owners: string,
-  data: { value: number; totalValue: number; fileCount: number }
-][];
-
-function addOwnersFromNode(
-  ownerMap: OwnerMap,
-  node: TreeNode,
-  earliest: number,
-  latest: number,
-  threshold: number,
-  linesNotCommits: boolean
-) {
-  if (isFile(node)) {
-    const owners = nodeOwners(
-      node,
-      earliest,
-      latest,
-      threshold,
-      linesNotCommits
-    );
-    if (owners && owners.users !== "") {
-      const { users, value, totalValue } = owners;
-
-      // I want the scale to show:
-      // - user count and name summary
-      // - actual users as a hover
-      // - global percentage - so % of all commits/lines
-      // so per file, need to store total value, and value aggregated by this set of users.
-      // (each file only has a single set of users, enough to get over the threshold)
-      // So store this data - as:
-      // { users: Set(user ids) - this is the key
-      //   value: value contributed by these users
-      //   totalValue: total value by all users
-      //   file? No, not at this stage.
-      //   fileCount is probably useful.
-      // }
-      const oldData = ownerMap.get(users);
-      if (!oldData) {
-        ownerMap.set(users, {
-          value,
-          totalValue,
-          fileCount: 1,
-        });
-      } else {
-        ownerMap.set(users, {
-          value: value + oldData.value,
-          totalValue: totalValue + oldData.totalValue,
-          fileCount: oldData.fileCount + 1,
-        });
-      }
-    }
-  }
-  if (isDirectory(node)) {
-    // eslint-disable-next-line no-restricted-syntax
-    for (const child of node.children) {
-      addOwnersFromNode(
-        ownerMap,
-        child,
-        earliest,
-        latest,
-        threshold,
-        linesNotCommits
-      );
-    }
-  }
-}
-
-function aggregateOwnerData(data: TreeNode, newState: State): OwnerData {
-  // TODO - could this live in another module?
-  const { threshold, linesNotCommits, topOwnerCount } = newState.config.owners;
-  const { earliest, latest } = newState.config.filters.dateRange;
-
-  const ownerMap: OwnerMap = new Map();
-  addOwnersFromNode(
-    ownerMap,
-    data,
-    earliest,
-    latest,
-    threshold,
-    linesNotCommits
-  );
-
-  const topData = Array.from(ownerMap)
-    .sort(([, val1], [, val2]) => {
-      return val2.fileCount - val1.fileCount;
-    })
-    .slice(0, topOwnerCount);
-
-  return topData; // keep as an array of arrays not a map
-}
-
 // allows state changes that need to access data
 function postprocessState(
   dataRef: VizDataRef,
   oldState: State,
   newState: State
 ) {
-  if (
-    newState.config.visualization === "owners" &&
-    (oldState.config.visualization !== "owners" ||
-      !_.isEqual(
-        oldState.config.filters.dateRange,
-        newState.config.filters.dateRange
-      ) ||
-      !_.isEqual(oldState.config.owners, newState.config.owners))
-  ) {
-    console.log("recalculating owner data on state change");
-    const result = _.cloneDeep(newState);
-    result.calculated.ownerData = aggregateOwnerData(
-      dataRef.current.files.tree,
-      newState
-    );
-    console.log("recalculation complete");
-    return result;
-  }
+  // TODO: this does nothing once I ditched OwnerData
+  // should it go? Does it need to calculate teams??
   return newState;
 }
 
@@ -604,14 +494,6 @@ interface SetCodeServerPrefix {
   type: "setCodeServerPrefix";
   payload: string;
 }
-interface SetOwnersThreshold {
-  type: "setOwnersTheshold";
-  payload: number;
-}
-interface SetOwnerLinesNotCommits {
-  type: "setOwnerLinesNotCommits";
-  payload: boolean;
-}
 interface SetRemoteUrlTemplate {
   type: "setRemoteUrlTemplate";
   payload: string;
@@ -647,8 +529,6 @@ export type Action =
   | SetTheme
   | EnableCodeServer
   | SetCodeServerPrefix
-  | SetOwnersThreshold
-  | SetOwnerLinesNotCommits
   | SetRemoteUrlTemplate
   | AddMessage
   | ClearMessages
@@ -738,18 +618,6 @@ function updateStateFromAction(state: State, action: Action): State {
     case "setCodeServerPrefix": {
       const result = _.cloneDeep(state);
       result.config.codeInspector.prefix = action.payload;
-      return result;
-    }
-
-    case "setOwnersTheshold": {
-      const result = _.cloneDeep(state);
-      result.config.owners.threshold = action.payload;
-      return result;
-    }
-
-    case "setOwnerLinesNotCommits": {
-      const result = _.cloneDeep(state);
-      result.config.owners.linesNotCommits = action.payload;
       return result;
     }
 

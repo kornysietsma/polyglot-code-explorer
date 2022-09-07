@@ -6,13 +6,11 @@ import {
   depthKey,
   goodBadUglyColourKeyData,
   numberOfChangersKeyData,
-  ownersColourKeyData,
 } from "./colourKeys";
 import {
   earlyLateScaleBuilder,
   goodBadUglyScale,
   numberOfChangersScale,
-  ownersColourScaleBuilder,
 } from "./ColourScales";
 import {
   nodeAge,
@@ -26,7 +24,6 @@ import {
   nodeIndentation,
   nodeLanguage,
   nodeNumberOfChangers,
-  nodeOwnersNamesOnly,
 } from "./nodeData";
 import {
   DirectoryNode,
@@ -303,8 +300,9 @@ class NumberOfChangersVisualization extends BaseVisualization<number> {
   }
   dataFn(d: HierarchyNode<FileNode>): number | undefined {
     const { earliest, latest } = this.state.config.filters.dateRange;
+    const { aliases } = this.state.config.userData;
     if (earliest && latest) {
-      return nodeNumberOfChangers(d.data, earliest, latest);
+      return nodeNumberOfChangers(d.data, aliases, earliest, latest);
     }
     return undefined;
   }
@@ -313,23 +311,6 @@ class NumberOfChangersVisualization extends BaseVisualization<number> {
   }
   colourKey(): [string, string][] {
     return numberOfChangersKeyData(this.scale, this.state);
-  }
-}
-
-class OwnersVisualization extends BaseVisualization<string> {
-  scale: (v: string) => string | undefined;
-  constructor(state: State, metadata: VizMetadata) {
-    super(state, metadata);
-    this.scale = ownersColourScaleBuilder(state);
-  }
-  dataFn(d: HierarchyNode<FileNode>): string | undefined {
-    return nodeOwnersNamesOnly(d.data, this.state);
-  }
-  parentFn(): string | undefined {
-    return undefined;
-  }
-  colourKey(): [string, string][] {
-    return ownersColourKeyData(this.scale, this.state, this.metadata);
   }
 }
 
@@ -541,31 +522,9 @@ export const Visualizations: {
       return new NumberOfChangersVisualization(state, metadata);
     },
   },
-  owners: {
-    displayOrder: 7,
-    title: "File ownership",
-    help: (
-      <div>
-        <p>
-          Shows who &ldquo;owns&rdquo; files in selected date range, based on
-          threshold. So if 80% of all commits to a file are by Jane, Joe and
-          Siobhan, and the threshold is 80%, then the file is considered
-          &ldquo;owned&rdquo; by these three. This can be measured in terms of
-          commits, or lines changed (added + deleted)
-        </p>
-        <p>
-          Note currently there is no way to distinguish one user with multiple
-          logins from multiple people!
-        </p>
-      </div>
-    ),
-    buildVisualization(state, metadata) {
-      return new OwnersVisualization(state, metadata);
-    },
-  },
 
   churn: {
-    displayOrder: 8,
+    displayOrder: 7,
     title: "Churn",
     defaultChild: "days",
     children: {
