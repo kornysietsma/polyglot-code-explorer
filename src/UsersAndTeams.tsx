@@ -1,50 +1,64 @@
+import _ from "lodash";
 import React, { useId } from "react";
 import ReactModal from "react-modal";
 
 import { DefaultProps } from "./components.types";
+import DelayedInput from "./DelayedInput";
 import EditAlias from "./EditAlias";
+import HelpPanel from "./HelpPanel";
 import { aggregateUserStats, UserStats } from "./nodeData";
 import { displayUser, UserData } from "./polyglot_data.types";
-import { Team, Teams, themedColours, UserAliases } from "./state";
+import {
+  Team,
+  Teams,
+  themedColours,
+  UserAliasData,
+  UserAliases,
+} from "./state";
 import ToggleablePanel from "./ToggleablePanel";
 
-export type UserAndStats = UserData & UserStats & { outOfDate: boolean };
+export type UserAndStatsAndAliases = UserData &
+  UserStats & { isAlias: boolean; outOfDate: boolean };
 
 export type UsersAndTeamsPageState = {
-  users: UserAndStats[];
-  teams: Teams;
+  usersAndAliases: UserAndStatsAndAliases[];
   aliases: UserAliases;
+  teams: Teams;
+  hiddenTeams: Set<string>;
   usersSort: { key: string; ascending: boolean };
   checkedUsers: Set<number>;
   userFilter: string;
   showCheckedUsers: boolean;
 };
-const initialPageState: UsersAndTeamsPageState = {
-  users: [],
-  teams: new Map(),
-  aliases: new Map(),
-  usersSort: { key: "files", ascending: true },
-  checkedUsers: new Set(),
-  userFilter: "",
-  showCheckedUsers: false,
+const initialPageState: () => UsersAndTeamsPageState = () => {
+  return {
+    usersAndAliases: [],
+    teams: new Map(),
+    hiddenTeams: new Set(),
+    aliases: new Map(),
+    usersSort: { key: "files", ascending: true },
+    checkedUsers: new Set(),
+    userFilter: "",
+    showCheckedUsers: false,
+  };
 };
 
 function sortUsers(
-  users: UserAndStats[],
+  users: UserAndStatsAndAliases[],
   usersSort: { key: string; ascending: boolean }
-): UserAndStats[] {
+): UserAndStatsAndAliases[] {
   const { key } = usersSort;
   return [...users].sort((a, b) => {
     switch (key) {
       case "name": {
         const aName = a.name ?? "";
-        const bNAme = b.name ?? "";
+        const bName = b.name ?? "";
         return usersSort.ascending
-          ? aName.localeCompare(bNAme, "en", {
+          ? aName.localeCompare(bName, "en", {
               ignorePunctuation: true,
               sensitivity: "accent",
             })
-          : bNAme.localeCompare(aName, "en", {
+          : bName.localeCompare(aName, "en", {
               ignorePunctuation: true,
               sensitivity: "accent",
             });
@@ -75,14 +89,15 @@ function sortUsers(
 }
 
 const UsersAndTeams = (props: DefaultProps) => {
-  const { dataRef, state } = props;
+  const { dataRef, state, dispatch } = props;
 
   const { users } = dataRef.current.metadata;
 
-  const { userData } = state.config;
+  const { userData, filters } = state.config;
 
-  const [pageState, setPageState] =
-    React.useState<UsersAndTeamsPageState>(initialPageState);
+  const [pageState, setPageState] = React.useState<UsersAndTeamsPageState>(
+    initialPageState()
+  );
 
   const tree = dataRef.current.files.tree;
 
@@ -97,10 +112,10 @@ const UsersAndTeams = (props: DefaultProps) => {
     // Need to re-initialise local state from parent state every time we open the modal
     const userStats = aggregateUserStats(tree, state);
 
-    const usersWithStats: UserAndStats[] = users.map((user) => {
+    const usersWithStats: UserAndStatsAndAliases[] = users.map((user) => {
       const stats = userStats.get(user.id);
       if (stats) {
-        return { ...user, ...stats, outOfDate: false };
+        return { ...user, ...stats, outOfDate: false, isAlias: false };
       } else {
         return {
           ...user,
@@ -110,15 +125,35 @@ const UsersAndTeams = (props: DefaultProps) => {
           commits: 0,
           lastCommitDay: undefined,
           outOfDate: false,
+          isAlias: false,
         };
       }
     });
-
+    const aliasUserData: UserAndStatsAndAliases[] = [...userData.aliasData]
+      .sort(([aliasIdA], [aliasIdB]) => aliasIdA - aliasIdB)
+      .map(([aliasId, userData]) => {
+        const stats = userStats.get(aliasId);
+        if (stats) {
+          return { ...userData, ...stats, outOfDate: false, isAlias: true };
+        } else {
+          return {
+            ...userData,
+            files: 0,
+            lines: 0,
+            days: 0,
+            commits: 0,
+            lastCommitDay: undefined,
+            outOfDate: false,
+            isAlias: true,
+          };
+        }
+      });
     setPageState({
-      ...initialPageState,
-      users: usersWithStats,
-      teams: userData.teams,
+      ...initialPageState(),
+      usersAndAliases: [...usersWithStats, ...aliasUserData],
       aliases: userData.aliases,
+      teams: userData.teams,
+      hiddenTeams: filters.hiddenTeams,
     });
 
     setIsOpen(true);
@@ -128,6 +163,27 @@ const UsersAndTeams = (props: DefaultProps) => {
     setIsOpen(false);
   }
   function save() {
+    const aliasData: UserAliasData = new Map();
+    for (const user of pageState.usersAndAliases) {
+      if (user.isAlias) {
+        aliasData.set(user.id, {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+        });
+      }
+    }
+
+    dispatch({
+      type: "setUserTeamAliasData",
+      payload: {
+        teams: pageState.teams,
+        hiddenTeams: pageState.hiddenTeams,
+        aliases: pageState.aliases,
+        aliasData,
+        nextAliasNumber: pageState.usersAndAliases.length,
+      },
+    });
     setIsOpen(false);
   }
 
@@ -149,9 +205,7 @@ const UsersAndTeams = (props: DefaultProps) => {
     return "sortable unsorted";
   };
 
-  function handleUserCheck(event: React.ChangeEvent<HTMLInputElement>) {
-    const user = parseInt(event.target.value);
-    const checked = event.target.checked;
+  function handleUserCheck(user: number, checked: boolean) {
     const checkedUsers = pageState.checkedUsers;
 
     if (checked) {
@@ -162,11 +216,25 @@ const UsersAndTeams = (props: DefaultProps) => {
     setPageState({ ...pageState, checkedUsers });
   }
 
+  function handleTeamCheck(team: string, checked: boolean) {
+    const hiddenTeams = pageState.hiddenTeams;
+
+    if (checked) {
+      hiddenTeams.add(team);
+    } else {
+      hiddenTeams.delete(team);
+    }
+    setPageState({ ...pageState, hiddenTeams });
+  }
+
   const showCheckedUsersId = useId();
 
-  const userFilter: (user: UserAndStats) => boolean = (user) => {
+  const userFilter: (user: UserAndStatsAndAliases) => boolean = (user) => {
     if (pageState.aliases.has(user.id)) {
       return false; // don't show aliased users at all
+    }
+    if (pageState.checkedUsers.has(user.id)) {
+      return true; // always show checked users - too confusing otherwise!
     }
     if (pageState.showCheckedUsers && !pageState.checkedUsers.has(user.id)) {
       return false;
@@ -189,7 +257,9 @@ const UsersAndTeams = (props: DefaultProps) => {
   const newTeam = () => {
     let teamName =
       pageState.checkedUsers.size == 1
-        ? pageState.users[pageState.checkedUsers.values().next().value]?.name
+        ? pageState.usersAndAliases[
+            pageState.checkedUsers.values().next().value
+          ]?.name
         : undefined;
     if (!teamName) {
       teamName = `team ${pageState.teams.size + 1}`;
@@ -247,37 +317,110 @@ const UsersAndTeams = (props: DefaultProps) => {
   ];
 
   const reColourTeams = () => {
-    const sortedTeams = [...pageState.teams].sort(teamSort);
-
-    if (sortedTeams.length == 0) {
+    let visibleTeams = [...pageState.teams].filter(
+      ([name]) => !pageState.hiddenTeams.has(name)
+    );
+    if (visibleTeams.length == 0) {
       console.log("Can't recolour teams as none are shown");
       return;
     }
+    const hiddenTeams = [...pageState.teams].filter(([name]) =>
+      pageState.hiddenTeams.has(name)
+    );
+    visibleTeams = _.shuffle(visibleTeams);
+
     // note any colours outside the big colour range will be white!  Remap those yourself...
     const { neutralColour } = themedColours(state.config);
 
-    sortedTeams.forEach(([, team], index) => {
+    visibleTeams.forEach(([, team], index) => {
       if (index < bigColourRange.length) {
         team.colour = bigColourRange[index]!;
       } else {
         team.colour = neutralColour;
       }
     });
-    setPageState({ ...pageState, teams: new Map(sortedTeams) });
+    setPageState({
+      ...pageState,
+      teams: new Map([...visibleTeams, ...hiddenTeams]),
+    });
   };
 
   function changeTeamColour(name: string, value: string) {
-    const teams = pageState.teams;
+    const teams = _.cloneDeep(pageState.teams);
     const team = teams.get(name);
     if (team) team.colour = value;
     setPageState({ ...pageState, teams });
   }
 
+  function validTeamChange(
+    oldName: string,
+    newName: string
+  ): string | undefined {
+    if (oldName == newName) return undefined;
+    if (newName.trim() == "") return "cannot be blank";
+    if (pageState.teams.has(newName)) return "name already in use";
+    return undefined;
+  }
+
+  function renameTeam(oldName: string, newName: string) {
+    if (validTeamChange(oldName, newName) !== undefined) {
+      throw new Error("logic error - invalid team name change");
+    }
+    const oldTeam = pageState.teams.get(oldName);
+    if (oldTeam == undefined) {
+      throw new Error("Logic error - invalid old team");
+    }
+    const { teams, hiddenTeams } = pageState;
+    teams.set(newName, oldTeam);
+    teams.delete(oldName);
+    if (hiddenTeams.has(oldName)) {
+      hiddenTeams.delete(oldName);
+      hiddenTeams.add(newName);
+    }
+    setPageState({ ...pageState, teams, hiddenTeams });
+  }
+
+  function selectTeamMembers(team: string) {
+    const users = pageState.teams.get(team)?.users;
+    if (users == undefined) {
+      throw new Error("logic error - invalid team name");
+    }
+    setPageState({ ...pageState, checkedUsers: new Set(users) });
+  }
+
+  function addUsersToTeam(teamName: string) {
+    const teams = _.cloneDeep(pageState.teams);
+    const team = teams.get(teamName);
+    if (team == undefined) {
+      throw new Error("logic error - invalid team name");
+    }
+    for (const user of pageState.checkedUsers) {
+      team.users.add(user);
+    }
+    setPageState({ ...pageState, teams });
+  }
+
+  function removeUsersFromTeam(teamName: string) {
+    const teams = _.cloneDeep(pageState.teams);
+    const team = teams.get(teamName);
+    if (team == undefined) {
+      throw new Error("logic error - invalid team name");
+    }
+    for (const user of pageState.checkedUsers) {
+      team.users.delete(user);
+    }
+    setPageState({ ...pageState, teams });
+  }
+
   const checkedAliasUsers = modalIsOpen
-    ? [...pageState.checkedUsers].filter((u) => pageState.users[u]!.isAlias)
+    ? [...pageState.checkedUsers].filter(
+        (u) => pageState.usersAndAliases[u]!.isAlias
+      )
     : [];
   const checkedNormalUsers = modalIsOpen
-    ? [...pageState.checkedUsers].filter((u) => !pageState.users[u]!.isAlias)
+    ? [...pageState.checkedUsers].filter(
+        (u) => !pageState.usersAndAliases[u]!.isAlias
+      )
     : [];
 
   const editAlias = (userid: number) => () => {
@@ -305,9 +448,77 @@ const UsersAndTeams = (props: DefaultProps) => {
         <div className="buttonList">
           <button onClick={save}>save and close</button>
           <button onClick={cancel}>cancel</button>
-          <p>Users and Teams</p>
         </div>
         <h3>Users and Teams</h3>
+        <HelpPanel>
+          <strong>
+            Note - changes won&apos;t be saved until you choose &ldquo;Save and
+            close&rdquo; at the top!
+          </strong>
+          <h4>Users</h4>
+          <p>
+            Select users on the lower panel to show actions for aliasing and
+            creating teams.
+          </p>
+          <p>
+            You can click on the column headings to sort the table. You can also
+            filter the user list by name and email with the filter field, and
+            you can choose to only show selected users with the checkbox.
+          </p>
+          <h4>Aliases</h4>
+          <p>
+            Aliases allow you to merge duplicate users e.g. with multiple email
+            addresses. An alias is just like a user, with a name and optional
+            email address.
+          </p>
+          <p>You can:</p>
+          <ul>
+            <li>
+              Create an alias by selecting one or more users and pressing the
+              create button
+            </li>
+            <li>
+              Add users to an alias by selecting an alias and one or more users
+            </li>
+            <li>Edit an alias (edit button on the right)</li>
+          </ul>
+          <p>(there is currently no way to delete an alias)</p>
+          <h4>Teams</h4>
+          <p>
+            Teams allow you to group users, give them colours, and use the teams
+            in other parts of the system
+          </p>
+          <p>You can:</p>
+          <ul>
+            <li>
+              Create a team by selecting users in the user list, then pressing
+              the create new team button.
+            </li>
+            <li>
+              Add or remove users from a team by selecting users then pressing
+              the appropriate button
+            </li>
+            <li>
+              Change the colour shown for a team by clicking the colour button
+            </li>
+            <li>
+              Hide a team by checking the &ldquo;hidden&rdquo; button - this
+              acts as a filter in the rest of the system, that team will no
+              longer be visible
+            </li>
+            <li>
+              Rename a team by typing in the team name field - you need to click
+              the ✓ to apply the change. If the change is invalid the ✓ will be
+              greyed out - hover over the button for the reason.
+            </li>
+            <li>
+              Auto-colour teams - the auto-colour button assigns a set of up to
+              20 colours that should be reasonably distinct to teams in a random
+              order. Only shown teams are coloured this way!
+            </li>
+          </ul>
+          <p></p>
+        </HelpPanel>
         <ToggleablePanel
           title="Teams"
           showInitially={true}
@@ -323,7 +534,9 @@ const UsersAndTeams = (props: DefaultProps) => {
             <thead>
               <tr>
                 <th>Name</th>
+                <th>Hidden</th>
                 <th>Colour</th>
+                <th>Actions</th>
                 <th>Users</th>
               </tr>
             </thead>
@@ -331,9 +544,28 @@ const UsersAndTeams = (props: DefaultProps) => {
               {[...pageState.teams].sort(teamSort).map(([name, teamData]) => {
                 return (
                   <tr key={name}>
-                    <td>{name}</td>
                     <td>
                       {" "}
+                      <DelayedInput
+                        value={name}
+                        onChange={renameTeam}
+                        validate={validTeamChange}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        value={name}
+                        onChange={(event) =>
+                          handleTeamCheck(
+                            event.target.value,
+                            event.target.checked
+                          )
+                        }
+                        checked={pageState.hiddenTeams.has(name)}
+                      ></input>
+                    </td>
+                    <td>
                       <input
                         type="color"
                         name="dot colour"
@@ -344,9 +576,36 @@ const UsersAndTeams = (props: DefaultProps) => {
                       />
                     </td>
                     <td>
+                      <button
+                        onClick={() => {
+                          selectTeamMembers(name);
+                        }}
+                      >
+                        select
+                      </button>
+                      {pageState.checkedUsers.size > 0 ? (
+                        <button
+                          onClick={() => {
+                            addUsersToTeam(name);
+                          }}
+                        >
+                          add users
+                        </button>
+                      ) : null}
+                      {pageState.checkedUsers.size > 0 ? (
+                        <button
+                          onClick={() => {
+                            removeUsersFromTeam(name);
+                          }}
+                        >
+                          remove users
+                        </button>
+                      ) : null}
+                    </td>
+                    <td>
                       {[...teamData.users]
                         .map((u) => {
-                          const user = pageState.users[u];
+                          const user = pageState.usersAndAliases[u];
                           if (!user) {
                             throw new Error("invalid user!");
                           }
@@ -400,7 +659,7 @@ const UsersAndTeams = (props: DefaultProps) => {
             />
             <button onClick={() => setUserFilter("")}>&#x1f5d1;</button>
             <label htmlFor={showCheckedUsersId}>
-              only checked:
+              only show selected users:
               <input
                 type="checkbox"
                 id={showCheckedUsersId}
@@ -465,7 +724,7 @@ const UsersAndTeams = (props: DefaultProps) => {
               </tr>
             </thead>
             <tbody>
-              {sortUsers(pageState.users, pageState.usersSort)
+              {sortUsers(pageState.usersAndAliases, pageState.usersSort)
                 .filter(userFilter)
                 .map((user) => {
                   const aliased = pageState.aliases.has(user.id);
@@ -476,7 +735,12 @@ const UsersAndTeams = (props: DefaultProps) => {
                         <input
                           type="checkbox"
                           value={user.id}
-                          onChange={handleUserCheck}
+                          onChange={(event) =>
+                            handleUserCheck(
+                              parseInt(event.target.value),
+                              event.target.checked
+                            )
+                          }
                           checked={pageState.checkedUsers.has(user.id)}
                         ></input>
                       </td>

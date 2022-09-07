@@ -3,7 +3,10 @@ import { Dispatch, SetStateAction, useId, useState } from "react";
 import ReactModal from "react-modal";
 
 import { Teams } from "./state";
-import { UserAndStats, UsersAndTeamsPageState } from "./UsersAndTeams";
+import {
+  UserAndStatsAndAliases,
+  UsersAndTeamsPageState,
+} from "./UsersAndTeams";
 
 type Props = {
   aliasBeingEdited: number | undefined;
@@ -39,9 +42,9 @@ const EditAlias = (props: Props) => {
   const aliasNameId = useId();
   const aliasEmailId = useId();
 
-  const shownUsers = modalIsOpen
-    ? [
-        ...parentState.users
+  const shownUsers: Set<number> = modalIsOpen
+    ? new Set([
+        ...parentState.usersAndAliases
           .filter((user) => {
             const aliasedTo = parentState.aliases.get(user.id);
             if (user.isAlias) {
@@ -60,8 +63,8 @@ const EditAlias = (props: Props) => {
           })
           .map((u) => u.id)
           .sort(),
-      ]
-    : [];
+      ])
+    : new Set();
 
   function validate(state: PageState) {
     const formErrors: string[] = [];
@@ -81,11 +84,13 @@ const EditAlias = (props: Props) => {
     // Need to re-initialise local state from parent state every time we open the modal
     const newPageState = { ...pageState };
     if (aliasBeingEdited !== undefined) {
-      newPageState.aliasName = parentState.users[aliasBeingEdited]!.name ?? "";
+      newPageState.aliasName =
+        parentState.usersAndAliases[aliasBeingEdited]!.name ?? "";
       newPageState.aliasEmail =
-        parentState.users[aliasBeingEdited]!.email ?? "";
+        parentState.usersAndAliases[aliasBeingEdited]!.email ?? "";
     } else {
-      const latest = parentState.users[latestUser(shownUsers)];
+      // new alias
+      const latest = parentState.usersAndAliases[latestUser(shownUsers)];
       if (latest != undefined) {
         newPageState.aliasName = latest.name ?? "";
         newPageState.aliasEmail = latest.email ?? "";
@@ -170,26 +175,28 @@ const EditAlias = (props: Props) => {
     const newParentState = _.cloneDeep(parentState);
     if (aliasBeingEdited !== undefined) {
       // update
-      const aliasUser = parentState.users[aliasBeingEdited];
+      const aliasUser = newParentState.usersAndAliases[aliasBeingEdited];
       if (aliasUser == undefined) {
         throw new Error("Logic error: Editing undefined user");
       }
       aliasUser.outOfDate = true;
       aliasUser.name = pageState.aliasName;
       aliasUser.email = pageState.aliasEmail;
-      newParentState.users.forEach((user, userId) => {
-        if (!user.isAlias) {
-          if (pageState.selectedUsers.has(userId)) {
-            addAlias(newParentState, aliasBeingEdited, userId);
-          } else {
-            removeAlias(newParentState, aliasBeingEdited, userId);
+      newParentState.usersAndAliases.forEach((user, userId) => {
+        if (shownUsers.has(userId)) {
+          if (!user.isAlias) {
+            if (pageState.selectedUsers.has(userId)) {
+              addAlias(newParentState, aliasBeingEdited, userId);
+            } else {
+              removeAlias(newParentState, aliasBeingEdited, userId);
+            }
           }
         }
       });
     } else {
       // create
-      const aliasUserId = parentState.users.length;
-      const aliasUser: UserAndStats = {
+      const aliasUserId = parentState.usersAndAliases.length;
+      const aliasUser: UserAndStatsAndAliases = {
         id: aliasUserId,
         name: pageState.aliasName,
         email: pageState.aliasEmail,
@@ -201,13 +208,15 @@ const EditAlias = (props: Props) => {
         lastCommitDay: undefined,
         outOfDate: true,
       };
-      newParentState.users.push(aliasUser);
-      newParentState.users.forEach((user, userId) => {
-        if (!user.isAlias) {
-          if (pageState.selectedUsers.has(userId)) {
-            addAlias(newParentState, aliasUserId, userId);
-          } else {
-            removeAlias(newParentState, aliasUserId, userId);
+      newParentState.usersAndAliases.push(aliasUser);
+      newParentState.usersAndAliases.forEach((user, userId) => {
+        if (shownUsers.has(userId)) {
+          if (!user.isAlias) {
+            if (pageState.selectedUsers.has(userId)) {
+              addAlias(newParentState, aliasUserId, userId);
+            } else {
+              removeAlias(newParentState, aliasUserId, userId);
+            }
           }
         }
       });
@@ -216,15 +225,15 @@ const EditAlias = (props: Props) => {
     setIsOpen(false);
   }
 
-  function latestUser(users: number[]): number {
-    if (users.length == 0) {
+  function latestUser(users: Set<number>): number {
+    if (users.size == 0) {
       throw new Error("Logic error: no users supplied");
     }
 
     const sortedUsers = [...users].sort(
       (a, b) =>
-        (parentState.users[b]!.lastCommitDay ?? 0) -
-        (parentState.users[a]!.lastCommitDay ?? 0)
+        (parentState.usersAndAliases[b]!.lastCommitDay ?? 0) -
+        (parentState.usersAndAliases[a]!.lastCommitDay ?? 0)
     );
     return sortedUsers[0]!;
   }
@@ -317,8 +326,8 @@ const EditAlias = (props: Props) => {
           </tr>
         </thead>
         <tbody>
-          {shownUsers.map((userId) => {
-            const user = parentState.users[userId]!;
+          {[...shownUsers].sort().map((userId) => {
+            const user = parentState.usersAndAliases[userId]!;
 
             return (
               <tr key={user.id}>

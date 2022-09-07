@@ -3,11 +3,12 @@ import _ from "lodash";
 import moment from "moment";
 
 import { nodeOwners } from "./nodeData";
-import { isDirectory, isFile, TreeNode } from "./polyglot_data.types";
+import { isDirectory, isFile, TreeNode, UserData } from "./polyglot_data.types";
 import { isParentVisualization, Visualizations } from "./VisualizationData";
 import { VizDataRef } from "./viz.types";
 
 export type UserAliases = Map<number, number>;
+export type UserAliasData = Map<number, UserData>;
 export type Team = {
   users: Set<number>;
   colour: string;
@@ -100,6 +101,13 @@ export type Config = {
   userData: {
     teams: Teams;
     aliases: UserAliases;
+    // alias users can't live in the main user list as that isn't in the state!
+    // however to keep user IDs simple sequential numbers, aliases are still keyed by a number
+    // starting with the first number greater than the user count.
+    firstAliasNumber: number;
+    // next available alias number - this could be calculated? it is users.length + aliasData.size
+    nextAliasNumber: number;
+    aliasData: UserAliasData;
   };
   colours: {
     currentTheme: "dark" | "light"; // also sets css on the body!
@@ -149,11 +157,15 @@ export type Config = {
       earliest: number;
       latest: number;
     };
-    teams?: Set<string>;
+    hiddenTeams: Set<string>;
   };
   // TODO: selectedNode needs to be made serializable - probably as a path - used to be a node
   selectedNode?: string;
 };
+
+export function isAlias(state: State, user: number): boolean {
+  return user >= state.config.userData.firstAliasNumber;
+}
 
 export type CouplingConfig = {
   couplingAvailable: boolean;
@@ -206,6 +218,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
   const {
     metadata: {
       stats: { maxDepth, earliestCommit, latestCommit, coupling },
+      users,
     },
     files,
   } = initialDataRef.current;
@@ -312,6 +325,9 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
       userData: {
         teams: new Map(),
         aliases: new Map(),
+        firstAliasNumber: users.length,
+        nextAliasNumber: users.length,
+        aliasData: new Map(),
       },
       colours: {
         currentTheme: "dark", // also sets css on the body!
@@ -361,6 +377,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
           earliest,
           latest,
         },
+        hiddenTeams: new Set(),
       },
       selectedNode: undefined,
     },
@@ -606,6 +623,16 @@ interface AddMessage {
 interface ClearMessages {
   type: "clearMessages";
 }
+interface SetUserTeamAliasData {
+  type: "setUserTeamAliasData";
+  payload: {
+    teams: Teams;
+    hiddenTeams: Set<string>;
+    aliases: UserAliases;
+    aliasData: UserAliasData;
+    nextAliasNumber: number;
+  };
+}
 
 export type Action =
   | SetVisualization
@@ -624,7 +651,8 @@ export type Action =
   | SetOwnerLinesNotCommits
   | SetRemoteUrlTemplate
   | AddMessage
-  | ClearMessages;
+  | ClearMessages
+  | SetUserTeamAliasData;
 
 function updateStateFromAction(state: State, action: Action): State {
   const { expensiveConfig, couplingConfig, config } = state;
@@ -741,6 +769,16 @@ function updateStateFromAction(state: State, action: Action): State {
 
     case "clearMessages": {
       return { ...state, messages: [] };
+    }
+
+    case "setUserTeamAliasData": {
+      const result = _.cloneDeep(state);
+      result.config.userData.teams = action.payload.teams;
+      result.config.filters.hiddenTeams = action.payload.hiddenTeams;
+      result.config.userData.aliases = action.payload.aliases;
+      result.config.userData.aliasData = action.payload.aliasData;
+      result.config.userData.nextAliasNumber = action.payload.nextAliasNumber;
+      return result;
     }
 
     default: {

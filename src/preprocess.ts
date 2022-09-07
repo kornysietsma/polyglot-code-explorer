@@ -223,7 +223,6 @@ export function postprocessUsers(users: GitUser[] | undefined): UserData[] {
       id: user.id,
       name: user.user.name,
       email: user.user.email,
-      isAlias: false,
     };
   });
 }

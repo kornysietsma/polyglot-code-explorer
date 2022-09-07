@@ -69,8 +69,6 @@ export type UserData = {
   id: number;
   name?: string;
   email?: string;
-  // pseudo users are added to the main list for when we alias users together
-  isAlias: boolean;
 };
 
 export function displayUser(user: UserData): string {
