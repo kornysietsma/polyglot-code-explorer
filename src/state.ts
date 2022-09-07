@@ -94,12 +94,7 @@ export type Config = {
   userData: {
     teams: Teams;
     aliases: UserAliases;
-    // alias users can't live in the main user list as that isn't in the state!
-    // however to keep user IDs simple sequential numbers, aliases are still keyed by a number
-    // starting with the first number greater than the user count.
-    firstAliasNumber: number;
-    // next available alias number - this could be calculated? it is users.length + aliasData.size
-    nextAliasNumber: number;
+    // alias keys are sequential numbers starting with the users length
     aliasData: UserAliasData;
   };
   colours: {
@@ -156,8 +151,8 @@ export type Config = {
   selectedNode?: string;
 };
 
-export function isAlias(state: State, userId: number): boolean {
-  return userId >= state.config.userData.firstAliasNumber;
+export function isAlias(users: UserData[], userId: number): boolean {
+  return userId >= users.length;
 }
 
 export function possiblyAlias(aliases: UserAliases, userId: number): number {
@@ -169,7 +164,7 @@ export function getUserData(
   state: State,
   userId: number
 ): UserData {
-  const user = isAlias(state, userId)
+  const user = isAlias(users, userId)
     ? state.config.userData.aliasData.get(userId)
     : users[userId];
   if (user == undefined) {
@@ -227,7 +222,6 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
   const {
     metadata: {
       stats: { maxDepth, earliestCommit, latestCommit, coupling },
-      users,
     },
     files,
   } = initialDataRef.current;
@@ -328,8 +322,6 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
       userData: {
         teams: new Map(),
         aliases: new Map(),
-        firstAliasNumber: users.length,
-        nextAliasNumber: users.length,
         aliasData: new Map(),
       },
       colours: {
@@ -512,7 +504,6 @@ interface SetUserTeamAliasData {
     hiddenTeams: Set<string>;
     aliases: UserAliases;
     aliasData: UserAliasData;
-    nextAliasNumber: number;
   };
 }
 
@@ -645,7 +636,6 @@ function updateStateFromAction(state: State, action: Action): State {
       result.config.filters.hiddenTeams = action.payload.hiddenTeams;
       result.config.userData.aliases = action.payload.aliases;
       result.config.userData.aliasData = action.payload.aliasData;
-      result.config.userData.nextAliasNumber = action.payload.nextAliasNumber;
       return result;
     }
 

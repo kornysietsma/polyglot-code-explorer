@@ -181,7 +181,6 @@ const UsersAndTeams = (props: DefaultProps) => {
         hiddenTeams: pageState.hiddenTeams,
         aliases: pageState.aliases,
         aliasData,
-        nextAliasNumber: pageState.usersAndAliases.length,
       },
     });
     setIsOpen(false);

@@ -30,7 +30,7 @@ const Controller = (props: DefaultProps) => {
   const remoteUrlTemplateId = useId();
 
   const sortedVis = Object.entries(Visualizations).sort(
-    ([, v1], [, v2]) => v2.displayOrder - v1.displayOrder
+    ([, v1], [, v2]) => v1.displayOrder - v2.displayOrder
   );
   const currentParentVisData = Visualizations[state.config.visualization];
   if (currentParentVisData == undefined) {
