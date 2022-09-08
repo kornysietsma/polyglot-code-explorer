@@ -198,7 +198,7 @@ export type State = {
   messages: Message[];
 };
 
-export function isAlias(users: UserData[], userId: number): boolean {
+function isAlias(users: UserData[], userId: number): boolean {
   return userId >= users.length;
 }
 

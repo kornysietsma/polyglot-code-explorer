@@ -60,6 +60,7 @@
     "eslint-plugin-simple-import-sort": "^7.0.0",
     "prettier": "^2.7.1",
     "react-scripts": "5.0.1",
+    "ts-unused-exports": "^8.0.0",
     "typescript-plugin-css-modules": "^3.4.0"
   }
 }

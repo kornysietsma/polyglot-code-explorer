@@ -147,7 +147,7 @@ export type VisualizationData = {
   buildVisualization: (state: State, metadata: VizMetadata) => Visualization;
 };
 
-export type ParentVisualizationData = {
+type ParentVisualizationData = {
   displayOrder: number;
   title: string;
   defaultChild: string;

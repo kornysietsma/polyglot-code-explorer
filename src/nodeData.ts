@@ -24,9 +24,6 @@ import {
 export function nodePath(node: TreeNode): string {
   return node.path;
 }
-export function nodeName(node: TreeNode): string {
-  return node.name;
-}
 
 function addDescendants(nodes: TreeNode[], node: TreeNode): void {
   nodes.push(node);
@@ -225,7 +222,7 @@ export function nodeChurnLines(
   return data.fractionalLines;
 }
 
-export function nodeCouplingData(node: FileNode) {
+function nodeCouplingData(node: FileNode) {
   return node.data.coupling;
 }
 
@@ -240,7 +237,7 @@ export type CouplingLink = {
   targetCount: number;
 };
 
-export function nodeCouplingFiles(
+function nodeCouplingFiles(
   node: TreeNode,
   earliest: number,
   latest: number
@@ -324,7 +321,7 @@ export function nodeCouplingFilesFiltered(
   });
 }
 
-export function nodeLayoutData(node: TreeNode) {
+function nodeLayoutData(node: TreeNode) {
   if (isDirectory(node)) {
     return undefined;
   }
@@ -335,7 +332,7 @@ export function nodeCenter(node: TreeNode) {
   return nodeLayoutData(node)?.center;
 }
 
-export type UserStatsAccumulator = {
+type UserStatsAccumulator = {
   commits: number;
   lines: number;
   days: Set<number>;
@@ -495,7 +492,7 @@ export function nodeTopTeam(
   return sortedTeamChangers(changers, metric)[0]![0];
 }
 
-export function addUserStats(
+function addUserStats(
   userStats: Map<number, UserStatsAccumulator>,
   node: TreeNode,
   aliases: UserAliases,

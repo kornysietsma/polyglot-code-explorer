@@ -48,7 +48,7 @@ export function goodBadUglyScale(
     .clamp(true);
 }
 
-export interface DisplayScale<Input, Output, Unknown> {
+interface DisplayScale<Input, Output, Unknown> {
   (value: Input): Output | Unknown;
 }
 
