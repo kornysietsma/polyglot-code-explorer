@@ -5,6 +5,7 @@ import ReactModal from "react-modal";
 import { DefaultProps } from "./components.types";
 import DelayedInput from "./DelayedInput";
 import EditAlias from "./EditAlias";
+import { ExportUser, FORMAT_VERSION, UserExportData } from "./exportImport";
 import HelpPanel from "./HelpPanel";
 import { aggregateUserStats, UserStats } from "./nodeData";
 import { displayUser, UserData } from "./polyglot_data.types";
@@ -29,6 +30,7 @@ export type UsersAndTeamsPageState = {
   checkedUsers: Set<number>;
   userFilter: string;
   showCheckedUsers: boolean;
+  importErrors: string[];
 };
 const initialPageState: () => UsersAndTeamsPageState = () => {
   return {
@@ -40,6 +42,7 @@ const initialPageState: () => UsersAndTeamsPageState = () => {
     checkedUsers: new Set(),
     userFilter: "",
     showCheckedUsers: false,
+    importErrors: [],
   };
 };
 
@@ -107,6 +110,8 @@ const UsersAndTeams = (props: DefaultProps) => {
   const [aliasBeingEdited, setAliasBeingEdited] = React.useState<
     number | undefined
   >(undefined);
+
+  const hiddenFileInput = React.useRef<HTMLInputElement>(null);
 
   function openModal() {
     // Need to re-initialise local state from parent state every time we open the modal
@@ -184,6 +189,143 @@ const UsersAndTeams = (props: DefaultProps) => {
       },
     });
     setIsOpen(false);
+  }
+
+  function toExportUser(userId: number): ExportUser {
+    const user = pageState.usersAndAliases[userId];
+    if (user == undefined) {
+      throw new Error(`Can't export user ${userId}`);
+    }
+    return { name: user.name, email: user.email };
+  }
+
+  function exportToJson() {
+    const exportData: UserExportData = {
+      version: FORMAT_VERSION,
+      aliasData: pageState.usersAndAliases
+        .filter((user) => user.isAlias)
+        .map((user) => {
+          return { name: user.name, email: user.email };
+        }),
+      aliases: [...pageState.aliases].map(([fromUser, toUser]) => [
+        toExportUser(fromUser),
+        toExportUser(toUser),
+      ]),
+      teams: [...pageState.teams].map(([teamName, team]) => {
+        const users = [...team.users].map(toExportUser);
+        return { name: teamName, users, colour: team.colour };
+      }),
+      hiddenTeams: [...pageState.hiddenTeams],
+    };
+
+    const tempElement = document.createElement("a");
+    const file = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: "application/json",
+    });
+    tempElement.href = URL.createObjectURL(file);
+    tempElement.download = "userData.json";
+    document.body.appendChild(tempElement);
+    tempElement.click();
+    tempElement.parentNode?.removeChild(tempElement);
+  }
+
+  function clearImportErrorMessages() {
+    setPageState({
+      ...pageState,
+      importErrors: [],
+    });
+  }
+
+  function addImportErrorMessage(message: string) {
+    setPageState({
+      ...pageState,
+      importErrors: [...pageState.importErrors, message],
+    });
+  }
+
+  function processImportedData(data: UserExportData) {
+    if (data.version == undefined || data.version != FORMAT_VERSION) {
+      throw new Error(`Invalid data file version ${data.version}`);
+    }
+    const { aliasData, aliases, teams, hiddenTeams } = data;
+    const newPageState = _.cloneDeep(pageState);
+    const newUsersAndAliases: UserAndStatsAndAliases[] = [
+      ...newPageState.usersAndAliases,
+      ...aliasData.map((alias, index) => {
+        return {
+          id: index,
+          name: alias.name,
+          email: alias.email,
+          files: 0,
+          lines: 0,
+          days: 0,
+          commits: 0,
+          lastCommitDay: undefined,
+          outOfDate: false,
+          isAlias: true,
+        };
+      }),
+    ];
+    const lookupUser = (exportUser: ExportUser) => {
+      const userMatch = _.findIndex(
+        newUsersAndAliases,
+        (user) => user.name == exportUser.name && user.email == exportUser.email
+      );
+      if (userMatch < 0) {
+        throw new Error(
+          `Unknown user "${exportUser.name} <${exportUser.email}>"`
+        );
+      }
+      return userMatch;
+    };
+
+    const newTeams: Teams = new Map(
+      teams.map((team) => {
+        return [
+          team.name,
+          { colour: team.colour, users: new Set(team.users.map(lookupUser)) },
+        ];
+      })
+    );
+
+    const newAliases: UserAliases = new Map(
+      aliases.map(([user, aliasedTo]) => {
+        return [lookupUser(user), lookupUser(aliasedTo)];
+      })
+    );
+
+    const newHiddenTeams = new Set(hiddenTeams);
+    setPageState({
+      ...initialPageState(),
+      usersAndAliases: newUsersAndAliases,
+      teams: newTeams,
+      hiddenTeams: newHiddenTeams,
+      aliases: newAliases,
+      importErrors: pageState.importErrors,
+    });
+  }
+
+  function importFromJson(files: FileList | null) {
+    if (files == null) {
+      addImportErrorMessage("No file passed to import");
+      return;
+    }
+    const file = files[0]!;
+    console.log("importing", file);
+    const fileReader = new FileReader();
+    fileReader.readAsText(file);
+    fileReader.onload = (e) => {
+      try {
+        if (e.target && typeof e.target?.result == "string") {
+          const value = JSON.parse(e.target.result) as UserExportData;
+          processImportedData(value);
+        } else {
+          addImportErrorMessage("invalid upload result type");
+        }
+      } catch (e) {
+        addImportErrorMessage(`${e}`);
+      }
+    };
   }
 
   const setSort = (key: string) => {
@@ -447,7 +589,37 @@ const UsersAndTeams = (props: DefaultProps) => {
         <div className="buttonList">
           <button onClick={save}>save and close</button>
           <button onClick={cancel}>cancel</button>
+          <button onClick={exportToJson}>export to JSON</button>
+          <button
+            onClick={() => {
+              clearImportErrorMessages();
+              hiddenFileInput.current?.click();
+            }}
+          >
+            import from JSON
+          </button>
+          <input
+            type="file"
+            ref={hiddenFileInput}
+            name="file"
+            style={{ display: "none" }}
+            onChange={(event) => {
+              console.log("uploaded:", event);
+              importFromJson(event.target?.files);
+            }}
+          ></input>
         </div>
+        {pageState.importErrors.length == 0 ? null : (
+          <div className="Messages">
+            <h3>Import errors:</h3>
+            <ul>
+              {pageState.importErrors.map((error, ix) => (
+                <li key={ix}>{error}</li>
+              ))}
+            </ul>
+            <button onClick={clearImportErrorMessages}>clear</button>
+          </div>
+        )}
         <h3>Users and Teams</h3>
         <HelpPanel>
           <strong>
