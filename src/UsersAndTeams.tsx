@@ -10,7 +10,7 @@ import HelpPanel from "./HelpPanel";
 import { aggregateUserStats, UserStats } from "./nodeData";
 import { displayUser, UserData } from "./polyglot_data.types";
 import {
-  Team,
+  sortTeamsByName,
   Teams,
   themedColours,
   UserAliasData,
@@ -421,18 +421,6 @@ const UsersAndTeams = (props: DefaultProps) => {
     setPageState({ ...pageState, teams: newTeams, checkedUsers: new Set() });
   };
 
-  const teamSort = (
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    [aName, a]: [string, Team],
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    [bName, b]: [string, Team]
-  ): number => {
-    return aName.localeCompare(bName, "en", {
-      ignorePunctuation: true,
-      sensitivity: "accent",
-    });
-  };
-
   // Generated with http://vrl.cs.brown.edu/color
   const bigColourRange = [
     "#a1def0",
@@ -712,81 +700,83 @@ const UsersAndTeams = (props: DefaultProps) => {
               </tr>
             </thead>
             <tbody>
-              {[...pageState.teams].sort(teamSort).map(([name, teamData]) => {
-                return (
-                  <tr key={name}>
-                    <td>
-                      {" "}
-                      <DelayedInput
-                        value={name}
-                        onChange={renameTeam}
-                        validate={validTeamChange}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        value={name}
-                        onChange={(event) =>
-                          handleTeamCheck(
-                            event.target.value,
-                            event.target.checked
-                          )
-                        }
-                        checked={pageState.hiddenTeams.has(name)}
-                      ></input>
-                    </td>
-                    <td>
-                      <input
-                        type="color"
-                        name="dot colour"
-                        value={teamData.colour}
-                        onChange={(evt) =>
-                          changeTeamColour(name, evt.target.value)
-                        }
-                      />
-                    </td>
-                    <td>
-                      <button
-                        onClick={() => {
-                          selectTeamMembers(name);
-                        }}
-                      >
-                        select
-                      </button>
-                      {pageState.checkedUsers.size > 0 ? (
-                        <button
-                          onClick={() => {
-                            addUsersToTeam(name);
-                          }}
-                        >
-                          add users
-                        </button>
-                      ) : null}
-                      {pageState.checkedUsers.size > 0 ? (
-                        <button
-                          onClick={() => {
-                            removeUsersFromTeam(name);
-                          }}
-                        >
-                          remove users
-                        </button>
-                      ) : null}
-                    </td>
-                    <td>
-                      {[...teamData.users]
-                        .map((u) => {
-                          const user = pageState.usersAndAliases[u];
-                          if (!user) {
-                            throw new Error("invalid user!");
+              {[...pageState.teams]
+                .sort(sortTeamsByName)
+                .map(([name, teamData]) => {
+                  return (
+                    <tr key={name}>
+                      <td>
+                        {" "}
+                        <DelayedInput
+                          value={name}
+                          onChange={renameTeam}
+                          validate={validTeamChange}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="checkbox"
+                          value={name}
+                          onChange={(event) =>
+                            handleTeamCheck(
+                              event.target.value,
+                              event.target.checked
+                            )
                           }
-                          return displayUser(user);
-                        })
-                        .join(", ")}
-                    </td>
-                  </tr>
-                );
-              })}
+                          checked={pageState.hiddenTeams.has(name)}
+                        ></input>
+                      </td>
+                      <td>
+                        <input
+                          type="color"
+                          name="dot colour"
+                          value={teamData.colour}
+                          onChange={(evt) =>
+                            changeTeamColour(name, evt.target.value)
+                          }
+                        />
+                      </td>
+                      <td>
+                        <button
+                          onClick={() => {
+                            selectTeamMembers(name);
+                          }}
+                        >
+                          select
+                        </button>
+                        {pageState.checkedUsers.size > 0 ? (
+                          <button
+                            onClick={() => {
+                              addUsersToTeam(name);
+                            }}
+                          >
+                            add users
+                          </button>
+                        ) : null}
+                        {pageState.checkedUsers.size > 0 ? (
+                          <button
+                            onClick={() => {
+                              removeUsersFromTeam(name);
+                            }}
+                          >
+                            remove users
+                          </button>
+                        ) : null}
+                      </td>
+                      <td>
+                        {[...teamData.users]
+                          .map((u) => {
+                            const user = pageState.usersAndAliases[u];
+                            if (!user) {
+                              throw new Error("invalid user!");
+                            }
+                            return displayUser(user);
+                          })
+                          .join(", ")}
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </ToggleablePanel>

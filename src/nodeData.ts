@@ -12,7 +12,7 @@ import {
   LocData,
   TreeNode,
 } from "./polyglot_data.types";
-import { possiblyAlias, State, UserAliases } from "./state";
+import { possiblyAlias, State, UserAliases, UserTeams } from "./state";
 
 // TODO: inline me
 export function nodePath(node: TreeNode): string {
@@ -139,6 +139,7 @@ export function nodeAge(node: FileNode, earliest: number, latest: number) {
   return Math.ceil((latest - lastCommit) / (24 * 60 * 60));
 }
 
+// TODO: delegate to nodeChangers
 export function nodeTopChangers(
   node: FileNode,
   aliases: UserAliases,
@@ -168,6 +169,7 @@ export function nodeTopChangers(
     .slice(0, maxPeople);
 }
 
+// TODO: delegate to nodeChangers
 export function nodeTopChangersByLines(
   node: FileNode,
   earliest: number,
@@ -434,7 +436,79 @@ export function nodeChangers(
 // accumulates all changes within a date range by team
 // Note we can't just sum results of nodeChangers() because a single change by
 // multiple members of the same team would be added multiple times.
-// export function nodeChangersByTeam(
+export function nodeChangersByTeam(
+  node: FileNode,
+  aliases: UserAliases,
+  userTeams: UserTeams,
+  earliest: number,
+  latest: number
+): Map<string, UserStatsAccumulator> | undefined {
+  const details = nodeChangeDetails(node, earliest, latest);
+  if (!details) return undefined;
+  const changerStats: Map<string, UserStatsAccumulator> = new Map();
+
+  details.forEach(
+    ({ users, commits, lines_added, lines_deleted, commit_day }) => {
+      // aggregate users into teams - otherwise 3 users from the
+      // same team would show as 3 changes!
+      const teams: Set<string> = new Set(
+        ...users.flatMap((user) => {
+          const realUser = possiblyAlias(aliases, user);
+          const teams = userTeams.get(realUser);
+          return teams ?? new Set<string>();
+        })
+      );
+
+      for (const team of teams) {
+        let myStats = changerStats.get(team);
+        if (!myStats) {
+          myStats = { commits: 0, lines: 0, days: new Set(), files: 1 };
+        }
+        myStats.commits += commits;
+        myStats.lines += lines_added + lines_deleted;
+        myStats.days.add(commit_day);
+        changerStats.set(team, myStats);
+      }
+    }
+  );
+
+  return changerStats;
+}
+
+export function nodeTopTeam(
+  node: FileNode,
+  metric: "lines" | "commits" | "files" | "days",
+  aliases: UserAliases,
+  userTeams: UserTeams,
+  earliest: number,
+  latest: number
+): string | undefined {
+  const changers = nodeChangersByTeam(
+    node,
+    aliases,
+    userTeams,
+    earliest,
+    latest
+  );
+  if (changers == undefined || changers.size == 0) {
+    return undefined;
+  }
+
+  const topChanger = [...changers].sort(([, teamA], [, teamB]) => {
+    switch (metric) {
+      case "lines":
+        return teamB.lines - teamA.lines;
+      case "commits":
+        return teamB.commits - teamA.commits;
+      case "files":
+        return teamB.files - teamA.files;
+      case "days":
+        return teamB.days.size - teamA.days.size;
+    }
+  })[0]!;
+
+  return topChanger[0];
+}
 
 export function addUserStats(
   userStats: Map<number, UserStatsAccumulator>,

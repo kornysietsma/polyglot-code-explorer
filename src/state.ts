@@ -151,6 +151,49 @@ export type Config = {
   selectedNode?: string;
 };
 
+export type CouplingConfig = {
+  couplingAvailable: boolean;
+  shown: boolean;
+  minBursts: number;
+  minRatio: number;
+  // maxCommonRoots - -1 means show all coupling
+  // 0 means only show files who have no roots in common - so /foo/baz.txt and /bar/baz.js
+  // 1 means only show files who have 0 or 1 roots in common - so /foo/bar/baz and /foo/fi/fum can match
+  maxCommonRoots: number;
+  dateRange: {
+    // TODO: use buckets instead!
+    earliest: number;
+    latest: number;
+  };
+};
+
+export type ExpensiveConfig = {
+  depth: number;
+};
+
+export type UserTeamData = Set<string>;
+export type UserTeams = Map<number, UserTeamData>;
+
+export type CalculatedState = {
+  // team lookup for each user, calculated whenever teams or aliases change
+  // aliased users will have no teams
+  userTeams: UserTeams;
+};
+
+export type Message = {
+  severity: "info" | "warn" | "error";
+  message: string;
+  timestamp: Date;
+};
+
+export type State = {
+  config: Config;
+  couplingConfig: CouplingConfig;
+  expensiveConfig: ExpensiveConfig;
+  calculated: CalculatedState;
+  messages: Message[];
+};
+
 export function isAlias(users: UserData[], userId: number): boolean {
   return userId >= users.length;
 }
@@ -173,50 +216,15 @@ export function getUserData(
   return user;
 }
 
-export type CouplingConfig = {
-  couplingAvailable: boolean;
-  shown: boolean;
-  minBursts: number;
-  minRatio: number;
-  // maxCommonRoots - -1 means show all coupling
-  // 0 means only show files who have no roots in common - so /foo/baz.txt and /bar/baz.js
-  // 1 means only show files who have 0 or 1 roots in common - so /foo/bar/baz and /foo/fi/fum can match
-  maxCommonRoots: number;
-  dateRange: {
-    // TODO: use buckets instead!
-    earliest: number;
-    latest: number;
-  };
-};
-
-export type ExpensiveConfig = {
-  depth: number;
-};
-
-export type UserTeamData = {
-  teams: string[];
-  aliasedTo?: number;
-};
-
-export type CalculatedState = {
-  // team lookup for each (aliased) user, calculated whenever teams or aliases change
-  // stored as an array as userids are sequential
-  userTeams: UserTeamData[];
-};
-
-export type Message = {
-  severity: "info" | "warn" | "error";
-  message: string;
-  timestamp: Date;
-};
-
-export type State = {
-  config: Config;
-  couplingConfig: CouplingConfig;
-  expensiveConfig: ExpensiveConfig;
-  calculated: CalculatedState;
-  messages: Message[];
-};
+export function sortTeamsByName(
+  [nameA]: [string, Team],
+  [nameB]: [string, Team]
+): number {
+  return nameA.localeCompare(nameB, "en", {
+    ignorePunctuation: true,
+    sensitivity: "accent",
+  });
+}
 
 function initialiseGlobalState(initialDataRef: VizDataRef) {
   const {
@@ -396,8 +404,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
     },
     calculated: {
       // this is mostly for state calculated in the postProcessState stage, based on data
-      // TODO: is this being calculated?
-      userTeams: [],
+      userTeams: new Map(),
     },
     messages: [],
   };
@@ -418,15 +425,49 @@ export function themedErrorColour(config: Config) {
   return themedColours(config).errorColour;
 }
 
+function buildUserTeams(teams: Teams, hiddenTeams: Set<string>): UserTeams {
+  const result: UserTeams = new Map();
+  for (const [name, team] of teams) {
+    if (!hiddenTeams.has(name)) {
+      for (const user of team.users) {
+        const userTeamData = result.get(user);
+        if (!userTeamData) {
+          result.set(user, new Set([name]));
+        } else {
+          userTeamData.add(name);
+        }
+      }
+    }
+  }
+  return result;
+}
+
 // allows state changes that need to access data
 function postprocessState(
   dataRef: VizDataRef,
   oldState: State,
   newState: State
 ) {
-  // TODO: this does nothing once I ditched OwnerData
-  // should it go? Does it need to calculate teams??
-  return newState;
+  console.time("postprocessing state");
+  let resultingState = newState;
+  let alreadyCloned = false; // if we modify state, need to clone it - but only once!
+  if (
+    resultingState.config.userData !== oldState.config.userData ||
+    resultingState.config.filters.hiddenTeams !==
+      oldState.config.filters.hiddenTeams
+  ) {
+    console.log("user data changed - updating cache");
+    if (!alreadyCloned) {
+      resultingState = _.cloneDeep(resultingState);
+      alreadyCloned = true;
+    }
+    resultingState.calculated.userTeams = buildUserTeams(
+      resultingState.config.userData.teams,
+      resultingState.config.filters.hiddenTeams
+    );
+  }
+  console.timeEnd("postprocessing state");
+  return resultingState;
 }
 
 type VisualizationKey = Extract<keyof typeof Visualizations, string>;

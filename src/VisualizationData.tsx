@@ -11,6 +11,7 @@ import {
   earlyLateScaleBuilder,
   goodBadUglyScale,
   numberOfChangersScale,
+  teamScale,
 } from "./ColourScales";
 import {
   nodeAge,
@@ -24,6 +25,7 @@ import {
   nodeIndentation,
   nodeLanguage,
   nodeNumberOfChangers,
+  nodeTopTeam,
 } from "./nodeData";
 import {
   DirectoryNode,
@@ -32,7 +34,7 @@ import {
   isHierarchyDirectory,
   TreeNode,
 } from "./polyglot_data.types";
-import { Config, State, themedColours } from "./state";
+import { Config, sortTeamsByName, State, themedColours } from "./state";
 import { VizMetadata } from "./viz.types";
 
 /**
@@ -348,6 +350,45 @@ class ChurnVisualization extends BaseVisualization<number> {
   }
 }
 
+export type TopTeamMetric = "lines" | "commits" | "files" | "days";
+
+class TeamVisualization extends BaseVisualization<string> {
+  metric: TopTeamMetric;
+  scale: (v: string) => string | undefined;
+  constructor(state: State, metadata: VizMetadata, metric: TopTeamMetric) {
+    super(state, metadata);
+    this.metric = metric;
+    this.scale = teamScale(state);
+  }
+  dataFn(d: HierarchyNode<FileNode>): string | undefined {
+    const { aliases } = this.state.config.userData;
+    const { userTeams } = this.state.calculated;
+    const { earliest, latest } = this.state.config.filters.dateRange;
+    return nodeTopTeam(
+      d.data,
+      this.metric,
+      aliases,
+      userTeams,
+      earliest,
+      latest
+    );
+  }
+  parentFn(): string | undefined {
+    // TODO: implement this!
+    return undefined;
+  }
+
+  colourKey(): [string, string][] {
+    const { teams } = this.state.config.userData;
+    const { hiddenTeams } = this.state.config.filters;
+    // TODO: sortY
+    return [...teams]
+      .filter(([name]) => !hiddenTeams.has(name))
+      .sort(sortTeamsByName)
+      .map(([name, team]) => [name, team.colour]);
+  }
+}
+
 export const Visualizations: {
   [visName: string]: VisualizationData | ParentVisualizationData;
 } = {
@@ -591,6 +632,93 @@ export const Visualizations: {
         ),
         buildVisualization(state, metadata) {
           return new ChurnVisualization(state, metadata, "lines");
+        },
+      },
+    },
+  },
+  team: {
+    displayOrder: 8,
+    title: "Team",
+    defaultChild: "lines",
+    children: {
+      lines: {
+        title: "Top team by lines changed",
+        displayOrder: 0,
+        help: (
+          <div>
+            <p>
+              Shows the team who has made the most changes in the selected date
+              range
+            </p>
+            <p>
+              This is the total lines changed, additions + deletions. Note that
+              reformatting or changes to line endings may show up as very large
+              despite being minimal code change.
+            </p>
+          </div>
+        ),
+        buildVisualization(state, metadata) {
+          return new TeamVisualization(state, metadata, "lines");
+        },
+      },
+      commits: {
+        title: "Top team by commits",
+        displayOrder: 1,
+        help: (
+          <div>
+            <p>
+              Shows the team who has made the most file commits in the selected
+              date range
+            </p>
+            <p>
+              Note that this uses the total of files committed - if you are
+              looking at a directory containing 10 files committed 10 times
+              each, it will show a value of 100 as it can&apos;t tell whether
+              the 10 files were committed together or not.
+            </p>
+          </div>
+        ),
+        buildVisualization(state, metadata) {
+          return new TeamVisualization(state, metadata, "commits");
+        },
+      },
+      files: {
+        title: "Top team by files changed",
+        displayOrder: 2,
+        help: (
+          <div>
+            <p>
+              Shows the team who has made the most changes in the selected date
+              range
+            </p>
+            <p>
+              This uses the number of files changed - this may include renames
+              or other changes with no actual file changed.
+            </p>
+          </div>
+        ),
+        buildVisualization(state, metadata) {
+          return new TeamVisualization(state, metadata, "files");
+        },
+      },
+      days: {
+        title: "Top team by days with a change",
+        displayOrder: 3,
+        help: (
+          <div>
+            <p>
+              Shows the team who has made changes on the most distinct days in
+              the selected date range
+            </p>
+            <p>
+              This does not distinguish between a day with 1 commit or 100
+              commit, it just counts days where any changes were made by any
+              team member.
+            </p>
+          </div>
+        ),
+        buildVisualization(state, metadata) {
+          return new TeamVisualization(state, metadata, "days");
         },
       },
     },

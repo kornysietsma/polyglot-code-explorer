@@ -50,7 +50,7 @@ const Controller = (props: DefaultProps) => {
 
   const sortedSubVis = isParentVisualization(currentParentVisData)
     ? Object.entries(currentParentVisData.children).sort(
-        ([, v1], [, v2]) => v2.displayOrder - v1.displayOrder
+        ([, v1], [, v2]) => v1.displayOrder - v2.displayOrder
       )
     : undefined;
 
