@@ -115,6 +115,31 @@ const Controller = (props: DefaultProps) => {
           </label>
         </div>
         <div>
+          <label>Metric for sorting user/team changes:</label>
+          <select
+            value={state.config.fileChangeMetric}
+            onChange={(event) =>
+              debouncedDispatch({
+                type: "setFileChangeMetric",
+                payload: event.target.value,
+              })
+            }
+          >
+            <option key="lines" value="lines">
+              Lines of code
+            </option>
+            <option key="commits" value="commits">
+              File commits
+            </option>
+            <option key="files" value="files">
+              Files changed
+            </option>
+            <option key="days" value="days">
+              Days containing a change
+            </option>
+          </select>
+        </div>
+        <div>
           <label htmlFor={codeServerId}>
             Code server available:&nbsp;
             <input

@@ -14,6 +14,8 @@ export type Team = {
 };
 export type Teams = Map<string, Team>;
 
+export type FileChangeMetric = "lines" | "commits" | "files" | "days";
+
 export type Config = {
   visualization: string; // could be fixed set
   subVis?: string;
@@ -21,6 +23,8 @@ export type Config = {
     timescaleHeight: number; // including margins
   };
   remoteUrlTemplate: string;
+  // used by default in inspecion panels and when sorting
+  fileChangeMetric: FileChangeMetric;
   codeInspector: {
     enabled: boolean;
     prefix: string;
@@ -257,6 +261,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
         timescaleHeight: 130, // including margins
       },
       remoteUrlTemplate: "https://{host}/{path}/{project}/blob/{ref}/{file}",
+      fileChangeMetric: "lines",
       codeInspector: {
         enabled: false,
         prefix: "http://localhost:8675/",
@@ -325,7 +330,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
         manyChangersColour: "yellow",
         manyChangersMax: 30, // starting to feel like a crowd
         precision: 0,
-        topChangersCount: 5, // show this many changers in NodeInspector
+        topChangersCount: 10, // show this many changers in NodeInspector
       },
       userData: {
         teams: new Map(),
@@ -547,6 +552,10 @@ interface SetUserTeamAliasData {
     aliasData: UserAliasData;
   };
 }
+interface SetFileChangeMetric {
+  type: "setFileChangeMetric";
+  payload: FileChangeMetric;
+}
 
 export type Action =
   | SetVisualization
@@ -564,7 +573,8 @@ export type Action =
   | SetRemoteUrlTemplate
   | AddMessage
   | ClearMessages
-  | SetUserTeamAliasData;
+  | SetUserTeamAliasData
+  | SetFileChangeMetric;
 
 function updateStateFromAction(state: State, action: Action): State {
   const { expensiveConfig, couplingConfig, config } = state;
@@ -679,6 +689,12 @@ function updateStateFromAction(state: State, action: Action): State {
       result.config.userData.aliasData = action.payload.aliasData;
       return result;
     }
+
+    case "setFileChangeMetric":
+      return {
+        ...state,
+        config: { ...config, fileChangeMetric: action.payload },
+      };
 
     default: {
       const impossible: never = action; // this will cause an error if an Action type isn't handled above

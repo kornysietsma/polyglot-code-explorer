@@ -12,7 +12,13 @@ import {
   LocData,
   TreeNode,
 } from "./polyglot_data.types";
-import { possiblyAlias, State, UserAliases, UserTeams } from "./state";
+import {
+  FileChangeMetric,
+  possiblyAlias,
+  State,
+  UserAliases,
+  UserTeams,
+} from "./state";
 
 // TODO: inline me
 export function nodePath(node: TreeNode): string {
@@ -137,66 +143,6 @@ export function nodeAge(node: FileNode, earliest: number, latest: number) {
   const lastCommit = nodeLastCommitDay(node, earliest, latest);
   if (!lastCommit) return undefined;
   return Math.ceil((latest - lastCommit) / (24 * 60 * 60));
-}
-
-// TODO: delegate to nodeChangers
-export function nodeTopChangers(
-  node: FileNode,
-  aliases: UserAliases,
-  earliest: number,
-  latest: number,
-  maxPeople: number
-): [number, number][] | undefined {
-  const details = nodeChangeDetails(node, earliest, latest);
-  if (!details) return undefined;
-  const changerStats: Map<number, number> = new Map();
-  details.forEach(({ users, commits }) => {
-    users.forEach((user) => {
-      const realUser = possiblyAlias(aliases, user);
-      const prev = changerStats.get(realUser);
-      if (!prev) {
-        changerStats.set(realUser, commits);
-      } else {
-        changerStats.set(realUser, prev + commits);
-      }
-    });
-  });
-
-  return [...changerStats.entries()]
-    .sort(([, ac], [, bc]) => {
-      return bc - ac;
-    })
-    .slice(0, maxPeople);
-}
-
-// TODO: delegate to nodeChangers
-export function nodeTopChangersByLines(
-  node: FileNode,
-  earliest: number,
-  latest: number,
-  maxPeople: number
-): [number, number][] | undefined {
-  const details = nodeChangeDetails(node, earliest, latest);
-  if (!details) return undefined;
-  const changerStats = new Map();
-  // eslint-disable-next-line camelcase
-  details.forEach(({ users, lines_added, lines_deleted }) => {
-    // eslint-disable-next-line camelcase
-    const totLines = lines_added + lines_deleted;
-    users.forEach((user) => {
-      if (!changerStats.has(user)) {
-        changerStats.set(user, totLines);
-      } else {
-        changerStats.set(user, changerStats.get(user) + totLines);
-      }
-    });
-  });
-
-  return [...changerStats.entries()]
-    .sort(([, ac], [, bc]) => {
-      return bc - ac;
-    })
-    .slice(0, maxPeople);
 }
 
 export function nodeNumberOfChangers(
@@ -389,12 +335,28 @@ export function nodeCenter(node: TreeNode) {
   return nodeLayoutData(node)?.center;
 }
 
-type UserStatsAccumulator = {
+export type UserStatsAccumulator = {
   commits: number;
   lines: number;
   days: Set<number>;
   files: number;
 };
+
+export function metricFrom(
+  stats: UserStatsAccumulator,
+  metric: FileChangeMetric
+) {
+  switch (metric) {
+    case "commits":
+      return stats.commits;
+    case "lines":
+      return stats.lines;
+    case "days":
+      return stats.days.size;
+    case "files":
+      return stats.files;
+  }
+}
 export type UserStats = {
   commits: number;
   lines: number;
@@ -431,6 +393,24 @@ export function nodeChangers(
   );
 
   return changerStats;
+}
+
+export function sortedNodeChangers(
+  changers: Map<number, UserStatsAccumulator>,
+  metric: FileChangeMetric
+): [number, UserStatsAccumulator][] {
+  return [...changers].sort(([, userA], [, userB]) => {
+    switch (metric) {
+      case "lines":
+        return userB.lines - userA.lines;
+      case "commits":
+        return userB.commits - userA.commits;
+      case "files":
+        return userB.files - userA.files;
+      case "days":
+        return userB.days.size - userA.days.size;
+    }
+  })!;
 }
 
 // accumulates all changes within a date range by team
@@ -475,9 +455,27 @@ export function nodeChangersByTeam(
   return changerStats;
 }
 
+export function sortedTeamChangers(
+  changers: Map<string, UserStatsAccumulator>,
+  metric: FileChangeMetric
+): [string, UserStatsAccumulator][] {
+  return [...changers].sort(([, teamA], [, teamB]) => {
+    switch (metric) {
+      case "lines":
+        return teamB.lines - teamA.lines;
+      case "commits":
+        return teamB.commits - teamA.commits;
+      case "files":
+        return teamB.files - teamA.files;
+      case "days":
+        return teamB.days.size - teamA.days.size;
+    }
+  });
+}
+
 export function nodeTopTeam(
   node: FileNode,
-  metric: "lines" | "commits" | "files" | "days",
+  metric: FileChangeMetric,
   aliases: UserAliases,
   userTeams: UserTeams,
   earliest: number,
@@ -494,20 +492,7 @@ export function nodeTopTeam(
     return undefined;
   }
 
-  const topChanger = [...changers].sort(([, teamA], [, teamB]) => {
-    switch (metric) {
-      case "lines":
-        return teamB.lines - teamA.lines;
-      case "commits":
-        return teamB.commits - teamA.commits;
-      case "files":
-        return teamB.files - teamA.files;
-      case "days":
-        return teamB.days.size - teamA.days.size;
-    }
-  })[0]!;
-
-  return topChanger[0];
+  return sortedTeamChangers(changers, metric)[0]![0];
 }
 
 export function addUserStats(

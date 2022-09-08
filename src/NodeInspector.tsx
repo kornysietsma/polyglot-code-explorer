@@ -6,16 +6,19 @@ import CouplingInspector from "./CouplingInspector";
 import { humanizeDate, humanizeDays } from "./datetimes";
 import {
   ChurnData,
+  metricFrom,
   nodeAge,
+  nodeChangers,
+  nodeChangersByTeam,
   nodeChurnData,
   nodeCreationDate,
   nodeIndentationData,
   nodeLastCommitDay,
   nodeLocData,
-  nodeNumberOfChangers,
   nodeRemoteHead,
   nodeRemoteUrl,
-  nodeTopChangers,
+  sortedNodeChangers,
+  sortedTeamChangers,
 } from "./nodeData";
 import PathInspector from "./PathInspector";
 import { FileNode, isDirectory, TreeNode } from "./polyglot_data.types";
@@ -139,6 +142,8 @@ const NodeInspector = ({
   const { topChangersCount } = state.config.numberOfChangers;
   const { couplingAvailable } = state.couplingConfig;
   const { aliases } = state.config.userData;
+  const { fileChangeMetric } = state.config;
+  const { userTeams } = state.calculated;
 
   const age = nodeAge(node, earliest, latest);
   const lastCommit = nodeLastCommitDay(node, earliest, latest);
@@ -155,14 +160,18 @@ const NodeInspector = ({
           lastCommit
         )} (${humanizeDays(age)})`
       : "";
-  const changerCount = nodeNumberOfChangers(node, aliases, earliest, latest);
-  const topChangers = nodeTopChangers(
-    node,
-    aliases,
-    earliest,
-    latest,
-    topChangersCount
+  const userChangers = sortedNodeChangers(
+    nodeChangers(node, aliases, earliest, latest) ?? new Map(),
+    fileChangeMetric
   );
+  const topUserChangers = userChangers.slice(0, topChangersCount);
+
+  const teamChangers = sortedTeamChangers(
+    nodeChangersByTeam(node, aliases, userTeams, earliest, latest) ?? new Map(),
+    fileChangeMetric
+  );
+  const topTeamChangers = teamChangers.slice(0, topChangersCount);
+
   const userName = (userId: number) => {
     const user = getUserData(users, state, userId);
     if (user == undefined) {
@@ -177,22 +186,49 @@ const NodeInspector = ({
     return user.email;
   };
   const topChangerTable =
-    topChangers && topChangers.length > 0 ? (
+    topUserChangers.length > 0 ? (
       <div>
         <h5>Top {topChangersCount} changers:</h5>
         <table>
           <thead>
             <tr>
               <th>User</th>
-              <th>Change count</th>
+              <th>Metric ({fileChangeMetric})</th>
             </tr>
           </thead>
           <tbody>
-            {topChangers.map(([user, count]) => {
+            {topUserChangers.map(([user, stats]) => {
               return (
                 <tr key={user}>
                   <td>{userName(user)}</td>
-                  <td>{count}</td>
+                  <td>{metricFrom(stats, fileChangeMetric)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      ""
+    );
+
+  const topTeamChangerTable =
+    topTeamChangers.length > 0 ? (
+      <div>
+        <h5>Top {topChangersCount} teams:</h5>
+        <table>
+          <thead>
+            <tr>
+              <th>Team</th>
+              <th>Metric ({fileChangeMetric})</th>
+            </tr>
+          </thead>
+          <tbody>
+            {topTeamChangers.map(([team, stats]) => {
+              return (
+                <tr key={team}>
+                  <td>{team}</td>
+                  <td>{metricFrom(stats, fileChangeMetric)}</td>
                 </tr>
               );
             })}
@@ -245,8 +281,20 @@ const NodeInspector = ({
         ""
       )}
       <ToggleablePanel title="file changers" showInitially={false}>
-        {changerCount ? <h5>Unique changers: {changerCount}</h5> : ""}
+        {userChangers.length > 0 ? (
+          <h5>Unique changers: {userChangers.length}</h5>
+        ) : (
+          ""
+        )}
         {topChangerTable}
+      </ToggleablePanel>
+      <ToggleablePanel title="file changers by team" showInitially={false}>
+        {teamChangers.length > 0 ? (
+          <h5>Unique changers: {teamChangers.length}</h5>
+        ) : (
+          ""
+        )}
+        {topTeamChangerTable}
       </ToggleablePanel>
       {churnReport(churnData)}
       {couplingAvailable && stats.coupling ? (

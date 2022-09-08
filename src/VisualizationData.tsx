@@ -34,7 +34,13 @@ import {
   isHierarchyDirectory,
   TreeNode,
 } from "./polyglot_data.types";
-import { Config, sortTeamsByName, State, themedColours } from "./state";
+import {
+  Config,
+  FileChangeMetric,
+  sortTeamsByName,
+  State,
+  themedColours,
+} from "./state";
 import { VizMetadata } from "./viz.types";
 
 /**
@@ -350,12 +356,10 @@ class ChurnVisualization extends BaseVisualization<number> {
   }
 }
 
-export type TopTeamMetric = "lines" | "commits" | "files" | "days";
-
 class TeamVisualization extends BaseVisualization<string> {
-  metric: TopTeamMetric;
+  metric: FileChangeMetric;
   scale: (v: string) => string | undefined;
-  constructor(state: State, metadata: VizMetadata, metric: TopTeamMetric) {
+  constructor(state: State, metadata: VizMetadata, metric: FileChangeMetric) {
     super(state, metadata);
     this.metric = metric;
     this.scale = teamScale(state);
