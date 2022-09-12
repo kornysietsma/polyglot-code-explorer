@@ -92,7 +92,7 @@ const Controller = (props: DefaultProps) => {
       <p>
         Selected date range {humanizeDate(earliest)} to {humanizeDate(latest)}
       </p>
-      <ToggleablePanel title="save/load" showInitially={false}>
+      <ToggleablePanel title="save/load settings" showInitially={false}>
         <SaveLoadControls dataRef={dataRef} state={state} dispatch={dispatch} />
       </ToggleablePanel>
       <ToggleablePanel title="advanced settings" showInitially={false}>

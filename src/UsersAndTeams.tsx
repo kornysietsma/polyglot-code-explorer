@@ -6,8 +6,11 @@ import { DefaultProps } from "./components.types";
 import DelayedInput from "./DelayedInput";
 import EditAlias from "./EditAlias";
 import {
+  exportableUserDataToJson,
   ExportUser,
-  FORMAT_VERSION,
+  FORMAT_FILE_USER_VERSION,
+  jsonToUserData,
+  StandaloneUserExportData,
   userAsKey,
   UserExportData,
 } from "./exportImport";
@@ -203,7 +206,6 @@ const UsersAndTeams = (props: DefaultProps) => {
 
   function exportToJson() {
     const exportData: UserExportData = {
-      version: FORMAT_VERSION,
       aliasData: pageState.usersAndAliases
         .filter((user) => user.isAlias)
         .map((user) => {
@@ -223,9 +225,13 @@ const UsersAndTeams = (props: DefaultProps) => {
         };
       }),
     };
+    const standaloneExportData: StandaloneUserExportData = {
+      version: FORMAT_FILE_USER_VERSION,
+      userData: exportData,
+    };
 
     const tempElement = document.createElement("a");
-    const file = new Blob([JSON.stringify(exportData, null, 2)], {
+    const file = new Blob([exportableUserDataToJson(standaloneExportData)], {
       type: "application/json",
     });
     tempElement.href = URL.createObjectURL(file);
@@ -249,11 +255,11 @@ const UsersAndTeams = (props: DefaultProps) => {
     });
   }
 
-  function processImportedData(data: UserExportData) {
-    if (data.version == undefined || data.version != FORMAT_VERSION) {
+  function processImportedData(data: StandaloneUserExportData) {
+    if (data.version == undefined || data.version != FORMAT_FILE_USER_VERSION) {
       throw new Error(`Invalid data file version ${data.version}`);
     }
-    const { aliasData, aliases, teams } = data;
+    const { aliasData, aliases, teams } = data.userData;
     const newPageState = _.cloneDeep(pageState);
     const newUsersAndAliases: UserAndStatsAndAliases[] = [
       ...newPageState.usersAndAliases,
@@ -326,7 +332,7 @@ const UsersAndTeams = (props: DefaultProps) => {
     fileReader.onload = (e) => {
       try {
         if (e.target && typeof e.target?.result == "string") {
-          const value = JSON.parse(e.target.result) as UserExportData;
+          const value = jsonToUserData(e.target.result);
           processImportedData(value);
         } else {
           addImportErrorMessage("invalid upload result type");
@@ -580,7 +586,9 @@ const UsersAndTeams = (props: DefaultProps) => {
           <button
             onClick={() => {
               clearImportErrorMessages();
-              hiddenFileInput.current?.click();
+              if (hiddenFileInput.current) {
+                hiddenFileInput.current.click();
+              }
             }}
           >
             import from JSON
@@ -590,6 +598,10 @@ const UsersAndTeams = (props: DefaultProps) => {
             ref={hiddenFileInput}
             name="file"
             style={{ display: "none" }}
+            onClick={() => {
+              // without this you can't load the same named file twice as onChange doesn't fire!
+              hiddenFileInput.current!.value = "";
+            }}
             onChange={(event) => {
               console.log("uploaded:", event);
               importFromJson(event.target?.files);

@@ -21,7 +21,11 @@ import {
 } from "./state";
 import { VizMetadata } from "./viz.types";
 
-export const FORMAT_VERSION = "1.0.1";
+/** the version of the format file - changes whenever state format changes */
+export const FORMAT_FILE_VERSION = "1.0.1";
+
+/** User data can be saved on it's own, in which case it has it's own format version */
+export const FORMAT_FILE_USER_VERSION = "1.1.0";
 
 export type ExportUser = {
   name: string;
@@ -41,10 +45,14 @@ export type ExportTeam = {
 };
 
 export type UserExportData = {
-  version: string;
   aliasData: ExportUser[];
   aliases: [user: ExportUser, aliasedTo: ExportUser][];
   teams: ExportTeam[];
+};
+
+export type StandaloneUserExportData = {
+  version: string;
+  userData: UserExportData;
 };
 
 type ExportableConfig = Omit<Config, "userData">;
@@ -87,7 +95,6 @@ function exportableUserData(state: State, users: UserData[]): UserExportData {
   });
 
   return {
-    version: FORMAT_VERSION,
     aliasData,
     aliases,
     teams,
@@ -107,7 +114,7 @@ export function stateToExportable(
 
   return {
     dataVersion: files.version,
-    formatVersion: FORMAT_VERSION,
+    formatVersion: FORMAT_FILE_VERSION,
     name: files.name,
     id: files.id,
     config: fixedConfig,
@@ -128,10 +135,10 @@ export function stateFromExportable(
   const messages: Message[] = [];
   const { aliasData, aliases, teams } = exportableState.userData;
 
-  if (exportableState.formatVersion != FORMAT_VERSION) {
+  if (exportableState.formatVersion != FORMAT_FILE_VERSION) {
     messages.push(
       errorMessage(
-        `Invalid format version ${exportableState.formatVersion} - expected ${FORMAT_VERSION}`
+        `Invalid format version ${exportableState.formatVersion} - expected ${FORMAT_FILE_VERSION}`
       )
     );
     if (!tolerant) failed = true;
@@ -251,7 +258,13 @@ export function jsonReviver(key: string, value: any): any {
 }
 
 export function exportableStateToJson(state: ExportableState): string {
-  return JSON.stringify(state, jsonReplacer);
+  return JSON.stringify(state, jsonReplacer, 2);
+}
+
+export function exportableUserDataToJson(
+  state: StandaloneUserExportData
+): string {
+  return JSON.stringify(state, jsonReplacer, 2);
 }
 
 export function jsonToExportableState(json: string): ExportableState {
@@ -263,4 +276,15 @@ export function jsonToExportableState(json: string): ExportableState {
     throw new Error("Json had no version - probably not a state file");
   }
   return result as ExportableState;
+}
+
+export function jsonToUserData(json: string): StandaloneUserExportData {
+  const result = JSON.parse(json, jsonReviver);
+  if (typeof result !== "object") {
+    throw new Error("Json wasn't an object");
+  }
+  if (!result["formatVersion"]) {
+    throw new Error("Json had no version - probably not a state file");
+  }
+  return result as StandaloneUserExportData;
 }
