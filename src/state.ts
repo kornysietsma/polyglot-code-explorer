@@ -11,6 +11,7 @@ export type UserAliasData = Map<number, UserData>;
 export type Team = {
   users: Set<number>;
   colour: string;
+  hidden: boolean;
 };
 export type Teams = Map<string, Team>;
 
@@ -149,7 +150,6 @@ export type Config = {
       earliest: number;
       latest: number;
     };
-    hiddenTeams: Set<string>;
   };
   // TODO: selectedNode needs to be made serializable - probably as a path - used to be a node
   selectedNode?: string;
@@ -189,6 +189,29 @@ export type Message = {
   message: string;
   timestamp: Date;
 };
+
+export function infoMessage(message: string): Message {
+  return {
+    severity: "info",
+    message,
+    timestamp: new Date(),
+  };
+}
+export function warnMessage(message: string): Message {
+  return {
+    severity: "warn",
+    message,
+    timestamp: new Date(),
+  };
+}
+
+export function errorMessage(message: string): Message {
+  return {
+    severity: "error",
+    message,
+    timestamp: new Date(),
+  };
+}
 
 export type State = {
   config: Config;
@@ -385,7 +408,6 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
           earliest,
           latest,
         },
-        hiddenTeams: new Set(),
       },
       selectedNode: undefined,
     },
@@ -413,11 +435,11 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
     },
     messages: [],
   };
-  defaults.messages.push({
-    timestamp: new Date(),
-    severity: "info",
-    message: `Loaded data file: ${files.name} version ${files.version} ID ${files.id}`,
-  });
+  defaults.messages.push(
+    infoMessage(
+      `Loaded data file: ${files.name} version ${files.version} ID ${files.id}`
+    )
+  );
   // could precalculate ownerData here - but it isn't needed until you select the 'owners' visualisation
   return defaults;
 }
@@ -430,10 +452,10 @@ export function themedErrorColour(config: Config) {
   return themedColours(config).errorColour;
 }
 
-function buildUserTeams(teams: Teams, hiddenTeams: Set<string>): UserTeams {
+function buildUserTeams(teams: Teams): UserTeams {
   const result: UserTeams = new Map();
   for (const [name, team] of teams) {
-    if (!hiddenTeams.has(name)) {
+    if (!team.hidden) {
       for (const user of team.users) {
         const userTeamData = result.get(user);
         if (!userTeamData) {
@@ -456,19 +478,14 @@ function postprocessState(
   console.time("postprocessing state");
   let resultingState = newState;
   let alreadyCloned = false; // if we modify state, need to clone it - but only once!
-  if (
-    resultingState.config.userData !== oldState.config.userData ||
-    resultingState.config.filters.hiddenTeams !==
-      oldState.config.filters.hiddenTeams
-  ) {
+  if (resultingState.config.userData !== oldState.config.userData) {
     console.log("user data changed - updating cache");
     if (!alreadyCloned) {
       resultingState = _.cloneDeep(resultingState);
       alreadyCloned = true;
     }
     resultingState.calculated.userTeams = buildUserTeams(
-      resultingState.config.userData.teams,
-      resultingState.config.filters.hiddenTeams
+      resultingState.config.userData.teams
     );
   }
   console.timeEnd("postprocessing state");
@@ -538,8 +555,13 @@ interface SetRemoteUrlTemplate {
 }
 interface AddMessage {
   type: "addMessage";
-  payload: { severity: "info" | "warn" | "error"; message: string };
+  payload: Message;
 }
+interface AddMessages {
+  type: "addMessages";
+  payload: Message[];
+}
+
 interface ClearMessages {
   type: "clearMessages";
 }
@@ -547,7 +569,6 @@ interface SetUserTeamAliasData {
   type: "setUserTeamAliasData";
   payload: {
     teams: Teams;
-    hiddenTeams: Set<string>;
     aliases: UserAliases;
     aliasData: UserAliasData;
   };
@@ -555,6 +576,10 @@ interface SetUserTeamAliasData {
 interface SetFileChangeMetric {
   type: "setFileChangeMetric";
   payload: FileChangeMetric;
+}
+interface SetAllState {
+  type: "setAllState";
+  payload: State;
 }
 
 export type Action =
@@ -572,9 +597,11 @@ export type Action =
   | SetCodeServerPrefix
   | SetRemoteUrlTemplate
   | AddMessage
+  | AddMessages
   | ClearMessages
   | SetUserTeamAliasData
-  | SetFileChangeMetric;
+  | SetFileChangeMetric
+  | SetAllState;
 
 function updateStateFromAction(state: State, action: Action): State {
   const { expensiveConfig, couplingConfig, config } = state;
@@ -670,11 +697,11 @@ function updateStateFromAction(state: State, action: Action): State {
     }
 
     case "addMessage": {
-      const message: Message = {
-        ...action.payload,
-        timestamp: new Date(),
-      };
-      return { ...state, messages: [...state.messages, message] };
+      return { ...state, messages: [...state.messages, action.payload] };
+    }
+
+    case "addMessages": {
+      return { ...state, messages: [...state.messages, ...action.payload] };
     }
 
     case "clearMessages": {
@@ -684,7 +711,6 @@ function updateStateFromAction(state: State, action: Action): State {
     case "setUserTeamAliasData": {
       const result = _.cloneDeep(state);
       result.config.userData.teams = action.payload.teams;
-      result.config.filters.hiddenTeams = action.payload.hiddenTeams;
       result.config.userData.aliases = action.payload.aliases;
       result.config.userData.aliasData = action.payload.aliasData;
       return result;
@@ -695,6 +721,9 @@ function updateStateFromAction(state: State, action: Action): State {
         ...state,
         config: { ...config, fileChangeMetric: action.payload },
       };
+
+    case "setAllState":
+      return action.payload;
 
     default: {
       const impossible: never = action; // this will cause an error if an Action type isn't handled above

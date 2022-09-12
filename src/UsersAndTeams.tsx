@@ -5,7 +5,12 @@ import ReactModal from "react-modal";
 import { DefaultProps } from "./components.types";
 import DelayedInput from "./DelayedInput";
 import EditAlias from "./EditAlias";
-import { ExportUser, FORMAT_VERSION, UserExportData } from "./exportImport";
+import {
+  ExportUser,
+  FORMAT_VERSION,
+  userAsKey,
+  UserExportData,
+} from "./exportImport";
 import HelpPanel from "./HelpPanel";
 import { aggregateUserStats, UserStats } from "./nodeData";
 import { displayUser, UserData } from "./polyglot_data.types";
@@ -25,7 +30,6 @@ export type UsersAndTeamsPageState = {
   usersAndAliases: UserAndStatsAndAliases[];
   aliases: UserAliases;
   teams: Teams;
-  hiddenTeams: Set<string>;
   usersSort: { key: string; ascending: boolean };
   checkedUsers: Set<number>;
   userFilter: string;
@@ -96,7 +100,7 @@ const UsersAndTeams = (props: DefaultProps) => {
 
   const { users } = dataRef.current.metadata;
 
-  const { userData, filters } = state.config;
+  const { userData } = state.config;
 
   const [pageState, setPageState] = React.useState<UsersAndTeamsPageState>(
     initialPageState()
@@ -158,7 +162,6 @@ const UsersAndTeams = (props: DefaultProps) => {
       usersAndAliases: [...usersWithStats, ...aliasUserData],
       aliases: userData.aliases,
       teams: userData.teams,
-      hiddenTeams: filters.hiddenTeams,
     });
 
     setIsOpen(true);
@@ -183,7 +186,6 @@ const UsersAndTeams = (props: DefaultProps) => {
       type: "setUserTeamAliasData",
       payload: {
         teams: pageState.teams,
-        hiddenTeams: pageState.hiddenTeams,
         aliases: pageState.aliases,
         aliasData,
       },
@@ -213,9 +215,13 @@ const UsersAndTeams = (props: DefaultProps) => {
       ]),
       teams: [...pageState.teams].map(([teamName, team]) => {
         const users = [...team.users].map(toExportUser);
-        return { name: teamName, users, colour: team.colour };
+        return {
+          name: teamName,
+          users,
+          colour: team.colour,
+          hidden: team.hidden,
+        };
       }),
-      hiddenTeams: [...pageState.hiddenTeams],
     };
 
     const tempElement = document.createElement("a");
@@ -247,7 +253,7 @@ const UsersAndTeams = (props: DefaultProps) => {
     if (data.version == undefined || data.version != FORMAT_VERSION) {
       throw new Error(`Invalid data file version ${data.version}`);
     }
-    const { aliasData, aliases, teams, hiddenTeams } = data;
+    const { aliasData, aliases, teams } = data;
     const newPageState = _.cloneDeep(pageState);
     const newUsersAndAliases: UserAndStatsAndAliases[] = [
       ...newPageState.usersAndAliases,
@@ -266,12 +272,13 @@ const UsersAndTeams = (props: DefaultProps) => {
         };
       }),
     ];
+    const reverseLookup: Map<string, number> = new Map();
+    for (const user of newUsersAndAliases) {
+      reverseLookup.set(userAsKey(user), user.id);
+    }
     const lookupUser = (exportUser: ExportUser) => {
-      const userMatch = _.findIndex(
-        newUsersAndAliases,
-        (user) => user.name == exportUser.name && user.email == exportUser.email
-      );
-      if (userMatch < 0) {
+      const userMatch = reverseLookup.get(userAsKey(exportUser));
+      if (userMatch == undefined) {
         throw new Error(
           `Unknown user "${exportUser.name} <${exportUser.email}>"`
         );
@@ -283,7 +290,11 @@ const UsersAndTeams = (props: DefaultProps) => {
       teams.map((team) => {
         return [
           team.name,
-          { colour: team.colour, users: new Set(team.users.map(lookupUser)) },
+          {
+            colour: team.colour,
+            users: new Set(team.users.map(lookupUser)),
+            hidden: team.hidden,
+          },
         ];
       })
     );
@@ -294,12 +305,10 @@ const UsersAndTeams = (props: DefaultProps) => {
       })
     );
 
-    const newHiddenTeams = new Set(hiddenTeams);
     setPageState({
       ...initialPageState(),
       usersAndAliases: newUsersAndAliases,
       teams: newTeams,
-      hiddenTeams: newHiddenTeams,
       aliases: newAliases,
       importErrors: pageState.importErrors,
     });
@@ -358,14 +367,11 @@ const UsersAndTeams = (props: DefaultProps) => {
   }
 
   function handleTeamCheck(team: string, checked: boolean) {
-    const hiddenTeams = pageState.hiddenTeams;
+    const teams = _.clone(pageState.teams);
 
-    if (checked) {
-      hiddenTeams.add(team);
-    } else {
-      hiddenTeams.delete(team);
-    }
-    setPageState({ ...pageState, hiddenTeams });
+    teams.get(team)!.hidden = checked;
+
+    setPageState({ ...pageState, teams });
   }
 
   const showCheckedUsersId = useId();
@@ -417,6 +423,7 @@ const UsersAndTeams = (props: DefaultProps) => {
     newTeams.set(teamName, {
       users: pageState.checkedUsers,
       colour: themedColours(state.config).neutralColour,
+      hidden: false,
     });
     setPageState({ ...pageState, teams: newTeams, checkedUsers: new Set() });
   };
@@ -446,16 +453,12 @@ const UsersAndTeams = (props: DefaultProps) => {
   ];
 
   const reColourTeams = () => {
-    let visibleTeams = [...pageState.teams].filter(
-      ([name]) => !pageState.hiddenTeams.has(name)
-    );
+    let visibleTeams = [...pageState.teams].filter(([, team]) => !team.hidden);
     if (visibleTeams.length == 0) {
       console.log("Can't recolour teams as none are shown");
       return;
     }
-    const hiddenTeams = [...pageState.teams].filter(([name]) =>
-      pageState.hiddenTeams.has(name)
-    );
+    const hiddenTeams = [...pageState.teams].filter(([, team]) => team.hidden);
     visibleTeams = _.shuffle(visibleTeams);
 
     // note any colours outside the big colour range will be white!  Remap those yourself...
@@ -499,14 +502,10 @@ const UsersAndTeams = (props: DefaultProps) => {
     if (oldTeam == undefined) {
       throw new Error("Logic error - invalid old team");
     }
-    const { teams, hiddenTeams } = pageState;
+    const { teams } = pageState;
     teams.set(newName, oldTeam);
     teams.delete(oldName);
-    if (hiddenTeams.has(oldName)) {
-      hiddenTeams.delete(oldName);
-      hiddenTeams.add(newName);
-    }
-    setPageState({ ...pageState, teams, hiddenTeams });
+    setPageState({ ...pageState, teams });
   }
 
   function selectTeamMembers(team: string) {
@@ -723,7 +722,7 @@ const UsersAndTeams = (props: DefaultProps) => {
                               event.target.checked
                             )
                           }
-                          checked={pageState.hiddenTeams.has(name)}
+                          checked={teamData.hidden}
                         ></input>
                       </td>
                       <td>

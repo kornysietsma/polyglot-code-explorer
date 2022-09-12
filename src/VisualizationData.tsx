@@ -384,10 +384,8 @@ class TeamVisualization extends BaseVisualization<string> {
 
   colourKey(): [string, string][] {
     const { teams } = this.state.config.userData;
-    const { hiddenTeams } = this.state.config.filters;
-    // TODO: sortY
     return [...teams]
-      .filter(([name]) => !hiddenTeams.has(name))
+      .filter(([, team]) => !team.hidden)
       .sort(sortTeamsByName)
       .map(([name, team]) => [name, team.colour]);
   }

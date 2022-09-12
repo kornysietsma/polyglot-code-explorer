@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import semver from "semver";
 
 import App from "./App";
-import { Tree } from "./polyglot_data.types";
+import { SUPPORTED_FILE_VERSION, Tree } from "./polyglot_data.types";
 import {
   countLanguagesIn,
   gatherGlobalStats,
@@ -12,8 +12,6 @@ import {
   postprocessUsers,
 } from "./preprocess";
 import { VizData, VizDataRefMaybe } from "./viz.types";
-
-const ValidFileVersion = "1.0";
 
 const useFetch = (
   url: string,
@@ -30,12 +28,12 @@ const useFetch = (
         const tree = json as Tree;
         if (tree.version === undefined) {
           throw new Error(
-            `No version in JSON data file at ${url} - this supports data versions ${ValidFileVersion}`
+            `No version in JSON data file at ${url} - this supports data versions ${SUPPORTED_FILE_VERSION}`
           );
         }
-        if (!semver.satisfies(tree.version, ValidFileVersion)) {
+        if (!semver.satisfies(tree.version, SUPPORTED_FILE_VERSION)) {
           throw new Error(
-            `Invalid version ${tree.version} in JSON data file at ${url} - this supports data versions ${ValidFileVersion}`
+            `Invalid version ${tree.version} in JSON data file at ${url} - this supports data versions ${SUPPORTED_FILE_VERSION}`
           );
         }
         console.log("linking parents");

@@ -1,5 +1,8 @@
 import { HierarchyNode } from "d3";
 
+/** these types should match this file version, semver style */
+export const SUPPORTED_FILE_VERSION = "1.0";
+
 export type Tree = {
   version: string;
   name: string;
@@ -67,8 +70,8 @@ export type GitUser = {
 
 export type UserData = {
   id: number;
-  name?: string;
-  email?: string;
+  name: string;
+  email: string;
 };
 
 export function displayUser(user: UserData): string {

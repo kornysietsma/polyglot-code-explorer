@@ -5,6 +5,7 @@ import { DefaultProps } from "./components.types";
 import CouplingController from "./CouplingController";
 import { humanizeDate } from "./datetimes";
 import HelpPanel from "./HelpPanel";
+import SaveLoadControls from "./SaveLoadControls";
 import ToggleablePanel from "./ToggleablePanel";
 import UsersAndTeams from "./UsersAndTeams";
 import VisColourKey from "./VisColourKey";
@@ -91,6 +92,9 @@ const Controller = (props: DefaultProps) => {
       <p>
         Selected date range {humanizeDate(earliest)} to {humanizeDate(latest)}
       </p>
+      <ToggleablePanel title="save/load" showInitially={false}>
+        <SaveLoadControls dataRef={dataRef} state={state} dispatch={dispatch} />
+      </ToggleablePanel>
       <ToggleablePanel title="advanced settings" showInitially={false}>
         <div>
           <UsersAndTeams dataRef={dataRef} state={state} dispatch={dispatch} />

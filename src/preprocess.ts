@@ -214,6 +214,16 @@ export function gatherNodesByPath(data: Tree): Map<string, TreeNode> {
   return nodesByPath;
 }
 
+/** 
+ *  Names and emails are converted so nulls become "", and tabs are replaced.
+I don't think you can have a tab in git? but just in case.
+I need tab-free names so later I can use "name\temail" as a map key.
+*/
+function stripTabs(text: string | undefined): string {
+  if (text == undefined) return "";
+  return text.replace("\t", "<tab>");
+}
+
 export function postprocessUsers(users: GitUser[] | undefined): UserData[] {
   if (users === undefined) {
     return [];
@@ -221,8 +231,8 @@ export function postprocessUsers(users: GitUser[] | undefined): UserData[] {
   return users.map((user) => {
     return {
       id: user.id,
-      name: user.user.name,
-      email: user.user.email,
+      name: stripTabs(user.user.name),
+      email: stripTabs(user.user.email),
     };
   });
 }
