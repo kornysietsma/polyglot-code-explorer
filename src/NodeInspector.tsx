@@ -141,7 +141,7 @@ const NodeInspector = ({
   const { earliest, latest } = state.config.filters.dateRange;
   const { topChangersCount } = state.config.numberOfChangers;
   const { couplingAvailable } = state.couplingConfig;
-  const { aliases } = state.config.userData;
+  const { aliases } = state.config.teamsAndAliases;
   const { fileChangeMetric } = state.config;
   const { userTeams } = state.calculated;
 

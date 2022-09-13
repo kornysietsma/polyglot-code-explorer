@@ -6,14 +6,14 @@ import { DefaultProps } from "./components.types";
 import DelayedInput from "./DelayedInput";
 import EditAlias from "./EditAlias";
 import {
-  exportableUserDataToJson,
+  exportableTeamsAndAliasesToJson,
   ExportTeamMember,
+  ExportTeamsAndAliases,
   ExportUser,
   FORMAT_FILE_USER_VERSION,
-  jsonToUserData,
-  StandaloneUserExportData,
-  userDataFromImport,
-  UserExportData,
+  jsonToStandaloneTeamsAndAliases,
+  StandaloneExportTeamsAndAliases,
+  teamsAndAliasesFromImport,
 } from "./exportImport";
 import HelpPanel from "./HelpPanel";
 import { aggregateUserStats, DEFAULT_USER_STATS, UserStats } from "./nodeData";
@@ -187,7 +187,7 @@ const UsersAndTeams = (props: DefaultProps) => {
 
     const { usersAndAliases, aliases, teams } = usersAndTeamsToPageFormat(
       users,
-      state.config.userData,
+      state.config.teamsAndAliases,
       earliest,
       latest,
       true // on open, we always refresh stats
@@ -279,7 +279,7 @@ const UsersAndTeams = (props: DefaultProps) => {
   }
 
   function exportToJson() {
-    const exportData: UserExportData = {
+    const exportData: ExportTeamsAndAliases = {
       aliasData: pageState.usersAndAliases
         .filter((user) => user.isAlias)
         .map((user) => {
@@ -299,15 +299,18 @@ const UsersAndTeams = (props: DefaultProps) => {
         };
       }),
     };
-    const standaloneExportData: StandaloneUserExportData = {
+    const standaloneExportData: StandaloneExportTeamsAndAliases = {
       formatVersion: FORMAT_FILE_USER_VERSION,
-      userData: exportData,
+      teamsAndAliases: exportData,
     };
 
     const tempElement = document.createElement("a");
-    const file = new Blob([exportableUserDataToJson(standaloneExportData)], {
-      type: "application/json",
-    });
+    const file = new Blob(
+      [exportableTeamsAndAliasesToJson(standaloneExportData)],
+      {
+        type: "application/json",
+      }
+    );
     tempElement.href = URL.createObjectURL(file);
     tempElement.download = "userData.json";
     document.body.appendChild(tempElement);
@@ -330,7 +333,7 @@ const UsersAndTeams = (props: DefaultProps) => {
   }
 
   function processImportedData(
-    data: StandaloneUserExportData,
+    data: StandaloneExportTeamsAndAliases,
     tolerant: boolean
   ) {
     const messages: Message[] = [];
@@ -351,13 +354,13 @@ const UsersAndTeams = (props: DefaultProps) => {
         aliasData: importedAliasData,
         aliases: importedAliases,
         teams: importedTeams,
-      } = data.userData;
+      } = data.teamsAndAliases;
 
       const {
-        newUserData,
+        newTeamsAndAliases,
         failed: newFailed,
         messages: newMessages,
-      } = userDataFromImport(
+      } = teamsAndAliasesFromImport(
         users,
         importedAliases,
         importedAliasData,
@@ -370,7 +373,7 @@ const UsersAndTeams = (props: DefaultProps) => {
       if (newMessages.length > 0) {
         messages.push(...newMessages);
       }
-      if (failed || newUserData == undefined) {
+      if (failed || newTeamsAndAliases == undefined) {
         setPageState({
           ...pageState,
           importMessages: messages,
@@ -380,7 +383,7 @@ const UsersAndTeams = (props: DefaultProps) => {
 
       const { usersAndAliases, aliases, teams } = usersAndTeamsToPageFormat(
         users,
-        newUserData,
+        newTeamsAndAliases,
         earliest,
         latest,
         recalcStats
@@ -421,7 +424,7 @@ const UsersAndTeams = (props: DefaultProps) => {
     fileReader.onload = (e) => {
       try {
         if (e.target && typeof e.target?.result == "string") {
-          const value = jsonToUserData(e.target.result);
+          const value = jsonToStandaloneTeamsAndAliases(e.target.result);
           processImportedData(value, tolerant);
         } else {
           addImportMessage(errorMessage("invalid upload result type"));

@@ -74,7 +74,7 @@ function themedColours(config: Config) {
 
 export function teamScale(state: State) {
   return (teamName: string) => {
-    const teamData = state.config.userData.teams.get(teamName);
+    const teamData = state.config.teamsAndAliases.teams.get(teamName);
     return teamData?.colour;
   };
 }

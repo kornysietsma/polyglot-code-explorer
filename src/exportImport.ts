@@ -24,10 +24,10 @@ import {
 import { VizMetadata } from "./viz.types";
 
 /** the version of the format file - changes whenever state format changes */
-export const FORMAT_FILE_VERSION = "1.3.1";
+export const FORMAT_FILE_VERSION = "1.3.2";
 
 /** User data can be saved on it's own, in which case it has it's own format version */
-export const FORMAT_FILE_USER_VERSION = "1.3.1";
+export const FORMAT_FILE_USER_VERSION = "1.3.2";
 
 export type ExportUser = {
   name: string;
@@ -51,18 +51,18 @@ export type ExportTeam = {
   hidden: boolean;
 };
 
-export type UserExportData = {
+export type ExportTeamsAndAliases = {
   aliasData: ExportUser[];
   aliases: [user: ExportUser, aliasedTo: ExportUser][];
   teams: ExportTeam[];
 };
 
-export type StandaloneUserExportData = {
+export type StandaloneExportTeamsAndAliases = {
   formatVersion: string;
-  userData: UserExportData;
+  teamsAndAliases: ExportTeamsAndAliases;
 };
 
-type ExportableConfig = Omit<Config, "userData">;
+type ExportableConfig = Omit<Config, "teamsAndAliases">;
 
 type ExportableState = {
   dataVersion: string;
@@ -72,7 +72,7 @@ type ExportableState = {
   config: ExportableConfig;
   couplingConfig: CouplingConfig;
   expensiveConfig: ExpensiveConfig;
-  userData: UserExportData;
+  teamsAndAliases: ExportTeamsAndAliases;
 };
 
 function toExportUser(
@@ -96,32 +96,37 @@ function toExportTeamMember(
   };
 }
 
-function exportableUserData(state: State, users: UserData[]): UserExportData {
-  const { userData } = state.config;
+function exportableTeamsAndAliases(
+  state: State,
+  users: UserData[]
+): ExportTeamsAndAliases {
+  const { teamsAndAliases } = state.config;
 
   const toExport = (userId: number) => {
     return toExportUser(users, state, userId);
   };
 
-  const aliasData: ExportUser[] = [...userData.aliasData]
+  const aliasData: ExportUser[] = [...teamsAndAliases.aliasData]
     .sort(([userIdA], [userIdB]) => userIdB - userIdA)
     .map(([, user]) => {
       return { name: user.name, email: user.email };
     });
   const exportableAliases: [user: ExportUser, aliasedTo: ExportUser][] = [
-    ...userData.aliases,
+    ...teamsAndAliases.aliases,
   ].map(([fromUser, toUser]) => [toExport(fromUser), toExport(toUser)]);
-  const teams: ExportTeam[] = [...userData.teams].map(([teamName, team]) => {
-    const teamMembers: ExportTeamMember[] = [...team.users].map((u) =>
-      toExportTeamMember(users, state, u)
-    );
-    return {
-      name: teamName,
-      users: teamMembers,
-      colour: team.colour,
-      hidden: team.hidden,
-    };
-  });
+  const teams: ExportTeam[] = [...teamsAndAliases.teams].map(
+    ([teamName, team]) => {
+      const teamMembers: ExportTeamMember[] = [...team.users].map((u) =>
+        toExportTeamMember(users, state, u)
+      );
+      return {
+        name: teamName,
+        users: teamMembers,
+        colour: team.colour,
+        hidden: team.hidden,
+      };
+    }
+  );
 
   return {
     aliasData,
@@ -136,7 +141,7 @@ export function stateToExportable(
   metadata: VizMetadata
 ): ExportableState {
   // explicitly save these parts of state - other parts might not be wanted
-  const { userData: _unused, ...trimmedConfig } = state.config;
+  const { teamsAndAliases: _unused, ...trimmedConfig } = state.config;
   const fixedConfig: ExportableConfig = {
     ...trimmedConfig,
   };
@@ -149,7 +154,7 @@ export function stateToExportable(
     config: fixedConfig,
     expensiveConfig: state.expensiveConfig,
     couplingConfig: state.couplingConfig,
-    userData: exportableUserData(state, metadata.users),
+    teamsAndAliases: exportableTeamsAndAliases(state, metadata.users),
   };
 }
 
@@ -163,7 +168,11 @@ export function stateFromExportable(
     const { users } = metadata;
     let failed = false;
 
-    const { aliasData, aliases, teams: teams } = exportableState.userData;
+    const {
+      aliasData,
+      aliases,
+      teams: teams,
+    } = exportableState.teamsAndAliases;
 
     if (exportableState.formatVersion != FORMAT_FILE_VERSION) {
       messages.push(
@@ -185,23 +194,23 @@ export function stateFromExportable(
     }
 
     const {
-      newUserData,
+      newTeamsAndAliases,
       failed: newFailed,
       messages: newMessages,
-    } = userDataFromImport(users, aliases, aliasData, teams, tolerant);
+    } = teamsAndAliasesFromImport(users, aliases, aliasData, teams, tolerant);
     if (newFailed) {
       failed = true;
     }
     if (newMessages.length > 0) {
       messages.push(...newMessages);
     }
-    if (newUserData == undefined) {
-      // userDataFromImport must have failed fatally
+    if (newTeamsAndAliases == undefined) {
+      // teamsAndAliasesFromImport must have failed fatally
       return { state: undefined, messages };
     }
     const newConfig: Config = {
       ...exportableState.config,
-      ...{ userData: newUserData },
+      ...{ teamsAndAliases: newTeamsAndAliases },
     };
     const newState: State = {
       config: newConfig,
@@ -220,13 +229,17 @@ export function stateFromExportable(
   }
 }
 
-export function userDataFromImport(
+export function teamsAndAliasesFromImport(
   users: UserData[],
   importedAliases: [user: ExportUser, aliasedTo: ExportUser][],
   importedAliasData: ExportUser[],
   importedTeams: ExportTeam[],
   tolerant: boolean
-): { newUserData?: TeamsAndAliases; failed: boolean; messages: Message[] } {
+): {
+  newTeamsAndAliases?: TeamsAndAliases;
+  failed: boolean;
+  messages: Message[];
+} {
   let failed = false;
   const messages: Message[] = [];
   try {
@@ -291,15 +304,15 @@ export function userDataFromImport(
         number
       ][]
     );
-    const newUserData = {
+    const newTeamsAndAliases = {
       teams: newTeams,
       aliases: newAliases,
       aliasData: newAliasData,
     };
-    return { newUserData, failed, messages };
+    return { newTeamsAndAliases, failed, messages };
   } catch (e) {
     messages.push(errorMessage(`${e}`));
-    return { newUserData: undefined, failed: true, messages };
+    return { newTeamsAndAliases: undefined, failed: true, messages };
   }
 }
 
@@ -339,8 +352,8 @@ export function exportableStateToJson(state: ExportableState): string {
   return JSON.stringify(state, jsonReplacer, 2);
 }
 
-export function exportableUserDataToJson(
-  state: StandaloneUserExportData
+export function exportableTeamsAndAliasesToJson(
+  state: StandaloneExportTeamsAndAliases
 ): string {
   return JSON.stringify(state, jsonReplacer, 2);
 }
@@ -356,7 +369,9 @@ export function jsonToExportableState(json: string): ExportableState {
   return result as ExportableState;
 }
 
-export function jsonToUserData(json: string): StandaloneUserExportData {
+export function jsonToStandaloneTeamsAndAliases(
+  json: string
+): StandaloneExportTeamsAndAliases {
   const result = JSON.parse(json, jsonReviver);
   if (typeof result !== "object") {
     throw new Error("Json wasn't an object");
@@ -364,5 +379,5 @@ export function jsonToUserData(json: string): StandaloneUserExportData {
   if (!result["formatVersion"]) {
     throw new Error("Json had no version - probably not a user file");
   }
-  return result as StandaloneUserExportData;
+  return result as StandaloneExportTeamsAndAliases;
 }

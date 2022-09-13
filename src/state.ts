@@ -103,7 +103,7 @@ export type Config = {
     precision: number;
     topChangersCount: number; // show this many changers in NodeInspector
   };
-  userData: TeamsAndAliases;
+  teamsAndAliases: TeamsAndAliases;
   colours: {
     currentTheme: "dark" | "light"; // also sets css on the body!
     dark: {
@@ -237,7 +237,7 @@ export function getUserData(
   userId: number
 ): UserData {
   const user = isAlias(users, userId)
-    ? state.config.userData.aliasData.get(userId)
+    ? state.config.teamsAndAliases.aliasData.get(userId)
     : users[userId];
   if (user == undefined) {
     throw new Error(`Invalid user id #{userId}`);
@@ -357,7 +357,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
         precision: 0,
         topChangersCount: 10, // show this many changers in NodeInspector
       },
-      userData: {
+      teamsAndAliases: {
         teams: new Map(),
         aliases: new Map(),
         aliasData: new Map(),
@@ -480,14 +480,16 @@ function postprocessState(
   console.time("postprocessing state");
   let resultingState = newState;
   let alreadyCloned = false; // if we modify state, need to clone it - but only once!
-  if (resultingState.config.userData !== oldState.config.userData) {
+  if (
+    resultingState.config.teamsAndAliases !== oldState.config.teamsAndAliases
+  ) {
     console.log("user data changed - updating cache");
     if (!alreadyCloned) {
       resultingState = _.cloneDeep(resultingState);
       alreadyCloned = true;
     }
     resultingState.calculated.userTeams = buildUserTeams(
-      resultingState.config.userData.teams
+      resultingState.config.teamsAndAliases.teams
     );
   }
   console.timeEnd("postprocessing state");
@@ -712,9 +714,9 @@ function updateStateFromAction(state: State, action: Action): State {
 
     case "setUserTeamAliasData": {
       const result = _.cloneDeep(state);
-      result.config.userData.teams = action.payload.teams;
-      result.config.userData.aliases = action.payload.aliases;
-      result.config.userData.aliasData = action.payload.aliasData;
+      result.config.teamsAndAliases.teams = action.payload.teams;
+      result.config.teamsAndAliases.aliases = action.payload.aliases;
+      result.config.teamsAndAliases.aliasData = action.payload.aliasData;
       return result;
     }
 

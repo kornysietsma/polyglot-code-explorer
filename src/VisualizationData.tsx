@@ -308,7 +308,7 @@ class NumberOfChangersVisualization extends BaseVisualization<number> {
   }
   dataFn(d: HierarchyNode<FileNode>): number | undefined {
     const { earliest, latest } = this.state.config.filters.dateRange;
-    const { aliases } = this.state.config.userData;
+    const { aliases } = this.state.config.teamsAndAliases;
     if (earliest && latest) {
       return nodeNumberOfChangers(d.data, aliases, earliest, latest);
     }
@@ -365,7 +365,7 @@ class TeamVisualization extends BaseVisualization<string> {
     this.scale = teamScale(state);
   }
   dataFn(d: HierarchyNode<FileNode>): string | undefined {
-    const { aliases } = this.state.config.userData;
+    const { aliases } = this.state.config.teamsAndAliases;
     const { userTeams } = this.state.calculated;
     const { earliest, latest } = this.state.config.filters.dateRange;
     return nodeTopTeam(
@@ -383,7 +383,7 @@ class TeamVisualization extends BaseVisualization<string> {
   }
 
   colourKey(): [string, string][] {
-    const { teams } = this.state.config.userData;
+    const { teams } = this.state.config.teamsAndAliases;
     return [...teams]
       .filter(([, team]) => !team.hidden)
       .sort(sortTeamsByName)
