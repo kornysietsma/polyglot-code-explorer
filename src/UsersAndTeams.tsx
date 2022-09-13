@@ -23,12 +23,14 @@ import {
   infoMessage,
   Message,
   sortTeamsByName,
+  Team,
   Teams,
   TeamsAndAliases,
   themedColours,
   UserAliasData,
   UserAliases,
 } from "./state";
+import TeamWidget from "./TeamWidget";
 import ToggleablePanel from "./ToggleablePanel";
 
 export type UserAndStatsAndAliases = UserData &
@@ -659,6 +661,28 @@ const UsersAndTeams = (props: DefaultProps) => {
     setAliasModalIsOpen(true);
   };
 
+  function teamsForUser(userId: number): [name: string, data: Team][] {
+    const userTeams = [...pageState.teams].filter(([, teamData]) =>
+      teamData.users.has(userId)
+    );
+    return userTeams;
+  }
+  function userTeamDisplay(userId: number) {
+    const teams = teamsForUser(userId).sort(sortTeamsByName);
+    return (
+      <span>
+        {teams.map(([teamName, team]) => (
+          <TeamWidget
+            key={teamName}
+            team={team}
+            bodyText={teamName}
+            hoverText={teamName}
+          ></TeamWidget>
+        ))}
+      </span>
+    );
+  }
+
   return (
     <div>
       <button onClick={openModal} type="button">
@@ -971,7 +995,6 @@ const UsersAndTeams = (props: DefaultProps) => {
                 >
                   ID
                 </th>
-                <th>alias?</th>
                 <th
                   onClick={() => setSort("name")}
                   className={sortHeaderStyle("name")}
@@ -1009,16 +1032,15 @@ const UsersAndTeams = (props: DefaultProps) => {
                   Lines changed total
                 </th>
                 <th>Actions</th>
+                <th>Teams</th>
               </tr>
             </thead>
             <tbody>
               {sortUsers(pageState.usersAndAliases, pageState.usersSort)
                 .filter(userFilter)
                 .map((user) => {
-                  const aliased = pageState.aliases.has(user.id);
-
                   return (
-                    <tr key={user.id} className={aliased ? "aliased" : ""}>
+                    <tr key={user.id}>
                       <td>
                         <input
                           type="checkbox"
@@ -1033,11 +1055,6 @@ const UsersAndTeams = (props: DefaultProps) => {
                         ></input>
                       </td>
                       <td>{user.id}</td>
-                      <td>
-                        {aliased
-                          ? ` -> ${pageState.aliases.get(user.id)!}`
-                          : ""}
-                      </td>
                       <td>{user.name}</td>
                       <td>{user.email}</td>
                       <td>{user.files}</td>
@@ -1051,6 +1068,8 @@ const UsersAndTeams = (props: DefaultProps) => {
                           </button>
                         ) : null}
                       </td>
+
+                      <td>{userTeamDisplay(user.id)}</td>
                     </tr>
                   );
                 })}

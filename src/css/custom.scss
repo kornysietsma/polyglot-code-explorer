@@ -76,3 +76,10 @@ table.sortable {
 span.delayedInput {
   white-space: nowrap;
 }
+
+.teamWidget {
+  display: inline-block;
+  min-width: 1em;
+  min-height: 1em;
+  padding: 0 5px 0 5px;
+}
