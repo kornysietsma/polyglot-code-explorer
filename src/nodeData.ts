@@ -361,6 +361,14 @@ export type UserStats = {
   lastCommitDay?: number;
 };
 
+export const DEFAULT_USER_STATS: UserStats = {
+  commits: 0,
+  lines: 0,
+  days: 0,
+  files: 0,
+  lastCommitDay: undefined,
+};
+
 // accumulates all changes within a date range by user
 export function nodeChangers(
   node: FileNode,

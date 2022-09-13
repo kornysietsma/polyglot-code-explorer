@@ -13,7 +13,7 @@ type Props = {
   modalIsOpen: boolean;
   setIsOpen: Dispatch<SetStateAction<boolean>>;
   parentState: UsersAndTeamsPageState;
-  setParentState: Dispatch<SetStateAction<UsersAndTeamsPageState>>;
+  setParentState: (newState: UsersAndTeamsPageState) => void;
 };
 
 type PageState = {
@@ -179,7 +179,6 @@ const EditAlias = (props: Props) => {
       if (aliasUser == undefined) {
         throw new Error("Logic error: Editing undefined user");
       }
-      aliasUser.outOfDate = true;
       aliasUser.name = pageState.aliasName;
       aliasUser.email = pageState.aliasEmail;
       newParentState.usersAndAliases.forEach((user, userId) => {
@@ -206,7 +205,6 @@ const EditAlias = (props: Props) => {
         days: 0,
         files: 0,
         lastCommitDay: undefined,
-        outOfDate: true,
       };
       newParentState.usersAndAliases.push(aliasUser);
       newParentState.usersAndAliases.forEach((user, userId) => {

@@ -16,7 +16,7 @@ import {
   UserExportData,
 } from "./exportImport";
 import HelpPanel from "./HelpPanel";
-import { aggregateUserStats, UserStats } from "./nodeData";
+import { aggregateUserStats, DEFAULT_USER_STATS, UserStats } from "./nodeData";
 import { displayUser, UserData } from "./polyglot_data.types";
 import {
   errorMessage,
@@ -32,7 +32,7 @@ import {
 import ToggleablePanel from "./ToggleablePanel";
 
 export type UserAndStatsAndAliases = UserData &
-  UserStats & { isAlias: boolean; outOfDate: boolean };
+  UserStats & { isAlias: boolean };
 
 export type UsersAndTeamsPageState = {
   usersAndAliases: UserAndStatsAndAliases[];
@@ -124,39 +124,35 @@ const UsersAndTeams = (props: DefaultProps) => {
 
   const [tolerant, setTolerant] = React.useState(false);
   const tolerantCheckId = useId();
+  const [recalcStats, setRecalcStats] = React.useState(true);
+  const recalcStatsId = useId();
 
   const hiddenFileInput = React.useRef<HTMLInputElement>(null);
 
-  function toPageStateFormat(
+  /** converts users as stored in global state into format needed here, with stats */
+  function usersAndTeamsToPageFormat(
     users: UserData[],
     teamsAndAliases: TeamsAndAliases,
     earliest: number,
-    latest: number
+    latest: number,
+    recalcStats: boolean
   ): {
     usersAndAliases: UserAndStatsAndAliases[];
     aliases: UserAliases;
     teams: Teams;
   } {
-    const userStats = aggregateUserStats(
-      tree,
-      earliest,
-      latest,
-      teamsAndAliases.aliases
-    );
+    const userStats = recalcStats
+      ? aggregateUserStats(tree, earliest, latest, teamsAndAliases.aliases)
+      : undefined;
 
     const usersWithStats: UserAndStatsAndAliases[] = users.map((user) => {
-      const stats = userStats.get(user.id);
+      const stats = userStats?.get(user.id);
       if (stats) {
-        return { ...user, ...stats, outOfDate: false, isAlias: false };
+        return { ...user, ...stats, isAlias: false };
       } else {
         return {
           ...user,
-          files: 0,
-          lines: 0,
-          days: 0,
-          commits: 0,
-          lastCommitDay: undefined,
-          outOfDate: false,
+          ...DEFAULT_USER_STATS,
           isAlias: false,
         };
       }
@@ -166,18 +162,13 @@ const UsersAndTeams = (props: DefaultProps) => {
     ]
       .sort(([aliasIdA], [aliasIdB]) => aliasIdA - aliasIdB)
       .map(([aliasId, userData]) => {
-        const stats = userStats.get(aliasId);
+        const stats = userStats?.get(aliasId);
         if (stats) {
-          return { ...userData, ...stats, outOfDate: false, isAlias: true };
+          return { ...userData, ...stats, isAlias: true };
         } else {
           return {
             ...userData,
-            files: 0,
-            lines: 0,
-            days: 0,
-            commits: 0,
-            lastCommitDay: undefined,
-            outOfDate: false,
+            ...DEFAULT_USER_STATS,
             isAlias: true,
           };
         }
@@ -194,11 +185,12 @@ const UsersAndTeams = (props: DefaultProps) => {
     // Need to re-initialise local state from parent state every time we open the modal
     const { earliest, latest } = state.config.filters.dateRange;
 
-    const { usersAndAliases, aliases, teams } = toPageStateFormat(
+    const { usersAndAliases, aliases, teams } = usersAndTeamsToPageFormat(
       users,
       state.config.userData,
       earliest,
-      latest
+      latest,
+      true // on open, we always refresh stats
     );
 
     setPageState({
@@ -211,19 +203,38 @@ const UsersAndTeams = (props: DefaultProps) => {
     setIsOpen(true);
   }
 
-  /** refresh stats after we change aliases or teams */
-  function refreshStats() {
-    const { earliest, latest } = state.config.filters.dateRange;
-    const { aliases } = pageState;
+  function recalcStatsForPageState(
+    workingPageState: UsersAndTeamsPageState,
+    alreadyCloned: boolean
+  ): UsersAndTeamsPageState {
+    const { aliases } = workingPageState;
     const userStats = aggregateUserStats(tree, earliest, latest, aliases);
 
-    const newPageState = _.cloneDeep(pageState);
-    for (let user of newPageState.usersAndAliases) {
+    const newPageState = alreadyCloned
+      ? workingPageState
+      : _.cloneDeep(workingPageState);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    newPageState.usersAndAliases.forEach((user, index, arr) => {
       const stats = userStats.get(user.id);
       if (stats) {
-        user = { ...user, ...stats, outOfDate: false };
+        arr[index] = { ...user, ...stats };
+      } else {
+        arr[index] = { ...user, ...DEFAULT_USER_STATS };
       }
-    }
+    });
+    return newPageState;
+  }
+
+  function manuallyRecalcStats() {
+    const newPageState = recalcStatsForPageState(pageState, false);
+    setPageState(newPageState);
+  }
+  // called from child dialog
+  function setPageStateAndRecalc(newState: UsersAndTeamsPageState): void {
+    const finalState = recalcStats
+      ? recalcStatsForPageState(newState, true)
+      : newState;
+    setPageState(finalState);
   }
 
   function cancel() {
@@ -367,11 +378,12 @@ const UsersAndTeams = (props: DefaultProps) => {
         return;
       }
 
-      const { usersAndAliases, aliases, teams } = toPageStateFormat(
+      const { usersAndAliases, aliases, teams } = usersAndTeamsToPageFormat(
         users,
         newUserData,
         earliest,
-        latest
+        latest,
+        recalcStats
       );
 
       if (tolerant && messages.length > 0) {
@@ -659,7 +671,6 @@ const UsersAndTeams = (props: DefaultProps) => {
         <div className="buttonList">
           <button onClick={save}>save and close</button>
           <button onClick={cancel}>cancel</button>
-          <button onClick={refreshStats}>refresh stats (after editing)</button>
           <button onClick={exportToJson}>export to JSON</button>
           <button
             onClick={() => {
@@ -695,6 +706,18 @@ const UsersAndTeams = (props: DefaultProps) => {
               }}
             />
           </label>
+          <label htmlFor={tolerantCheckId}>
+            Refresh stats after import or editing:&nbsp;
+            <input
+              type="checkbox"
+              id={recalcStatsId}
+              checked={recalcStats}
+              onChange={(evt) => {
+                setRecalcStats(evt.target.checked);
+              }}
+            />
+          </label>
+          <button onClick={manuallyRecalcStats}>refresh stats now</button>
         </div>
         {pageState.importMessages.length == 0 ? null : (
           <div className="Messages">
@@ -887,7 +910,7 @@ const UsersAndTeams = (props: DefaultProps) => {
           modalIsOpen={aliasModalIsOpen}
           setIsOpen={setAliasModalIsOpen}
           parentState={pageState}
-          setParentState={setPageState}
+          setParentState={setPageStateAndRecalc}
         />
         <ToggleablePanel
           title="Users"
