@@ -15,7 +15,6 @@ import {
 import {
   FileChangeMetric,
   possiblyAlias,
-  State,
   UserAliases,
   UserTeams,
 } from "./state";
@@ -535,11 +534,10 @@ function lastDay(days: number[]): number | undefined {
 
 export function aggregateUserStats(
   node: TreeNode,
-  state: State
+  earliest: number,
+  latest: number,
+  aliases: UserAliases
 ): Map<number, UserStats> {
-  const { config } = state;
-  const { earliest, latest } = config.filters.dateRange;
-  const { aliases } = config.userData;
   const userStats: Map<number, UserStatsAccumulator> = new Map();
   addUserStats(userStats, node, aliases, earliest, latest);
   return new Map(

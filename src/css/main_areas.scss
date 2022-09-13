@@ -1,10 +1,15 @@
 /* the main top-level areas */
 
 .App-header {
-  text-align: center;
+  /* using flexbox to have the h1 centered, and two h3s left and right (the right one is blank */
+  display: flex;
   h1 {
     font-size: 2rem;
     margin: 0.3em 0;
+  }
+  h3 {
+    flex: 1;
+    margin: 0.5em 0;
   }
 }
 

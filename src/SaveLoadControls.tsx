@@ -93,7 +93,6 @@ const SaveLoadControls = (props: DefaultProps) => {
         throw new Error("No file passed to import");
       }
       const file = files[0]!;
-      console.log("importing", file);
       const fileReader = new FileReader();
       fileReader.readAsText(file);
       fileReader.onload = (e) => {
@@ -146,13 +145,12 @@ const SaveLoadControls = (props: DefaultProps) => {
             hiddenFileInput.current!.value = "";
           }}
           onChange={(event) => {
-            console.log("uploaded:", event);
             importFromJson(event.target?.files);
           }}
         ></input>
       </div>
       <label htmlFor={tolerantCheckId}>
-        Ignore import errors:&nbsp;
+        Ignore non-fatal import errors:&nbsp;
         <input
           type="checkbox"
           id={tolerantCheckId}

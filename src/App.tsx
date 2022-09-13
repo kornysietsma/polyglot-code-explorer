@@ -25,7 +25,9 @@ const App = ({ dataRefMaybe }: { dataRefMaybe: VizDataRefMaybe }) => {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>Polyglot Code Explorer v{process.env.REACT_APP_VERSION}</h1>
+        <h3>Polyglot Code Explorer v{process.env.REACT_APP_VERSION}</h3>
+        <h1>{dataRef.current.files.name}</h1>
+        <h3></h3>
       </header>
       <Messages messages={vizState.messages} dispatch={dispatch} />
       <Viz dataRef={dataRef} state={vizState} dispatch={dispatch} />

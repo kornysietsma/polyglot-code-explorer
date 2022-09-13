@@ -151,7 +151,6 @@ const Controller = (props: DefaultProps) => {
               id={codeServerId}
               checked={state.config.codeInspector.enabled}
               onChange={(evt) => {
-                console.log("chchange:", evt.target);
                 dispatch({
                   type: "enableCodeServer",
                   payload: evt.target.checked,

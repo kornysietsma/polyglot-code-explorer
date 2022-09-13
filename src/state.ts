@@ -17,6 +17,13 @@ export type Teams = Map<string, Team>;
 
 export type FileChangeMetric = "lines" | "commits" | "files" | "days";
 
+export type TeamsAndAliases = {
+  teams: Teams;
+  aliases: UserAliases;
+  // alias keys are sequential numbers starting with the users length
+  aliasData: UserAliasData;
+};
+
 export type Config = {
   visualization: string; // could be fixed set
   subVis?: string;
@@ -96,12 +103,7 @@ export type Config = {
     precision: number;
     topChangersCount: number; // show this many changers in NodeInspector
   };
-  userData: {
-    teams: Teams;
-    aliases: UserAliases;
-    // alias keys are sequential numbers starting with the users length
-    aliasData: UserAliasData;
-  };
+  userData: TeamsAndAliases;
   colours: {
     currentTheme: "dark" | "light"; // also sets css on the body!
     dark: {
@@ -221,7 +223,7 @@ export type State = {
   messages: Message[];
 };
 
-function isAlias(users: UserData[], userId: number): boolean {
+export function isAlias(users: UserData[], userId: number): boolean {
   return userId >= users.length;
 }
 

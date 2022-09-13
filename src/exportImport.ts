@@ -13,33 +13,40 @@ import {
   errorMessage,
   ExpensiveConfig,
   getUserData,
+  isAlias,
   Message,
   State,
   Teams,
+  TeamsAndAliases,
   UserAliasData,
   UserAliases,
 } from "./state";
 import { VizMetadata } from "./viz.types";
 
 /** the version of the format file - changes whenever state format changes */
-export const FORMAT_FILE_VERSION = "1.0.1";
+export const FORMAT_FILE_VERSION = "1.3.1";
 
 /** User data can be saved on it's own, in which case it has it's own format version */
-export const FORMAT_FILE_USER_VERSION = "1.1.0";
+export const FORMAT_FILE_USER_VERSION = "1.3.1";
 
 export type ExportUser = {
   name: string;
   email: string;
 };
 
+export type ExportTeamMember = ExportUser & { isAlias: boolean };
+
 /** for reverse indexes */
 export function userAsKey(user: UserData | ExportUser) {
-  return `${user.name}\t${user.email}`;
+  return `${user.name}\t${user.email}\tf`;
+}
+export function aliasAsKey(user: UserData | ExportUser) {
+  return `${user.name}\t${user.email}\tt`;
 }
 
 export type ExportTeam = {
   name: string;
-  users: ExportUser[];
+  users: ExportTeamMember[];
   colour: string;
   hidden: boolean;
 };
@@ -51,7 +58,7 @@ export type UserExportData = {
 };
 
 export type StandaloneUserExportData = {
-  version: string;
+  formatVersion: string;
   userData: UserExportData;
 };
 
@@ -76,28 +83,50 @@ function toExportUser(
   const user = getUserData(users, state, userId);
   return { name: user.name, email: user.email };
 }
+function toExportTeamMember(
+  users: UserData[],
+  state: State,
+  userId: number
+): ExportTeamMember {
+  const user = getUserData(users, state, userId);
+  return {
+    name: user.name,
+    email: user.email,
+    isAlias: isAlias(users, userId),
+  };
+}
 
 function exportableUserData(state: State, users: UserData[]): UserExportData {
-  const toExport = (userId: number) => toExportUser(users, state, userId);
-
   const { userData } = state.config;
+
+  const toExport = (userId: number) => {
+    return toExportUser(users, state, userId);
+  };
+
   const aliasData: ExportUser[] = [...userData.aliasData]
     .sort(([userIdA], [userIdB]) => userIdB - userIdA)
     .map(([, user]) => {
       return { name: user.name, email: user.email };
     });
-  const aliases: [user: ExportUser, aliasedTo: ExportUser][] = [
+  const exportableAliases: [user: ExportUser, aliasedTo: ExportUser][] = [
     ...userData.aliases,
   ].map(([fromUser, toUser]) => [toExport(fromUser), toExport(toUser)]);
   const teams: ExportTeam[] = [...userData.teams].map(([teamName, team]) => {
-    const users = [...team.users].map(toExport);
-    return { name: teamName, users, colour: team.colour, hidden: team.hidden };
+    const teamMembers: ExportTeamMember[] = [...team.users].map((u) =>
+      toExportTeamMember(users, state, u)
+    );
+    return {
+      name: teamName,
+      users: teamMembers,
+      colour: team.colour,
+      hidden: team.hidden,
+    };
   });
 
   return {
     aliasData,
-    aliases,
-    teams,
+    aliases: exportableAliases,
+    teams: teams,
   };
 }
 
@@ -129,100 +158,149 @@ export function stateFromExportable(
   exportableState: ExportableState,
   tolerant: boolean
 ): { state?: State; messages: Message[] } {
-  const { users } = metadata;
-  let failed = false;
-
   const messages: Message[] = [];
-  const { aliasData, aliases, teams } = exportableState.userData;
+  try {
+    const { users } = metadata;
+    let failed = false;
 
-  if (exportableState.formatVersion != FORMAT_FILE_VERSION) {
-    messages.push(
-      errorMessage(
-        `Invalid format version ${exportableState.formatVersion} - expected ${FORMAT_FILE_VERSION}`
-      )
-    );
-    if (!tolerant) failed = true;
-  }
-  if (!semver.satisfies(exportableState.dataVersion, SUPPORTED_FILE_VERSION)) {
-    messages.push(
-      errorMessage(
-        `Invalid data version ${exportableState.dataVersion} - this release of Explorer supports  ${SUPPORTED_FILE_VERSION}`
-      )
-    );
-    if (!tolerant) failed = true;
-  }
+    const { aliasData, aliases, teams: teams } = exportableState.userData;
 
-  const firstAliasId = users.length;
-  const newAliasData: UserAliasData = new Map(
-    aliasData.map((alias, index) => {
-      const newId = index + firstAliasId;
-      return [newId, { id: newId, name: alias.name, email: alias.email }];
-    })
-  );
-  const reverseLookup: Map<string, number> = new Map();
-  for (const user of users) {
-    reverseLookup.set(userAsKey(user), user.id);
-  }
-  for (const alias of newAliasData.values()) {
-    reverseLookup.set(userAsKey(alias), alias.id);
-  }
-  const lookupUser = (exportUser: ExportUser) => {
-    const userMatch = reverseLookup.get(userAsKey(exportUser));
-
-    if (userMatch == undefined) {
+    if (exportableState.formatVersion != FORMAT_FILE_VERSION) {
       messages.push(
-        errorMessage(`Unknown user "${exportUser.name} <${exportUser.email}>"`)
+        errorMessage(
+          `Invalid format version ${exportableState.formatVersion} - expected ${FORMAT_FILE_VERSION}`
+        )
       );
       if (!tolerant) failed = true;
-      return undefined;
     }
-    return userMatch;
-  };
+    if (
+      !semver.satisfies(exportableState.dataVersion, SUPPORTED_FILE_VERSION)
+    ) {
+      messages.push(
+        errorMessage(
+          `Invalid data version ${exportableState.dataVersion} - this release of Explorer supports  ${SUPPORTED_FILE_VERSION}`
+        )
+      );
+      if (!tolerant) failed = true;
+    }
 
-  const newTeams: Teams = new Map(
-    teams.map((team) => {
-      return [
-        team.name,
-        {
-          colour: team.colour,
-          users: new Set<number>(
-            team.users.map(lookupUser).filter((u) => u != undefined) as number[]
-          ),
-          hidden: team.hidden,
-        },
-      ];
-    })
-  );
-  const newAliases: UserAliases = new Map(
-    aliases
-      .map(([user, aliasedTo]) => {
-        return [lookupUser(user), lookupUser(aliasedTo)];
+    const {
+      newUserData,
+      failed: newFailed,
+      messages: newMessages,
+    } = userDataFromImport(users, aliases, aliasData, teams, tolerant);
+    if (newFailed) {
+      failed = true;
+    }
+    if (newMessages.length > 0) {
+      messages.push(...newMessages);
+    }
+    if (newUserData == undefined) {
+      // userDataFromImport must have failed fatally
+      return { state: undefined, messages };
+    }
+    const newConfig: Config = {
+      ...exportableState.config,
+      ...{ userData: newUserData },
+    };
+    const newState: State = {
+      config: newConfig,
+      couplingConfig: exportableState.couplingConfig,
+      expensiveConfig: exportableState.expensiveConfig,
+      calculated: {
+        // calculated in dispatcher
+        userTeams: new Map(),
+      },
+      messages,
+    };
+    return { state: failed ? undefined : newState, messages };
+  } catch (e) {
+    messages.push(errorMessage(`${e}`));
+    return { state: undefined, messages };
+  }
+}
+
+export function userDataFromImport(
+  users: UserData[],
+  importedAliases: [user: ExportUser, aliasedTo: ExportUser][],
+  importedAliasData: ExportUser[],
+  importedTeams: ExportTeam[],
+  tolerant: boolean
+): { newUserData?: TeamsAndAliases; failed: boolean; messages: Message[] } {
+  let failed = false;
+  const messages: Message[] = [];
+  try {
+    const firstAliasId = users.length;
+    const newAliasData: UserAliasData = new Map(
+      importedAliasData.map((alias, index) => {
+        const newId: number = index + firstAliasId;
+        return [newId, { id: newId, name: alias.name, email: alias.email }];
       })
-      .filter(([a, b]) => a != undefined && b != undefined) as [
-      number,
-      number
-    ][]
-  );
-  const newUserData = {
-    teams: newTeams,
-    aliases: newAliases,
-    aliasData: newAliasData,
-  };
-  const newConfig: Config = {
-    ...exportableState.config,
-    ...{ userData: newUserData },
-  };
-  const newState: State = {
-    config: newConfig,
-    couplingConfig: exportableState.couplingConfig,
-    expensiveConfig: exportableState.expensiveConfig,
-    calculated: {
-      // calculated in dispatcher
-      userTeams: new Map(),
-    },
-    messages,
-  };
-  return { state: failed ? undefined : newState, messages };
+    );
+    const reverseLookup: Map<string, number> = new Map();
+    const aliasReverseLookup: Map<string, number> = new Map();
+    for (const user of users) {
+      reverseLookup.set(userAsKey(user), user.id);
+    }
+    for (const alias of newAliasData.values()) {
+      aliasReverseLookup.set(userAsKey(alias), alias.id);
+    }
+    const lookupUser = (exportUser: ExportUser, isAlias: boolean) => {
+      const userKey = userAsKey(exportUser);
+      const userMatch = isAlias
+        ? aliasReverseLookup.get(userKey)
+        : reverseLookup.get(userKey);
+
+      if (userMatch == undefined) {
+        messages.push(
+          errorMessage(
+            `Unknown ${isAlias ? "alias" : "user"} "${exportUser.name} <${
+              exportUser.email
+            }>"`
+          )
+        );
+        if (!tolerant) failed = true;
+        return undefined;
+      }
+      return userMatch;
+    };
+
+    const newTeams: Teams = new Map(
+      importedTeams.map((team) => {
+        return [
+          team.name,
+          {
+            colour: team.colour,
+            users: new Set<number>(
+              team.users
+                .map((u) => lookupUser(u, u.isAlias))
+                .filter((u) => u != undefined) as number[]
+            ),
+            hidden: team.hidden,
+          },
+        ];
+      })
+    );
+    const newAliases: UserAliases = new Map(
+      importedAliases
+        .map(([user, aliasedTo]) => {
+          return [lookupUser(user, false), lookupUser(aliasedTo, true)];
+        })
+        .filter(([a, b]) => a != undefined && b != undefined) as [
+        number,
+        number
+      ][]
+    );
+    const newUserData = {
+      teams: newTeams,
+      aliases: newAliases,
+      aliasData: newAliasData,
+    };
+    return { newUserData, failed, messages };
+  } catch (e) {
+    messages.push(errorMessage(`${e}`));
+    return { newUserData: undefined, failed: true, messages };
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -284,7 +362,7 @@ export function jsonToUserData(json: string): StandaloneUserExportData {
     throw new Error("Json wasn't an object");
   }
   if (!result["formatVersion"]) {
-    throw new Error("Json had no version - probably not a state file");
+    throw new Error("Json had no version - probably not a user file");
   }
   return result as StandaloneUserExportData;
 }

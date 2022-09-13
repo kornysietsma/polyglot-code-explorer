@@ -7,19 +7,24 @@ import DelayedInput from "./DelayedInput";
 import EditAlias from "./EditAlias";
 import {
   exportableUserDataToJson,
+  ExportTeamMember,
   ExportUser,
   FORMAT_FILE_USER_VERSION,
   jsonToUserData,
   StandaloneUserExportData,
-  userAsKey,
+  userDataFromImport,
   UserExportData,
 } from "./exportImport";
 import HelpPanel from "./HelpPanel";
 import { aggregateUserStats, UserStats } from "./nodeData";
 import { displayUser, UserData } from "./polyglot_data.types";
 import {
+  errorMessage,
+  infoMessage,
+  Message,
   sortTeamsByName,
   Teams,
+  TeamsAndAliases,
   themedColours,
   UserAliasData,
   UserAliases,
@@ -37,7 +42,7 @@ export type UsersAndTeamsPageState = {
   checkedUsers: Set<number>;
   userFilter: string;
   showCheckedUsers: boolean;
-  importErrors: string[];
+  importMessages: Message[];
 };
 const initialPageState: () => UsersAndTeamsPageState = () => {
   return {
@@ -49,7 +54,7 @@ const initialPageState: () => UsersAndTeamsPageState = () => {
     checkedUsers: new Set(),
     userFilter: "",
     showCheckedUsers: false,
-    importErrors: [],
+    importMessages: [],
   };
 };
 
@@ -102,8 +107,7 @@ const UsersAndTeams = (props: DefaultProps) => {
   const { dataRef, state, dispatch } = props;
 
   const { users } = dataRef.current.metadata;
-
-  const { userData } = state.config;
+  const { earliest, latest } = state.config.filters.dateRange;
 
   const [pageState, setPageState] = React.useState<UsersAndTeamsPageState>(
     initialPageState()
@@ -118,11 +122,27 @@ const UsersAndTeams = (props: DefaultProps) => {
     number | undefined
   >(undefined);
 
+  const [tolerant, setTolerant] = React.useState(false);
+  const tolerantCheckId = useId();
+
   const hiddenFileInput = React.useRef<HTMLInputElement>(null);
 
-  function openModal() {
-    // Need to re-initialise local state from parent state every time we open the modal
-    const userStats = aggregateUserStats(tree, state);
+  function toPageStateFormat(
+    users: UserData[],
+    teamsAndAliases: TeamsAndAliases,
+    earliest: number,
+    latest: number
+  ): {
+    usersAndAliases: UserAndStatsAndAliases[];
+    aliases: UserAliases;
+    teams: Teams;
+  } {
+    const userStats = aggregateUserStats(
+      tree,
+      earliest,
+      latest,
+      teamsAndAliases.aliases
+    );
 
     const usersWithStats: UserAndStatsAndAliases[] = users.map((user) => {
       const stats = userStats.get(user.id);
@@ -141,7 +161,9 @@ const UsersAndTeams = (props: DefaultProps) => {
         };
       }
     });
-    const aliasUserData: UserAndStatsAndAliases[] = [...userData.aliasData]
+    const aliasUserData: UserAndStatsAndAliases[] = [
+      ...teamsAndAliases.aliasData,
+    ]
       .sort(([aliasIdA], [aliasIdB]) => aliasIdA - aliasIdB)
       .map(([aliasId, userData]) => {
         const stats = userStats.get(aliasId);
@@ -160,14 +182,48 @@ const UsersAndTeams = (props: DefaultProps) => {
           };
         }
       });
+
+    return {
+      usersAndAliases: [...usersWithStats, ...aliasUserData],
+      aliases: teamsAndAliases.aliases,
+      teams: teamsAndAliases.teams,
+    };
+  }
+
+  function openModal() {
+    // Need to re-initialise local state from parent state every time we open the modal
+    const { earliest, latest } = state.config.filters.dateRange;
+
+    const { usersAndAliases, aliases, teams } = toPageStateFormat(
+      users,
+      state.config.userData,
+      earliest,
+      latest
+    );
+
     setPageState({
       ...initialPageState(),
-      usersAndAliases: [...usersWithStats, ...aliasUserData],
-      aliases: userData.aliases,
-      teams: userData.teams,
+      usersAndAliases,
+      aliases,
+      teams,
     });
 
     setIsOpen(true);
+  }
+
+  /** refresh stats after we change aliases or teams */
+  function refreshStats() {
+    const { earliest, latest } = state.config.filters.dateRange;
+    const { aliases } = pageState;
+    const userStats = aggregateUserStats(tree, earliest, latest, aliases);
+
+    const newPageState = _.cloneDeep(pageState);
+    for (let user of newPageState.usersAndAliases) {
+      const stats = userStats.get(user.id);
+      if (stats) {
+        user = { ...user, ...stats, outOfDate: false };
+      }
+    }
   }
 
   function cancel() {
@@ -203,6 +259,13 @@ const UsersAndTeams = (props: DefaultProps) => {
     }
     return { name: user.name, email: user.email };
   }
+  function toExportTeamMember(userId: number): ExportTeamMember {
+    const user = pageState.usersAndAliases[userId];
+    if (user == undefined) {
+      throw new Error(`Can't export user ${userId}`);
+    }
+    return { name: user.name, email: user.email, isAlias: user.isAlias };
+  }
 
   function exportToJson() {
     const exportData: UserExportData = {
@@ -216,17 +279,17 @@ const UsersAndTeams = (props: DefaultProps) => {
         toExportUser(toUser),
       ]),
       teams: [...pageState.teams].map(([teamName, team]) => {
-        const users = [...team.users].map(toExportUser);
+        const teamMembers = [...team.users].map(toExportTeamMember);
         return {
           name: teamName,
-          users,
+          users: teamMembers,
           colour: team.colour,
           hidden: team.hidden,
         };
       }),
     };
     const standaloneExportData: StandaloneUserExportData = {
-      version: FORMAT_FILE_USER_VERSION,
+      formatVersion: FORMAT_FILE_USER_VERSION,
       userData: exportData,
     };
 
@@ -241,104 +304,118 @@ const UsersAndTeams = (props: DefaultProps) => {
     tempElement.parentNode?.removeChild(tempElement);
   }
 
-  function clearImportErrorMessages() {
+  function clearImportMessages() {
     setPageState({
       ...pageState,
-      importErrors: [],
+      importMessages: [],
     });
   }
 
-  function addImportErrorMessage(message: string) {
+  function addImportMessage(message: Message) {
     setPageState({
       ...pageState,
-      importErrors: [...pageState.importErrors, message],
+      importMessages: [...pageState.importMessages, message],
     });
   }
 
-  function processImportedData(data: StandaloneUserExportData) {
-    if (data.version == undefined || data.version != FORMAT_FILE_USER_VERSION) {
-      throw new Error(`Invalid data file version ${data.version}`);
-    }
-    const { aliasData, aliases, teams } = data.userData;
-    const newPageState = _.cloneDeep(pageState);
-    const newUsersAndAliases: UserAndStatsAndAliases[] = [
-      ...newPageState.usersAndAliases,
-      ...aliasData.map((alias, index) => {
-        return {
-          id: index,
-          name: alias.name,
-          email: alias.email,
-          files: 0,
-          lines: 0,
-          days: 0,
-          commits: 0,
-          lastCommitDay: undefined,
-          outOfDate: false,
-          isAlias: true,
-        };
-      }),
-    ];
-    const reverseLookup: Map<string, number> = new Map();
-    for (const user of newUsersAndAliases) {
-      reverseLookup.set(userAsKey(user), user.id);
-    }
-    const lookupUser = (exportUser: ExportUser) => {
-      const userMatch = reverseLookup.get(userAsKey(exportUser));
-      if (userMatch == undefined) {
-        throw new Error(
-          `Unknown user "${exportUser.name} <${exportUser.email}>"`
+  function processImportedData(
+    data: StandaloneUserExportData,
+    tolerant: boolean
+  ) {
+    const messages: Message[] = [];
+    try {
+      let failed = false;
+      if (
+        data.formatVersion == undefined ||
+        data.formatVersion != FORMAT_FILE_USER_VERSION
+      ) {
+        messages.push(
+          errorMessage(
+            `Invalid format version ${data.formatVersion} - expected ${FORMAT_FILE_USER_VERSION}`
+          )
         );
+        if (!tolerant) failed = true;
       }
-      return userMatch;
-    };
+      const {
+        aliasData: importedAliasData,
+        aliases: importedAliases,
+        teams: importedTeams,
+      } = data.userData;
 
-    const newTeams: Teams = new Map(
-      teams.map((team) => {
-        return [
-          team.name,
-          {
-            colour: team.colour,
-            users: new Set(team.users.map(lookupUser)),
-            hidden: team.hidden,
-          },
-        ];
-      })
-    );
+      const {
+        newUserData,
+        failed: newFailed,
+        messages: newMessages,
+      } = userDataFromImport(
+        users,
+        importedAliases,
+        importedAliasData,
+        importedTeams,
+        tolerant
+      );
+      if (newFailed) {
+        failed = true;
+      }
+      if (newMessages.length > 0) {
+        messages.push(...newMessages);
+      }
+      if (failed || newUserData == undefined) {
+        setPageState({
+          ...pageState,
+          importMessages: messages,
+        });
+        return;
+      }
 
-    const newAliases: UserAliases = new Map(
-      aliases.map(([user, aliasedTo]) => {
-        return [lookupUser(user), lookupUser(aliasedTo)];
-      })
-    );
+      const { usersAndAliases, aliases, teams } = toPageStateFormat(
+        users,
+        newUserData,
+        earliest,
+        latest
+      );
 
-    setPageState({
-      ...initialPageState(),
-      usersAndAliases: newUsersAndAliases,
-      teams: newTeams,
-      aliases: newAliases,
-      importErrors: pageState.importErrors,
-    });
+      if (tolerant && messages.length > 0) {
+        messages.push(infoMessage("Errors were found and ignored."));
+      }
+      messages.push(infoMessage("User data loaded."));
+
+      setPageState({
+        ...initialPageState(),
+        usersAndAliases,
+        teams,
+        aliases,
+        importMessages: messages,
+      });
+    } catch (e) {
+      messages.push(errorMessage(`${e}`));
+      // TODO: set page state
+      setPageState({
+        ...pageState,
+        importMessages: messages,
+      });
+
+      return;
+    }
   }
 
   function importFromJson(files: FileList | null) {
     if (files == null) {
-      addImportErrorMessage("No file passed to import");
+      addImportMessage(errorMessage("No file passed to import"));
       return;
     }
     const file = files[0]!;
-    console.log("importing", file);
     const fileReader = new FileReader();
     fileReader.readAsText(file);
     fileReader.onload = (e) => {
       try {
         if (e.target && typeof e.target?.result == "string") {
           const value = jsonToUserData(e.target.result);
-          processImportedData(value);
+          processImportedData(value, tolerant);
         } else {
-          addImportErrorMessage("invalid upload result type");
+          addImportMessage(errorMessage("invalid upload result type"));
         }
       } catch (e) {
-        addImportErrorMessage(`${e}`);
+        addImportMessage(errorMessage(`${e}`));
       }
     };
   }
@@ -582,10 +659,11 @@ const UsersAndTeams = (props: DefaultProps) => {
         <div className="buttonList">
           <button onClick={save}>save and close</button>
           <button onClick={cancel}>cancel</button>
+          <button onClick={refreshStats}>refresh stats (after editing)</button>
           <button onClick={exportToJson}>export to JSON</button>
           <button
             onClick={() => {
-              clearImportErrorMessages();
+              clearImportMessages();
               if (hiddenFileInput.current) {
                 hiddenFileInput.current.click();
               }
@@ -603,20 +681,32 @@ const UsersAndTeams = (props: DefaultProps) => {
               hiddenFileInput.current!.value = "";
             }}
             onChange={(event) => {
-              console.log("uploaded:", event);
               importFromJson(event.target?.files);
             }}
           ></input>
+          <label htmlFor={tolerantCheckId}>
+            Ignore non-fatal import errors:&nbsp;
+            <input
+              type="checkbox"
+              id={tolerantCheckId}
+              checked={tolerant}
+              onChange={(evt) => {
+                setTolerant(evt.target.checked);
+              }}
+            />
+          </label>
         </div>
-        {pageState.importErrors.length == 0 ? null : (
+        {pageState.importMessages.length == 0 ? null : (
           <div className="Messages">
-            <h3>Import errors:</h3>
+            <h3>Import messages:</h3>
             <ul>
-              {pageState.importErrors.map((error, ix) => (
-                <li key={ix}>{error}</li>
+              {pageState.importMessages.map((message, ix) => (
+                <li key={ix} className={message.severity}>
+                  {message.message}
+                </li>
               ))}
             </ul>
-            <button onClick={clearImportErrorMessages}>clear</button>
+            <button onClick={clearImportMessages}>clear</button>
           </div>
         )}
         <h3>Users and Teams</h3>
