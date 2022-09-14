@@ -62,4 +62,96 @@ describe("aggregating node info by team", () => {
     const expected: Map<string, UserStatsAccumulator> = new Map();
     expect(nodeChangers!).toEqual(expected);
   });
+  test("can aggregate basic team stats", () => {
+    const { fileNode, aliases, userTeams, earliest, latest } =
+      minimalNodeChangersParams();
+    userTeams.set(0, new Set(["teamA", "teamB"]));
+    fileNode.data.git!.details!.push({
+      commit_day: 1,
+      users: [0],
+      commits: 1,
+      lines_added: 1,
+      lines_deleted: 1,
+    });
+    const nodeChangers = nodeChangersByTeam(
+      fileNode,
+      aliases,
+      userTeams,
+      earliest,
+      latest
+    );
+    expect(nodeChangers).toBeDefined();
+    const expected: Map<string, UserStatsAccumulator> = new Map([
+      ["teamA", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
+      ["teamB", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
+    ]);
+    expect(nodeChangers!).toEqual(expected);
+  });
+  test("can aggregate more complex team stats", () => {
+    const { fileNode, aliases, userTeams, earliest, latest } =
+      minimalNodeChangersParams();
+    userTeams.set(0, new Set(["teamA"]));
+    userTeams.set(1, new Set(["teamB"]));
+    fileNode.data.git!.details!.push({
+      commit_day: 1,
+      users: [0, 1],
+      commits: 1,
+      lines_added: 1,
+      lines_deleted: 1,
+    });
+    const nodeChangers = nodeChangersByTeam(
+      fileNode,
+      aliases,
+      userTeams,
+      earliest,
+      latest
+    );
+    expect(nodeChangers).toBeDefined();
+    const expected: Map<string, UserStatsAccumulator> = new Map([
+      ["teamA", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
+      ["teamB", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
+    ]);
+    expect(nodeChangers!).toEqual(expected);
+  });
+  test("can aggregate overlapping teams", () => {
+    const { fileNode, aliases, userTeams, earliest, latest } =
+      minimalNodeChangersParams();
+    userTeams.set(0, new Set(["teamA"]));
+    userTeams.set(1, new Set(["teamB"]));
+    userTeams.set(2, new Set(["teamA", "teamB"]));
+    fileNode.data.git!.details!.push({
+      commit_day: 1,
+      users: [0, 1],
+      commits: 1,
+      lines_added: 1,
+      lines_deleted: 1,
+    });
+    fileNode.data.git!.details!.push({
+      commit_day: 2,
+      users: [1, 2],
+      commits: 1,
+      lines_added: 1,
+      lines_deleted: 1,
+    });
+    fileNode.data.git!.details!.push({
+      commit_day: 3,
+      users: [1],
+      commits: 1,
+      lines_added: 1,
+      lines_deleted: 1,
+    });
+    const nodeChangers = nodeChangersByTeam(
+      fileNode,
+      aliases,
+      userTeams,
+      earliest,
+      latest
+    );
+    expect(nodeChangers).toBeDefined();
+    const expected: Map<string, UserStatsAccumulator> = new Map([
+      ["teamA", { commits: 2, lines: 4, days: new Set([1, 2]), files: 1 }],
+      ["teamB", { commits: 3, lines: 6, days: new Set([1, 2, 3]), files: 1 }],
+    ]);
+    expect(nodeChangers!).toEqual(expected);
+  });
 });

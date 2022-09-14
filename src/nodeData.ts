@@ -436,10 +436,10 @@ export function nodeChangersByTeam(
       // aggregate users into teams - otherwise 3 users from the
       // same team would show as 3 changes!
       const teams: Set<string> = new Set(
-        ...users.flatMap((user) => {
+        users.flatMap((user) => {
           const realUser = possiblyAlias(aliases, user);
           const teams = userTeams.get(realUser);
-          return teams ?? new Set<string>();
+          return teams ? [...teams] : [];
         })
       );
 

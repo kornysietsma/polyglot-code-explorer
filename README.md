@@ -84,6 +84,17 @@ For a discussion of how I use React and D3 together, take a look at [my blog pos
 
 This was created using Create-React-App and hasn't been "ejected" yet so you can upgrade react versions and the like.  You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
+## Testing
+
+To run tests, `yarn test`
+
+I have hardly any tests - mostly as this started as all UI code with little logic, and frankly the effort for UI testing on a rapidly changing pet project just didn't seem worth the benefits.
+
+I'm finally adding some tests now, but mostly around pure JavaScript logic which is
+easy to test - and initially, just where I'm doing something new, and complex, and especially where I find bugs.
+
+I'm a huge fan of proper testing for code that anyone depends on day-to-day - if someone wants to fund me to quit my job and write a comprehensive test suite, I'd be very happy!
+
 ## A note on typescript and eslint checks
 
 I found, after some digging, that Typescript by default doesn't check or warn you
