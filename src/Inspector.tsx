@@ -1,23 +1,33 @@
-import React from "react";
-
 import { DefaultProps } from "./components.types";
 import DirectoryNodeInspector from "./DirectoryNodeInspector";
 import NodeInspector from "./NodeInspector";
 import { isDirectory } from "./polyglot_data.types";
+import { errorMessage } from "./state";
 
 const Inspector = (props: DefaultProps) => {
   const { state, dispatch, dataRef } = props;
   const { metadata } = dataRef.current;
   const { selectedNode: selectedNodePath } = state.config;
 
-  const selectedNode =
-    selectedNodePath === undefined
-      ? undefined
-      : metadata.nodesByPath.get(selectedNodePath);
-  const hasSelection = selectedNode != null;
-  const showDirectory = hasSelection && isDirectory(selectedNode);
-  const nodeInspector = !hasSelection ? undefined : showDirectory ? (
-    <DirectoryNodeInspector node={selectedNode} dispatch={dispatch} />
+  const selectedNode = metadata.nodesByPath.get(selectedNodePath);
+  if (!selectedNode) {
+    dispatch({
+      type: "addMessage",
+      payload: errorMessage(`Invalid node selected ${selectedNodePath}`),
+    });
+    dispatch({
+      type: "selectNode",
+      payload: "",
+    });
+    throw new Error("bad selected node");
+  }
+  const nodeInspector = isDirectory(selectedNode) ? (
+    <DirectoryNodeInspector
+      node={selectedNode}
+      state={state}
+      metadata={metadata}
+      dispatch={dispatch}
+    />
   ) : (
     <NodeInspector
       node={selectedNode}
@@ -26,23 +36,7 @@ const Inspector = (props: DefaultProps) => {
       dispatch={dispatch}
     />
   );
-  return (
-    <aside className="Inspector">
-      {hasSelection ? (
-        nodeInspector
-      ) : (
-        <div>
-          <p>Please click on the chart to select a file/folder</p>
-          <p>
-            <i>
-              <b>Note </b>
-            </i>
-            there is a date selector at the bottom of the diagram!
-          </p>
-        </div>
-      )}
-    </aside>
-  );
+  return <aside className="Inspector">{nodeInspector}</aside>;
 };
 
 export default Inspector;

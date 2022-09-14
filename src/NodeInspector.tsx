@@ -17,14 +17,20 @@ import {
   nodeLocData,
   nodeRemoteHead,
   nodeRemoteUrl,
-  sortedNodeChangers,
-  sortedTeamChangers,
+  sortedUserStatsAccumulators,
 } from "./nodeData";
 import PathInspector from "./PathInspector";
-import { FileNode, isDirectory, TreeNode } from "./polyglot_data.types";
+import {
+  displayUser,
+  FileNode,
+  isDirectory,
+  TreeNode,
+} from "./polyglot_data.types";
 import SourceCodeInspector from "./SourceCodeInspector";
 import { Action, getUserData, State } from "./state";
+import TeamWidget from "./TeamWidget";
 import ToggleablePanel from "./ToggleablePanel";
+import { userTeamListForUser } from "./UserTeamList";
 import { VizMetadata } from "./viz.types";
 
 function findGitUrl(node: TreeNode, remoteUrlTemplate: string) {
@@ -141,7 +147,7 @@ const NodeInspector = ({
   const { earliest, latest } = state.config.filters.dateRange;
   const { topChangersCount } = state.config.numberOfChangers;
   const { couplingAvailable } = state.couplingConfig;
-  const { aliases } = state.config.teamsAndAliases;
+  const { teams, aliases } = state.config.teamsAndAliases;
   const { fileChangeMetric } = state.config;
   const { userTeams } = state.calculated;
 
@@ -160,31 +166,18 @@ const NodeInspector = ({
           lastCommit
         )} (${humanizeDays(age)})`
       : "";
-  const userChangers = sortedNodeChangers(
+  const userChangers = sortedUserStatsAccumulators(
     nodeChangers(node, aliases, earliest, latest) ?? new Map(),
     fileChangeMetric
   );
   const topUserChangers = userChangers.slice(0, topChangersCount);
 
-  const teamChangers = sortedTeamChangers(
+  const teamChangers = sortedUserStatsAccumulators(
     nodeChangersByTeam(node, aliases, userTeams, earliest, latest) ?? new Map(),
     fileChangeMetric
   );
   const topTeamChangers = teamChangers.slice(0, topChangersCount);
 
-  const userName = (userId: number) => {
-    const user = getUserData(users, state, userId);
-    if (user == undefined) {
-      throw new Error(`Invalid user ${userId}`);
-    }
-    if (user.name) {
-      if (user.email) {
-        return `${user.name} / ${user.email}`;
-      }
-      return user.name;
-    }
-    return user.email;
-  };
   const topChangerTable =
     topUserChangers.length > 0 ? (
       <div>
@@ -194,14 +187,16 @@ const NodeInspector = ({
             <tr>
               <th>User</th>
               <th>Metric ({fileChangeMetric})</th>
+              <th>Teams</th>
             </tr>
           </thead>
           <tbody>
             {topUserChangers.map(([user, stats]) => {
               return (
                 <tr key={user}>
-                  <td>{userName(user)}</td>
+                  <td>{displayUser(getUserData(users, state, user))}</td>
                   <td>{metricFrom(stats, fileChangeMetric)}</td>
+                  <td>{userTeamListForUser(state, user, false)}</td>
                 </tr>
               );
             })}
@@ -227,7 +222,13 @@ const NodeInspector = ({
             {topTeamChangers.map(([team, stats]) => {
               return (
                 <tr key={team}>
-                  <td>{team}</td>
+                  <td>
+                    <TeamWidget
+                      key={team}
+                      team={teams.get(team)!}
+                      bodyText={team}
+                    />
+                  </td>
                   <td>{metricFrom(stats, fileChangeMetric)}</td>
                 </tr>
               );
@@ -253,6 +254,9 @@ const NodeInspector = ({
       ) : (
         <h3>{node.name}</h3>
       )}
+      <button onClick={() => dispatch({ type: "selectNode", payload: "" })}>
+        clear selection
+      </button>
       <PathInspector node={node} dispatch={dispatch} />
       <SourceCodeInspector node={node} state={state} />
       <p>
@@ -282,7 +286,7 @@ const NodeInspector = ({
       )}
       <ToggleablePanel title="file changers" showInitially={false}>
         {userChangers.length > 0 ? (
-          <h5>Unique changers: {userChangers.length}</h5>
+          <h5>Unique users: {userChangers.length}</h5>
         ) : (
           ""
         )}
@@ -290,7 +294,7 @@ const NodeInspector = ({
       </ToggleablePanel>
       <ToggleablePanel title="file changers by team" showInitially={false}>
         {teamChangers.length > 0 ? (
-          <h5>Unique changers: {teamChangers.length}</h5>
+          <h5>Unique teams: {teamChangers.length}</h5>
         ) : (
           ""
         )}

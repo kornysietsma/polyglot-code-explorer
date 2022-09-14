@@ -36,8 +36,8 @@ import {
   UserAliasData,
   UserAliases,
 } from "./state";
-import TeamWidget from "./TeamWidget";
 import ToggleablePanel from "./ToggleablePanel";
+import { UserTeamList } from "./UserTeamList";
 
 export type UserAndStatsAndAliases = UserData &
   UserStats & { isAlias: boolean };
@@ -712,18 +712,7 @@ const UsersAndTeams = (props: DefaultProps) => {
   }
   function userTeamDisplay(userId: number) {
     const teams = teamsForUserIncludingHidden(userId).sort(sortTeamsByName);
-    return (
-      <span>
-        {teams.map(([teamName, team]) => (
-          <TeamWidget
-            key={teamName}
-            team={team}
-            bodyText={teamName}
-            hoverText={teamName}
-          ></TeamWidget>
-        ))}
-      </span>
-    );
+    return <UserTeamList teams={teams} showNames={true}></UserTeamList>;
   }
 
   return (

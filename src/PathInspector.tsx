@@ -1,5 +1,3 @@
-import "./PathInspector.css";
-
 import React from "react";
 
 import { TreeNode } from "./polyglot_data.types";
@@ -23,7 +21,7 @@ const PathInspector = ({
   parents = parents.reverse();
 
   return (
-    <ToggleablePanel title="Path" extraClass="PathInspector" showInitially>
+    <ToggleablePanel title="Path" extraClass="SelectionNavigator" showInitially>
       <ul>
         {parents.map((parent) => (
           <li key={parent.path}>

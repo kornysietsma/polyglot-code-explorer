@@ -153,8 +153,8 @@ export type Config = {
       latest: number;
     };
   };
-  // TODO: selectedNode needs to be made serializable - probably as a path - used to be a node
-  selectedNode?: string;
+  // if blank, the root is selected (i.e. everything)
+  selectedNode: string;
 };
 
 export type CouplingConfig = {
@@ -411,7 +411,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
           latest,
         },
       },
-      selectedNode: undefined,
+      selectedNode: "",
     },
     couplingConfig: {
       couplingAvailable,
@@ -481,9 +481,11 @@ function postprocessState(
   let resultingState = newState;
   let alreadyCloned = false; // if we modify state, need to clone it - but only once!
   if (
-    resultingState.config.teamsAndAliases !== oldState.config.teamsAndAliases
+    !_.isEqual(
+      resultingState.config.teamsAndAliases,
+      oldState.config.teamsAndAliases
+    )
   ) {
-    console.log("user data changed - updating cache");
     if (!alreadyCloned) {
       resultingState = _.cloneDeep(resultingState);
       alreadyCloned = true;

@@ -338,8 +338,17 @@ export type UserStatsAccumulator = {
   files: number;
 };
 
+function isAccumulator(
+  stats: UserStatsAccumulator | UserStats
+): stats is UserStatsAccumulator {
+  return stats.days instanceof Set;
+}
+function statsDays(stats: UserStatsAccumulator | UserStats): number {
+  return isAccumulator(stats) ? stats.days.size : stats.days;
+}
+
 export function metricFrom(
-  stats: UserStatsAccumulator,
+  stats: UserStatsAccumulator | UserStats,
   metric: FileChangeMetric
 ) {
   switch (metric) {
@@ -348,7 +357,7 @@ export function metricFrom(
     case "lines":
       return stats.lines;
     case "days":
-      return stats.days.size;
+      return statsDays(stats);
     case "files":
       return stats.files;
   }
@@ -399,24 +408,6 @@ export function nodeChangers(
   return changerStats;
 }
 
-export function sortedNodeChangers(
-  changers: Map<number, UserStatsAccumulator>,
-  metric: FileChangeMetric
-): [number, UserStatsAccumulator][] {
-  return [...changers].sort(([, userA], [, userB]) => {
-    switch (metric) {
-      case "lines":
-        return userB.lines - userA.lines;
-      case "commits":
-        return userB.commits - userA.commits;
-      case "files":
-        return userB.files - userA.files;
-      case "days":
-        return userB.days.size - userA.days.size;
-    }
-  })!;
-}
-
 // accumulates all changes within a date range by team
 // Note we can't just sum results of nodeChangers() because a single change by
 // multiple members of the same team would be added multiple times.
@@ -459,22 +450,40 @@ export function nodeChangersByTeam(
   return changerStats;
 }
 
-export function sortedTeamChangers(
-  changers: Map<string, UserStatsAccumulator>,
+export function sortedUserStatsAccumulators<KeyType>(
+  changers: Map<KeyType, UserStatsAccumulator>,
   metric: FileChangeMetric
-): [string, UserStatsAccumulator][] {
-  return [...changers].sort(([, teamA], [, teamB]) => {
+): [KeyType, UserStatsAccumulator][] {
+  return [...changers].sort(([, userA], [, userB]) => {
     switch (metric) {
       case "lines":
-        return teamB.lines - teamA.lines;
+        return userB.lines - userA.lines;
       case "commits":
-        return teamB.commits - teamA.commits;
+        return userB.commits - userA.commits;
       case "files":
-        return teamB.files - teamA.files;
+        return userB.files - userA.files;
       case "days":
-        return teamB.days.size - teamA.days.size;
+        return userB.days.size - userA.days.size;
     }
-  });
+  })!;
+}
+
+export function sortedUserStats<KeyType>(
+  changers: Map<KeyType, UserStats>,
+  metric: FileChangeMetric
+): [KeyType, UserStats][] {
+  return [...changers].sort(([, userA], [, userB]) => {
+    switch (metric) {
+      case "lines":
+        return userB.lines - userA.lines;
+      case "commits":
+        return userB.commits - userA.commits;
+      case "files":
+        return userB.files - userA.files;
+      case "days":
+        return userB.days - userA.days;
+    }
+  })!;
 }
 
 export function nodeTopTeam(
@@ -496,7 +505,7 @@ export function nodeTopTeam(
     return undefined;
   }
 
-  return sortedTeamChangers(changers, metric)[0]![0];
+  return sortedUserStatsAccumulators(changers, metric)[0]![0];
 }
 
 function addUserStats(

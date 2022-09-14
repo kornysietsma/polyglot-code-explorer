@@ -24,6 +24,11 @@ body {
   line-height: 1.6;
 }
 
+table {
+  /* I override this by default, as I'd much prefer tables stay in their parent by default.  If I find a table where I don't want lines breaking, I can override that case. */
+  word-break: break-word;
+}
+
 .ModalOverlay {
   position: fixed;
   top: 0;
@@ -82,4 +87,8 @@ span.delayedInput {
   min-width: 1em;
   min-height: 1em;
   padding: 0 5px 0 5px;
+}
+
+.SelectionNavigator ul {
+  list-style: none;
 }

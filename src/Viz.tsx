@@ -494,11 +494,7 @@ function drawTimescale(
       [margin.left, 0.5],
       [width - margin.right, height - margin.bottom + 0.5],
     ])
-    // .on("brush", () => {
-    //   console.log("brush ignored");
-    // })
     .on("end", function ({ selection }: { selection: [number, number] }) {
-      console.log("brush end");
       if (selection) {
         const [startDate, endDate] = selection
           .map((x: number) => xScale.invert(x))

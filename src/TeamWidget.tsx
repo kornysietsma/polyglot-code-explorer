@@ -5,7 +5,7 @@ import { Team } from "./state";
 const TeamWidget = (props: {
   team: Team;
   bodyText?: string;
-  hoverText: string;
+  hoverText?: string;
 }) => {
   const { team, bodyText, hoverText } = props;
   const hsl = d3.hsl(d3.color(team.colour)!);
