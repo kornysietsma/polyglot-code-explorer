@@ -233,12 +233,12 @@ const UsersAndTeams = (props: DefaultProps) => {
   ): UsersAndTeamsPageState {
     const { aliases } = workingPageState;
     const userStats = aggregateUserStats(tree, earliest, latest, aliases);
-    const userTeams = buildUserTeams(pageState.teams);
+    const userTeams = buildUserTeams(workingPageState.teams);
     const teamStats = aggregateTeamStats(
       tree,
       earliest,
       latest,
-      pageState.aliases,
+      workingPageState.aliases,
       userTeams
     );
 
@@ -257,17 +257,21 @@ const UsersAndTeams = (props: DefaultProps) => {
     newPageState.teamStats = teamStats;
     return newPageState;
   }
+  function maybeRecalc(
+    workingPageState: UsersAndTeamsPageState,
+    alreadyCloned: boolean
+  ): UsersAndTeamsPageState {
+    return recalcStats
+      ? recalcStatsForPageState(workingPageState, alreadyCloned)
+      : workingPageState;
+  }
+  function setPageStateAndMaybeRecalc(newState: UsersAndTeamsPageState): void {
+    setPageState(maybeRecalc(newState, true));
+  }
 
   function manuallyRecalcStats() {
     const newPageState = recalcStatsForPageState(pageState, false);
     setPageState(newPageState);
-  }
-  // called from child dialog
-  function setPageStateAndRecalc(newState: UsersAndTeamsPageState): void {
-    const finalState = recalcStats
-      ? recalcStatsForPageState(newState, true)
-      : newState;
-    setPageState(finalState);
   }
 
   function cancel() {
@@ -502,7 +506,7 @@ const UsersAndTeams = (props: DefaultProps) => {
 
     teams.get(team)!.hidden = checked;
 
-    setPageState({ ...pageState, teams });
+    setPageState(maybeRecalc({ ...pageState, teams }, false));
   }
 
   const showCheckedUsersId = useId();
@@ -556,7 +560,12 @@ const UsersAndTeams = (props: DefaultProps) => {
       colour: themedColours(state.config).neutralColour,
       hidden: false,
     });
-    setPageState({ ...pageState, teams: newTeams, checkedUsers: new Set() });
+    setPageState(
+      maybeRecalc(
+        { ...pageState, teams: newTeams, checkedUsers: new Set() },
+        false
+      )
+    );
   };
 
   // Generated with http://vrl.cs.brown.edu/color
@@ -636,7 +645,7 @@ const UsersAndTeams = (props: DefaultProps) => {
     const { teams } = pageState;
     teams.set(newName, oldTeam);
     teams.delete(oldName);
-    setPageState({ ...pageState, teams });
+    setPageState(maybeRecalc({ ...pageState, teams }, false));
   }
 
   function selectTeamMembers(team: string) {
@@ -656,7 +665,7 @@ const UsersAndTeams = (props: DefaultProps) => {
     for (const user of pageState.checkedUsers) {
       team.users.add(user);
     }
-    setPageState({ ...pageState, teams });
+    setPageState(maybeRecalc({ ...pageState, teams }, false));
   }
 
   function removeUsersFromTeam(teamName: string) {
@@ -668,7 +677,7 @@ const UsersAndTeams = (props: DefaultProps) => {
     for (const user of pageState.checkedUsers) {
       team.users.delete(user);
     }
-    setPageState({ ...pageState, teams });
+    setPageState(maybeRecalc({ ...pageState, teams }, false));
   }
 
   const checkedAliasUsers = modalIsOpen
@@ -692,14 +701,17 @@ const UsersAndTeams = (props: DefaultProps) => {
     setAliasModalIsOpen(true);
   };
 
-  function teamsForUser(userId: number): [name: string, data: Team][] {
+  // this is a bit different from normal UserTeams as hidden teams are shown
+  function teamsForUserIncludingHidden(
+    userId: number
+  ): [name: string, data: Team][] {
     const userTeams = [...pageState.teams].filter(([, teamData]) =>
       teamData.users.has(userId)
     );
     return userTeams;
   }
   function userTeamDisplay(userId: number) {
-    const teams = teamsForUser(userId).sort(sortTeamsByName);
+    const teams = teamsForUserIncludingHidden(userId).sort(sortTeamsByName);
     return (
       <span>
         {teams.map(([teamName, team]) => (
@@ -977,7 +989,7 @@ const UsersAndTeams = (props: DefaultProps) => {
           modalIsOpen={aliasModalIsOpen}
           setIsOpen={setAliasModalIsOpen}
           parentState={pageState}
-          setParentState={setPageStateAndRecalc}
+          setParentState={setPageStateAndMaybeRecalc}
         />
         <ToggleablePanel
           title="Users"
