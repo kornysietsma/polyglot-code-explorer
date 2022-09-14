@@ -156,7 +156,9 @@ export type GitData = {
   last_update: number;
   age_in_days: number;
   creation_date?: number;
+  // TODO: do we need this?
   user_count: number;
+  //TODO: do we need this?
   users: number[];
   details: GitDetails[];
 };

@@ -454,7 +454,7 @@ export function themedErrorColour(config: Config) {
   return themedColours(config).errorColour;
 }
 
-function buildUserTeams(teams: Teams): UserTeams {
+export function buildUserTeams(teams: Teams): UserTeams {
   const result: UserTeams = new Map();
   for (const [name, team] of teams) {
     if (!team.hidden) {

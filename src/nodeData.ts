@@ -331,7 +331,7 @@ export function nodeCenter(node: TreeNode) {
   return nodeLayoutData(node)?.center;
 }
 
-type UserStatsAccumulator = {
+export type UserStatsAccumulator = {
   commits: number;
   lines: number;
   days: Set<number>;
@@ -536,6 +536,50 @@ function addUserStats(
   }
 }
 
+function addTeamStats(
+  teamStats: Map<string, UserStatsAccumulator>,
+  node: TreeNode,
+  aliases: UserAliases,
+  userTeams: UserTeams,
+  earliest: number,
+  latest: number
+) {
+  if (isFile(node)) {
+    const changers = nodeChangersByTeam(
+      node,
+      aliases,
+      userTeams,
+      earliest,
+      latest
+    );
+    if (changers) {
+      for (const [teamName, { commits, lines, days }] of changers) {
+        const stats = teamStats.get(teamName);
+        if (stats === undefined) {
+          teamStats.set(teamName, {
+            commits,
+            lines,
+            days,
+            files: 1,
+          });
+        } else {
+          stats.commits += commits;
+          stats.lines += lines;
+          days.forEach(function (d) {
+            stats.days.add(d);
+          });
+          stats.files += 1;
+        }
+      }
+    }
+  }
+  if (isDirectory(node)) {
+    node.children.forEach((child) => {
+      addTeamStats(teamStats, child, aliases, userTeams, earliest, latest);
+    });
+  }
+}
+
 function lastDay(days: number[]): number | undefined {
   return days.sort((a, b) => b - a)[0];
 }
@@ -551,6 +595,29 @@ export function aggregateUserStats(
   return new Map(
     [...userStats].map(([userId, { commits, files, lines, days }]) => [
       userId,
+      {
+        commits,
+        files,
+        lines,
+        days: days.size,
+        lastCommitDay: lastDay([...days]),
+      },
+    ])
+  );
+}
+
+export function aggregateTeamStats(
+  node: TreeNode,
+  earliest: number,
+  latest: number,
+  aliases: UserAliases,
+  userTeams: UserTeams
+): Map<string, UserStats> {
+  const teamStats: Map<string, UserStatsAccumulator> = new Map();
+  addTeamStats(teamStats, node, aliases, userTeams, earliest, latest);
+  return new Map(
+    [...teamStats].map(([teamName, { commits, files, lines, days }]) => [
+      teamName,
       {
         commits,
         files,

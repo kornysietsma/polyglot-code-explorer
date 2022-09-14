@@ -16,9 +16,15 @@ import {
   teamsAndAliasesFromImport,
 } from "./exportImport";
 import HelpPanel from "./HelpPanel";
-import { aggregateUserStats, DEFAULT_USER_STATS, UserStats } from "./nodeData";
+import {
+  aggregateTeamStats,
+  aggregateUserStats,
+  DEFAULT_USER_STATS,
+  UserStats,
+} from "./nodeData";
 import { displayUser, UserData } from "./polyglot_data.types";
 import {
+  buildUserTeams,
   errorMessage,
   infoMessage,
   Message,
@@ -40,6 +46,7 @@ export type UsersAndTeamsPageState = {
   usersAndAliases: UserAndStatsAndAliases[];
   aliases: UserAliases;
   teams: Teams;
+  teamStats: Map<string, UserStats>;
   usersSort: { key: string; ascending: boolean };
   checkedUsers: Set<number>;
   userFilter: string;
@@ -50,6 +57,7 @@ const initialPageState: () => UsersAndTeamsPageState = () => {
   return {
     usersAndAliases: [],
     teams: new Map(),
+    teamStats: new Map(),
     hiddenTeams: new Set(),
     aliases: new Map(),
     usersSort: { key: "files", ascending: true },
@@ -142,9 +150,20 @@ const UsersAndTeams = (props: DefaultProps) => {
     usersAndAliases: UserAndStatsAndAliases[];
     aliases: UserAliases;
     teams: Teams;
+    teamStats?: Map<string, UserStats>;
   } {
     const userStats = recalcStats
       ? aggregateUserStats(tree, earliest, latest, teamsAndAliases.aliases)
+      : undefined;
+    const userTeams = buildUserTeams(teamsAndAliases.teams);
+    const teamStats = recalcStats
+      ? aggregateTeamStats(
+          tree,
+          earliest,
+          latest,
+          teamsAndAliases.aliases,
+          userTeams
+        )
       : undefined;
 
     const usersWithStats: UserAndStatsAndAliases[] = users.map((user) => {
@@ -180,6 +199,7 @@ const UsersAndTeams = (props: DefaultProps) => {
       usersAndAliases: [...usersWithStats, ...aliasUserData],
       aliases: teamsAndAliases.aliases,
       teams: teamsAndAliases.teams,
+      teamStats,
     };
   }
 
@@ -187,19 +207,21 @@ const UsersAndTeams = (props: DefaultProps) => {
     // Need to re-initialise local state from parent state every time we open the modal
     const { earliest, latest } = state.config.filters.dateRange;
 
-    const { usersAndAliases, aliases, teams } = usersAndTeamsToPageFormat(
-      users,
-      state.config.teamsAndAliases,
-      earliest,
-      latest,
-      true // on open, we always refresh stats
-    );
+    const { usersAndAliases, aliases, teams, teamStats } =
+      usersAndTeamsToPageFormat(
+        users,
+        state.config.teamsAndAliases,
+        earliest,
+        latest,
+        true // on open, we always refresh stats
+      );
 
     setPageState({
       ...initialPageState(),
       usersAndAliases,
       aliases,
       teams,
+      teamStats: teamStats ?? new Map(),
     });
 
     setIsOpen(true);
@@ -211,6 +233,14 @@ const UsersAndTeams = (props: DefaultProps) => {
   ): UsersAndTeamsPageState {
     const { aliases } = workingPageState;
     const userStats = aggregateUserStats(tree, earliest, latest, aliases);
+    const userTeams = buildUserTeams(pageState.teams);
+    const teamStats = aggregateTeamStats(
+      tree,
+      earliest,
+      latest,
+      pageState.aliases,
+      userTeams
+    );
 
     const newPageState = alreadyCloned
       ? workingPageState
@@ -224,6 +254,7 @@ const UsersAndTeams = (props: DefaultProps) => {
         arr[index] = { ...user, ...DEFAULT_USER_STATS };
       }
     });
+    newPageState.teamStats = teamStats;
     return newPageState;
   }
 
@@ -848,12 +879,17 @@ const UsersAndTeams = (props: DefaultProps) => {
                 <th>Colour</th>
                 <th>Actions</th>
                 <th>Users</th>
+                <th>Files</th>
+                <th>Commits</th>
+                <th>Days</th>
+                <th>Lines</th>
               </tr>
             </thead>
             <tbody>
               {[...pageState.teams]
                 .sort(sortTeamsByName)
                 .map(([name, teamData]) => {
+                  const stats = pageState.teamStats.get(name);
                   return (
                     <tr key={name}>
                       <td>
@@ -925,6 +961,10 @@ const UsersAndTeams = (props: DefaultProps) => {
                           })
                           .join(", ")}
                       </td>
+                      <td>{stats ? stats.files : 0}</td>
+                      <td>{stats ? stats.commits : 0}</td>
+                      <td>{stats ? stats.days : 0}</td>
+                      <td>{stats ? stats.lines : 0}</td>
                     </tr>
                   );
                 })}

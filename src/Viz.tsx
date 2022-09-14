@@ -1,5 +1,16 @@
+// I use wildcard import for things that are not obviously d3 like "d3.color()"
 import * as d3 from "d3";
-import { D3ZoomEvent, HierarchyNode } from "d3";
+import {
+  axisBottom,
+  brushX,
+  D3ZoomEvent,
+  HierarchyNode,
+  ScaleLinear,
+  scaleLinear,
+  ScaleTime,
+  scaleUtc,
+  Selection,
+} from "d3";
 import _ from "lodash";
 import React, { RefObject, useEffect, useMemo, useRef } from "react";
 
@@ -20,9 +31,9 @@ import { getCurrentVis } from "./VisualizationData";
 import { VizMetadata } from "./viz.types";
 
 const redrawPolygons = (
-  svgSelection: d3.Selection<
+  svgSelection: Selection<
     SVGPathElement,
-    d3.HierarchyNode<TreeNode>,
+    HierarchyNode<TreeNode>,
     SVGGElement,
     unknown
   >,
@@ -52,9 +63,9 @@ const redrawPolygons = (
 };
 
 const redrawSelection = (
-  svgSelection: d3.Selection<
+  svgSelection: Selection<
     SVGPathElement,
-    d3.HierarchyNode<TreeNode>,
+    HierarchyNode<TreeNode>,
     SVGGElement,
     unknown
   >,
@@ -62,7 +73,7 @@ const redrawSelection = (
 ) => {
   const { config } = state;
 
-  const strokeWidthFn = (d: d3.HierarchyNode<TreeNode>) => {
+  const strokeWidthFn = (d: HierarchyNode<TreeNode>) => {
     if (d.data.layout.algorithm === "circlePack") return 0;
     return d.depth < 4 ? 4 - d.depth : 1;
   };
@@ -79,15 +90,15 @@ const redrawSelection = (
 
 function findSelectionPath(
   state: State,
-  nodesByPath: Map<string, d3.HierarchyNode<TreeNode>>
-): d3.HierarchyNode<TreeNode>[] {
+  nodesByPath: Map<string, HierarchyNode<TreeNode>>
+): HierarchyNode<TreeNode>[] {
   if (!state.config.selectedNode) return [];
 
   // This is where we need to go from a node path to the hierarchy!
   // or can we store this index elsewhere - when we build the hierarchy,
-  // map paths to d3.HierarchyNode<TreeNode> once and carry that around.
+  // map paths to HierarchyNode<TreeNode> once and carry that around.
 
-  let node: d3.HierarchyNode<TreeNode> | undefined = nodesByPath.get(
+  let node: HierarchyNode<TreeNode> | undefined = nodesByPath.get(
     state.config.selectedNode
   );
   if (node === undefined) {
@@ -96,7 +107,7 @@ function findSelectionPath(
     );
     return [];
   }
-  const results: d3.HierarchyNode<TreeNode>[] = [];
+  const results: HierarchyNode<TreeNode>[] = [];
   while (node.parent) {
     results.push(node);
     node = node.parent;
@@ -128,14 +139,14 @@ const update = (
     );
   }
   const selectionPath = findSelectionPath(state, metadata.hierarchyNodesByPath);
-  const group: d3.Selection<
+  const group: Selection<
     SVGGElement,
-    d3.HierarchyNode<TreeNode>,
+    HierarchyNode<TreeNode>,
     SVGSVGElement,
     unknown
   > = svg.selectAll(".topGroup");
   const selectionNodes = group
-    .selectAll<SVGPathElement, d3.HierarchyNode<TreeNode>>(".selected")
+    .selectAll<SVGPathElement, HierarchyNode<TreeNode>>(".selected")
     .data(selectionPath, (node) => node.data.path);
 
   const newSelectionNodes = selectionNodes
@@ -187,7 +198,7 @@ function arcPath(leftHand: boolean, source: Point, target: Point) {
 }
 
 function drawCoupling(
-  group: d3.Selection<SVGGElement, CouplingLink, SVGSVGElement, unknown>,
+  group: Selection<SVGGElement, CouplingLink, SVGSVGElement, unknown>,
   files: TreeNode,
   metadata: VizMetadata,
   state: State,
@@ -204,7 +215,7 @@ function drawCoupling(
       (node) => node.source.path + "->" + node.targetFile
     );
 
-  // TODO - consider reworking this with d3.join which seems to be the new hotness?
+  // TODO - consider reworking this with join which seems to be the new hotness?
   const newCouplingNodes = couplingNodes
     .enter()
     .append("path")
@@ -219,7 +230,7 @@ function drawCoupling(
     }
 
     return arcPath(true, sourcePos, targetPos);
-    // return `${d3.line()([sourcePos, targetPos])}`;
+    // return `${line()([sourcePos, targetPos])}`;
   };
 
   const couplingLineStroke = (d: CouplingLink) => {
@@ -277,7 +288,7 @@ const updateCoupling = (
   }
   const vizEl = d3Container.current;
   const svg = d3.select(vizEl);
-  const group: d3.Selection<SVGGElement, CouplingLink, SVGSVGElement, unknown> =
+  const group: Selection<SVGGElement, CouplingLink, SVGSVGElement, unknown> =
     svg.selectAll(".topGroup");
   drawCoupling(group, files, metadata, state, dispatch);
 };
@@ -315,14 +326,11 @@ const draw = (
       layout.width,
       layout.height,
     ]);
-  const group: d3.Selection<SVGGElement, CouplingLink, SVGSVGElement, unknown> =
+  const group: Selection<SVGGElement, CouplingLink, SVGSVGElement, unknown> =
     svg.selectAll(".topGroup");
   const rootNode = d3.hierarchy(files); // .sum(d => d.value);
 
-  const hierarchyNodesByPath: Map<
-    string,
-    d3.HierarchyNode<TreeNode>
-  > = new Map();
+  const hierarchyNodesByPath: Map<string, HierarchyNode<TreeNode>> = new Map();
   rootNode.descendants().forEach((node) => {
     hierarchyNodesByPath.set(node.data.path, node);
   });
@@ -338,12 +346,12 @@ const draw = (
     );
 
   const nodes = group
-    .selectAll<SVGPathElement, d3.HierarchyNode<TreeNode>>(".cell")
+    .selectAll<SVGPathElement, HierarchyNode<TreeNode>>(".cell")
     .data(allNodes, function (node) {
       return node.data.path;
     });
 
-  // TODO - consider reworking this with d3.join which seems to be the new hotness?
+  // TODO - consider reworking this with join which seems to be the new hotness?
   const newNodes = nodes.enter().append("path").classed("cell", true);
 
   redrawPolygons(nodes.merge(newNodes), metadata, state)
@@ -353,7 +361,7 @@ const draw = (
       function (
         this: SVGPathElement,
         event: PointerEvent,
-        node: d3.HierarchyNode<TreeNode>
+        node: HierarchyNode<TreeNode>
       ) {
         dispatch({ type: "selectNode", payload: node.data.path });
       }
@@ -365,7 +373,7 @@ const draw = (
 
   const selectionPath = findSelectionPath(state, metadata.hierarchyNodesByPath);
   const selectionNodes = group
-    .selectAll<SVGPathElement, d3.HierarchyNode<TreeNode>>(".selected")
+    .selectAll<SVGPathElement, HierarchyNode<TreeNode>>(".selected")
     .data(selectionPath, (node) => node.data.path);
 
   const newSelectionNodes = selectionNodes
@@ -385,7 +393,7 @@ const draw = (
 
   // zooming - see https://observablehq.com/@d3/zoomable-map-tiles?collection=@d3/d3-zoom
   const zoomed = (
-    event: D3ZoomEvent<SVGSVGElement, d3.HierarchyNode<TreeNode>>
+    event: D3ZoomEvent<SVGSVGElement, HierarchyNode<TreeNode>>
   ) => {
     group.attr("transform", event.transform.toString());
     //UPGRADE - does this work? Taken from https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/d3-zoom/d3-zoom-tests.ts
@@ -438,8 +446,8 @@ function drawTimescale(
 
   // we might simplify these, from an overly generic example
   const area = (
-    xScale: d3.ScaleTime<number, number, never>,
-    yScale: d3.ScaleLinear<number, number, never>
+    xScale: ScaleTime<number, number, never>,
+    yScale: ScaleLinear<number, number, never>
   ) =>
     d3
       .area<TimescaleIntervalData>()
@@ -451,7 +459,7 @@ function drawTimescale(
         return yScale(valueFn(d));
       });
 
-  const yMax = d3.max(timescaleData, valueFn);
+  const yMax = d3.max(timescaleData, valueFn); // TODO - something better than max?
   if (yMax == undefined) {
     throw new Error("No maximum timescale");
   }
@@ -463,29 +471,25 @@ function drawTimescale(
   dateRange[0] = addDays(dateRange[0], -1);
   dateRange[1] = addDays(dateRange[1], 1);
 
-  const xScale: d3.ScaleTime<number, number, never> = d3
-    .scaleUtc()
+  const xScale: ScaleTime<number, number, never> = scaleUtc()
     .domain(dateRange)
     .range([margin.left, width - margin.right, width]);
-  const yScale: d3.ScaleLinear<number, number, never> = d3
-    .scaleLinear()
+  const yScale: ScaleLinear<number, number, never> = scaleLinear()
     .domain([0, yMax])
     .range([height - margin.bottom, margin.top]);
 
   const xAxis = (
-    g: d3.Selection<SVGGElement, null, SVGSVGElement, unknown>,
-    xScale: d3.ScaleTime<number, number, never>,
+    g: Selection<SVGGElement, null, SVGSVGElement, unknown>,
+    xScale: ScaleTime<number, number, never>,
     height: number
   ) =>
     g.attr("transform", `translate(0,${height - margin.bottom})`).call(
-      d3
-        .axisBottom(xScale)
+      axisBottom(xScale)
         .ticks(width / 80)
         .tickSizeOuter(0)
     );
 
-  const brush = d3
-    .brushX<TimescaleIntervalData>()
+  const brush = brushX<TimescaleIntervalData>()
     .extent([
       [margin.left, 0.5],
       [width - margin.right, height - margin.bottom + 0.5],
