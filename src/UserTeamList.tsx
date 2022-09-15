@@ -1,5 +1,5 @@
 import { State, Team } from "./state";
-import TeamWidget from "./TeamWidget";
+import { TeamWidget } from "./TeamWidget";
 
 /** Creating the team list and sorting it is up to the caller - see functions below */
 export const UserTeamList = (props: {

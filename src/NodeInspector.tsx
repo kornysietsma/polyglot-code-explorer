@@ -28,7 +28,7 @@ import {
 } from "./polyglot_data.types";
 import SourceCodeInspector from "./SourceCodeInspector";
 import { Action, getUserData, State } from "./state";
-import TeamWidget from "./TeamWidget";
+import { teamOrNoTeamWidget } from "./TeamWidget";
 import ToggleablePanel from "./ToggleablePanel";
 import { userTeamListForUser } from "./UserTeamList";
 import { VizMetadata } from "./viz.types";
@@ -150,6 +150,7 @@ const NodeInspector = ({
   const { teams, aliases } = state.config.teamsAndAliases;
   const { fileChangeMetric } = state.config;
   const { userTeams } = state.calculated;
+  const { showNonTeamChanges } = state.config.teamVisualisation;
 
   const age = nodeAge(node, earliest, latest);
   const lastCommit = nodeLastCommitDay(node, earliest, latest);
@@ -173,7 +174,14 @@ const NodeInspector = ({
   const topUserChangers = userChangers.slice(0, topChangersCount);
 
   const teamChangers = sortedUserStatsAccumulators(
-    nodeChangersByTeam(node, aliases, userTeams, earliest, latest) ?? new Map(),
+    nodeChangersByTeam(
+      node,
+      aliases,
+      userTeams,
+      earliest,
+      latest,
+      showNonTeamChanges
+    ) ?? new Map(),
     fileChangeMetric
   );
   const topTeamChangers = teamChangers.slice(0, topChangersCount);
@@ -219,15 +227,17 @@ const NodeInspector = ({
             </tr>
           </thead>
           <tbody>
-            {topTeamChangers.map(([team, stats]) => {
+            {topTeamChangers.map(([teamName, stats]) => {
               return (
-                <tr key={team}>
+                <tr key={teamName}>
                   <td>
-                    <TeamWidget
-                      key={team}
-                      team={teams.get(team)!}
-                      bodyText={team}
-                    />
+                    {teamOrNoTeamWidget(
+                      teamName,
+                      teamName,
+                      teams,
+                      state,
+                      teamName
+                    )}
                   </td>
                   <td>{metricFrom(stats, fileChangeMetric)}</td>
                 </tr>

@@ -103,6 +103,9 @@ export type Config = {
     precision: number;
     topChangersCount: number; // show this many changers in NodeInspector
   };
+  teamVisualisation: {
+    showNonTeamChanges: boolean; // do we show non-team changes when they exceed team changes?
+  };
   teamsAndAliases: TeamsAndAliases;
   colours: {
     currentTheme: "dark" | "light"; // also sets css on the body!
@@ -118,6 +121,7 @@ export type Config = {
       neutralColour: string;
       nonexistentColour: string;
       errorColour: string; // used for logic errors - should never appear
+      noTeamColour: string; // when a file is changed by users not in teams
       circlePackBackground: string;
       ownerColours: {
         noOwnersColour: string;
@@ -138,6 +142,7 @@ export type Config = {
       neutralColour: string;
       nonexistentColour: string;
       errorColour: string; // used for logic errors - should never appear
+      noTeamColour: string; // when a file is changed by users not in teams
       circlePackBackground: string;
       ownerColours: {
         noOwnersColour: string;
@@ -357,6 +362,9 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
         precision: 0,
         topChangersCount: 10, // show this many changers in NodeInspector
       },
+      teamVisualisation: {
+        showNonTeamChanges: false,
+      },
       teamsAndAliases: {
         teams: new Map(),
         aliases: new Map(),
@@ -376,6 +384,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
           neutralColour: "#808080",
           nonexistentColour: "#111111",
           errorColour: "#ff0000",
+          noTeamColour: "#8080ff",
           circlePackBackground: "#111111",
           ownerColours: {
             noOwnersColour: "#222222",
@@ -396,6 +405,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
           neutralColour: "#808080",
           nonexistentColour: "#f7f7f7",
           errorColour: "#ff0000",
+          noTeamColour: "#8080ff",
           circlePackBackground: "#f7f7f7",
           ownerColours: {
             noOwnersColour: "#f7f7f7",
@@ -583,6 +593,12 @@ interface SetFileChangeMetric {
   type: "setFileChangeMetric";
   payload: FileChangeMetric;
 }
+
+interface SetShowNonTeamChanges {
+  type: "setShowNonTeamChanges";
+  payload: boolean;
+}
+
 interface SetAllState {
   type: "setAllState";
   payload: State;
@@ -607,6 +623,7 @@ export type Action =
   | ClearMessages
   | SetUserTeamAliasData
   | SetFileChangeMetric
+  | SetShowNonTeamChanges
   | SetAllState;
 
 function updateStateFromAction(state: State, action: Action): State {
@@ -727,6 +744,12 @@ function updateStateFromAction(state: State, action: Action): State {
         ...state,
         config: { ...config, fileChangeMetric: action.payload },
       };
+
+    case "setShowNonTeamChanges": {
+      const result = _.cloneDeep(state);
+      result.config.teamVisualisation.showNonTeamChanges = action.payload;
+      return result;
+    }
 
     case "setAllState":
       return action.payload;

@@ -29,6 +29,7 @@ const Controller = (props: DefaultProps) => {
   const codeServerId = useId();
   const codeServerPrefixId = useId();
   const remoteUrlTemplateId = useId();
+  const showNonTeamId = useId();
 
   const sortedVis = Object.entries(Visualizations).sort(
     ([, v1], [, v2]) => v1.displayOrder - v2.displayOrder
@@ -143,6 +144,21 @@ const Controller = (props: DefaultProps) => {
             </option>
           </select>
         </div>
+        <label htmlFor={showNonTeamId}>
+          Show changes by users without a team:&nbsp;
+          <input
+            type="checkbox"
+            id={showNonTeamId}
+            checked={state.config.teamVisualisation.showNonTeamChanges}
+            onChange={(evt) => {
+              dispatch({
+                type: "setShowNonTeamChanges",
+                payload: evt.target.checked,
+              });
+            }}
+          />
+        </label>
+
         <div>
           <label htmlFor={codeServerId}>
             Code server available:&nbsp;

@@ -24,7 +24,7 @@ import {
 import { VizMetadata } from "./viz.types";
 
 /** the version of the format file - changes whenever state format changes */
-export const FORMAT_FILE_VERSION = "1.3.2";
+export const FORMAT_FILE_VERSION = "1.3.3";
 
 /** User data can be saved on it's own, in which case it has it's own format version */
 export const FORMAT_FILE_USER_VERSION = "1.3.2";

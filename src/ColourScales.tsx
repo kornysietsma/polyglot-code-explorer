@@ -1,5 +1,6 @@
 import * as d3 from "d3";
 
+import { NO_TEAM_SYMBOL } from "./nodeData";
 import { Config, State } from "./state";
 
 export function numberOfChangersScale(state: State) {
@@ -74,6 +75,9 @@ function themedColours(config: Config) {
 
 export function teamScale(state: State) {
   return (teamName: string) => {
+    if (teamName == NO_TEAM_SYMBOL) {
+      return themedColours(state.config).noTeamColour;
+    }
     const teamData = state.config.teamsAndAliases.teams.get(teamName);
     return teamData?.colour;
   };

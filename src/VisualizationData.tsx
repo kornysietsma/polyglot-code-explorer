@@ -368,13 +368,15 @@ class TeamVisualization extends BaseVisualization<string> {
     const { aliases } = this.state.config.teamsAndAliases;
     const { userTeams } = this.state.calculated;
     const { earliest, latest } = this.state.config.filters.dateRange;
+    const { showNonTeamChanges } = this.state.config.teamVisualisation;
     return nodeTopTeam(
       d.data,
       this.metric,
       aliases,
       userTeams,
       earliest,
-      latest
+      latest,
+      showNonTeamChanges
     );
   }
   parentFn(): string | undefined {
@@ -384,10 +386,18 @@ class TeamVisualization extends BaseVisualization<string> {
 
   colourKey(): [string, string][] {
     const { teams } = this.state.config.teamsAndAliases;
-    return [...teams]
+    const teamColours: [string, string][] = [...teams]
       .filter(([, team]) => !team.hidden)
       .sort(sortTeamsByName)
       .map(([name, team]) => [name, team.colour]);
+    if (this.state.config.teamVisualisation.showNonTeamChanges) {
+      return [
+        ["Users with no team", themedColours(this.state.config).noTeamColour],
+        ...teamColours,
+      ];
+    } else {
+      return teamColours;
+    }
   }
 }
 

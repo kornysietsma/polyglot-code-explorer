@@ -162,7 +162,8 @@ const UsersAndTeams = (props: DefaultProps) => {
           earliest,
           latest,
           teamsAndAliases.aliases,
-          userTeams
+          userTeams,
+          false
         )
       : undefined;
 
@@ -239,7 +240,8 @@ const UsersAndTeams = (props: DefaultProps) => {
       earliest,
       latest,
       workingPageState.aliases,
-      userTeams
+      userTeams,
+      false
     );
 
     const newPageState = alreadyCloned

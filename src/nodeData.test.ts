@@ -56,7 +56,8 @@ describe("aggregating node info by team", () => {
       aliases,
       userTeams,
       earliest,
-      latest
+      latest,
+      false
     );
     expect(nodeChangers).toBeDefined();
     const expected: Map<string, UserStatsAccumulator> = new Map();
@@ -78,7 +79,8 @@ describe("aggregating node info by team", () => {
       aliases,
       userTeams,
       earliest,
-      latest
+      latest,
+      true
     );
     expect(nodeChangers).toBeDefined();
     const expected: Map<string, UserStatsAccumulator> = new Map([
@@ -104,7 +106,8 @@ describe("aggregating node info by team", () => {
       aliases,
       userTeams,
       earliest,
-      latest
+      latest,
+      true
     );
     expect(nodeChangers).toBeDefined();
     const expected: Map<string, UserStatsAccumulator> = new Map([
@@ -145,12 +148,78 @@ describe("aggregating node info by team", () => {
       aliases,
       userTeams,
       earliest,
-      latest
+      latest,
+      true
     );
     expect(nodeChangers).toBeDefined();
     const expected: Map<string, UserStatsAccumulator> = new Map([
       ["teamA", { commits: 2, lines: 4, days: new Set([1, 2]), files: 1 }],
       ["teamB", { commits: 3, lines: 6, days: new Set([1, 2, 3]), files: 1 }],
+    ]);
+    expect(nodeChangers!).toEqual(expected);
+  });
+  test("users with no team get special 'no team' category", () => {
+    const { fileNode, aliases, userTeams, earliest, latest } =
+      minimalNodeChangersParams();
+    userTeams.set(0, new Set(["teamA"]));
+    fileNode.data.git!.details!.push({
+      commit_day: 1,
+      users: [0],
+      commits: 1,
+      lines_added: 1,
+      lines_deleted: 1,
+    });
+    fileNode.data.git!.details!.push({
+      commit_day: 2,
+      users: [1],
+      commits: 3,
+      lines_added: 3,
+      lines_deleted: 4,
+    });
+    const nodeChangers = nodeChangersByTeam(
+      fileNode,
+      aliases,
+      userTeams,
+      earliest,
+      latest,
+      true
+    );
+    expect(nodeChangers).toBeDefined();
+    const expected: Map<string, UserStatsAccumulator> = new Map([
+      ["teamA", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
+      ["<NO TEAM>", { commits: 3, lines: 7, days: new Set([2]), files: 1 }],
+    ]);
+    expect(nodeChangers!).toEqual(expected);
+  });
+  test("users with no team ignored if wanted", () => {
+    const { fileNode, aliases, userTeams, earliest, latest } =
+      minimalNodeChangersParams();
+    userTeams.set(0, new Set(["teamA"]));
+    fileNode.data.git!.details!.push({
+      commit_day: 1,
+      users: [0],
+      commits: 1,
+      lines_added: 1,
+      lines_deleted: 1,
+    });
+    fileNode.data.git!.details!.push({
+      commit_day: 2,
+      users: [1],
+      commits: 3,
+      lines_added: 3,
+      lines_deleted: 4,
+    });
+    const nodeChangers = nodeChangersByTeam(
+      fileNode,
+      aliases,
+      userTeams,
+      earliest,
+      latest,
+      false
+    );
+    expect(nodeChangers).toBeDefined();
+    const expected: Map<string, UserStatsAccumulator> = new Map([
+      ["teamA", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
     ]);
     expect(nodeChangers!).toEqual(expected);
   });

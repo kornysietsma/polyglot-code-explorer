@@ -362,6 +362,10 @@ export function metricFrom(
       return stats.files;
   }
 }
+
+/** when aggregating by team, we flag changes by users with no team */
+export const NO_TEAM_SYMBOL = "<NO TEAM>";
+
 export type UserStats = {
   commits: number;
   lines: number;
@@ -416,11 +420,14 @@ export function nodeChangersByTeam(
   aliases: UserAliases,
   userTeams: UserTeams,
   earliest: number,
-  latest: number
+  latest: number,
+  includeNonTeamChanges: boolean
 ): Map<string, UserStatsAccumulator> | undefined {
   const details = nodeChangeDetails(node, earliest, latest);
   if (!details) return undefined;
   const changerStats: Map<string, UserStatsAccumulator> = new Map();
+
+  const noTeamEntry = includeNonTeamChanges ? [NO_TEAM_SYMBOL] : [];
 
   details.forEach(
     ({ users, commits, lines_added, lines_deleted, commit_day }) => {
@@ -430,7 +437,8 @@ export function nodeChangersByTeam(
         users.flatMap((user) => {
           const realUser = possiblyAlias(aliases, user);
           const teams = userTeams.get(realUser);
-          return teams ? [...teams] : [];
+
+          return teams ? [...teams] : noTeamEntry;
         })
       );
 
@@ -492,14 +500,16 @@ export function nodeTopTeam(
   aliases: UserAliases,
   userTeams: UserTeams,
   earliest: number,
-  latest: number
+  latest: number,
+  includeNonTeamChanges: boolean
 ): string | undefined {
   const changers = nodeChangersByTeam(
     node,
     aliases,
     userTeams,
     earliest,
-    latest
+    latest,
+    includeNonTeamChanges
   );
   if (changers == undefined || changers.size == 0) {
     return undefined;
@@ -551,7 +561,8 @@ function addTeamStats(
   aliases: UserAliases,
   userTeams: UserTeams,
   earliest: number,
-  latest: number
+  latest: number,
+  includeNonTeamChanges: boolean
 ) {
   if (isFile(node)) {
     const changers = nodeChangersByTeam(
@@ -559,7 +570,8 @@ function addTeamStats(
       aliases,
       userTeams,
       earliest,
-      latest
+      latest,
+      includeNonTeamChanges
     );
     if (changers) {
       for (const [teamName, { commits, lines, days }] of changers) {
@@ -584,7 +596,15 @@ function addTeamStats(
   }
   if (isDirectory(node)) {
     node.children.forEach((child) => {
-      addTeamStats(teamStats, child, aliases, userTeams, earliest, latest);
+      addTeamStats(
+        teamStats,
+        child,
+        aliases,
+        userTeams,
+        earliest,
+        latest,
+        includeNonTeamChanges
+      );
     });
   }
 }
@@ -620,10 +640,19 @@ export function aggregateTeamStats(
   earliest: number,
   latest: number,
   aliases: UserAliases,
-  userTeams: UserTeams
+  userTeams: UserTeams,
+  includeNonTeamChanges: boolean
 ): Map<string, UserStats> {
   const teamStats: Map<string, UserStatsAccumulator> = new Map();
-  addTeamStats(teamStats, node, aliases, userTeams, earliest, latest);
+  addTeamStats(
+    teamStats,
+    node,
+    aliases,
+    userTeams,
+    earliest,
+    latest,
+    includeNonTeamChanges
+  );
   return new Map(
     [...teamStats].map(([teamName, { commits, files, lines, days }]) => [
       teamName,
