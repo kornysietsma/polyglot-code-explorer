@@ -262,10 +262,9 @@ class AgeVisualization extends BaseVisualization<number> {
   }
   dataFn(d: HierarchyNode<FileNode>): number | undefined {
     const { earliest, latest } = this.state.config.filters.dateRange;
-    if (earliest && latest) {
-      return nodeAge(d.data, earliest, latest);
-    }
-    return undefined;
+    const { ignoredUsers } = this.state.config.teamsAndAliases;
+
+    return nodeAge(d.data, ignoredUsers, earliest, latest);
   }
   parentFn(): number | undefined {
     return undefined;
@@ -308,11 +307,14 @@ class NumberOfChangersVisualization extends BaseVisualization<number> {
   }
   dataFn(d: HierarchyNode<FileNode>): number | undefined {
     const { earliest, latest } = this.state.config.filters.dateRange;
-    const { aliases } = this.state.config.teamsAndAliases;
-    if (earliest && latest) {
-      return nodeNumberOfChangers(d.data, aliases, earliest, latest);
-    }
-    return undefined;
+    const { aliases, ignoredUsers } = this.state.config.teamsAndAliases;
+    return nodeNumberOfChangers(
+      d.data,
+      aliases,
+      ignoredUsers,
+      earliest,
+      latest
+    );
   }
   parentFn(): number | undefined {
     return undefined;
@@ -334,13 +336,15 @@ class ChurnVisualization extends BaseVisualization<number> {
   }
   dataFn(d: HierarchyNode<FileNode>): number | undefined {
     const { earliest, latest } = this.state.config.filters.dateRange;
+    const { ignoredUsers } = this.state.config.teamsAndAliases;
+
     switch (this.metric) {
       case "days":
-        return nodeChurnDays(d.data, earliest, latest);
+        return nodeChurnDays(d.data, ignoredUsers, earliest, latest);
       case "commits":
-        return nodeChurnCommits(d.data, earliest, latest);
+        return nodeChurnCommits(d.data, ignoredUsers, earliest, latest);
       case "lines":
-        return nodeChurnLines(d.data, earliest, latest);
+        return nodeChurnLines(d.data, ignoredUsers, earliest, latest);
     }
   }
   parentFn(): number | undefined {
@@ -365,7 +369,7 @@ class TeamVisualization extends BaseVisualization<string> {
     this.scale = teamScale(state);
   }
   dataFn(d: HierarchyNode<FileNode>): string | undefined {
-    const { aliases } = this.state.config.teamsAndAliases;
+    const { aliases, ignoredUsers } = this.state.config.teamsAndAliases;
     const { userTeams } = this.state.calculated;
     const { earliest, latest } = this.state.config.filters.dateRange;
     const { showNonTeamChanges } = this.state.config.teamVisualisation;
@@ -373,6 +377,7 @@ class TeamVisualization extends BaseVisualization<string> {
       d.data,
       this.metric,
       aliases,
+      ignoredUsers,
       userTeams,
       earliest,
       latest,

@@ -29,7 +29,7 @@ const DirectoryNodeInspector = ({
 }) => {
   // const { stats, users } = metadata;
   const { earliest, latest } = state.config.filters.dateRange;
-  const { aliases, teams } = state.config.teamsAndAliases;
+  const { aliases, teams, ignoredUsers } = state.config.teamsAndAliases;
   const { userTeams } = state.calculated;
   const { topChangersCount } = state.config.numberOfChangers;
   const { fileChangeMetric } = state.config;
@@ -37,7 +37,7 @@ const DirectoryNodeInspector = ({
   const { users } = metadata;
 
   const userChangers = sortedUserStats(
-    aggregateUserStats(node, earliest, latest, aliases),
+    aggregateUserStats(node, earliest, latest, aliases, ignoredUsers),
     fileChangeMetric
   );
   const topUserChangers = userChangers.slice(0, topChangersCount);
@@ -47,6 +47,7 @@ const DirectoryNodeInspector = ({
       earliest,
       latest,
       aliases,
+      ignoredUsers,
       userTeams,
       showNonTeamChanges
     ),

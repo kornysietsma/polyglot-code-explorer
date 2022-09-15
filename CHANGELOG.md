@@ -14,7 +14,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - added Teams and Aliases for users - many changes including new modal dialogs
 - removed code ownership entirely - it didn't work well, will replace with something more team oriented
 - moved styling to simpler non-component model, using css variables and some SASS for nested selectors
-
+- Team visualisation and team-based stats all over the place
+- Saving and loading state from file and browser local storage
+- Can ignore users (useful to stop bot users affecting stats)
+  
 ## [0.5.0] - 2021-04-03
 
 ### Changed

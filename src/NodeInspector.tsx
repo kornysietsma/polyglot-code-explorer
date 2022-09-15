@@ -147,13 +147,13 @@ const NodeInspector = ({
   const { earliest, latest } = state.config.filters.dateRange;
   const { topChangersCount } = state.config.numberOfChangers;
   const { couplingAvailable } = state.couplingConfig;
-  const { teams, aliases } = state.config.teamsAndAliases;
+  const { teams, aliases, ignoredUsers } = state.config.teamsAndAliases;
   const { fileChangeMetric } = state.config;
   const { userTeams } = state.calculated;
   const { showNonTeamChanges } = state.config.teamVisualisation;
 
-  const age = nodeAge(node, earliest, latest);
-  const lastCommit = nodeLastCommitDay(node, earliest, latest);
+  const age = nodeAge(node, ignoredUsers, earliest, latest);
+  const lastCommit = nodeLastCommitDay(node, ignoredUsers, earliest, latest);
   const creationDate = nodeCreationDate(node);
   let creationText = creationDate
     ? `File created on ${humanizeDate(creationDate)}`
@@ -168,7 +168,7 @@ const NodeInspector = ({
         )} (${humanizeDays(age)})`
       : "";
   const userChangers = sortedUserStatsAccumulators(
-    nodeChangers(node, aliases, earliest, latest) ?? new Map(),
+    nodeChangers(node, aliases, ignoredUsers, earliest, latest) ?? new Map(),
     fileChangeMetric
   );
   const topUserChangers = userChangers.slice(0, topChangersCount);
@@ -177,6 +177,7 @@ const NodeInspector = ({
     nodeChangersByTeam(
       node,
       aliases,
+      ignoredUsers,
       userTeams,
       earliest,
       latest,
@@ -250,7 +251,7 @@ const NodeInspector = ({
       ""
     );
 
-  const churnData = nodeChurnData(node, earliest, latest);
+  const churnData = nodeChurnData(node, ignoredUsers, earliest, latest);
 
   return (
     <div>

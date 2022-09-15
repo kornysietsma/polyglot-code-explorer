@@ -24,10 +24,10 @@ import {
 import { VizMetadata } from "./viz.types";
 
 /** the version of the format file - changes whenever state format changes */
-export const FORMAT_FILE_VERSION = "1.3.3";
+export const FORMAT_FILE_VERSION = "1.3.4";
 
 /** User data can be saved on it's own, in which case it has it's own format version */
-export const FORMAT_FILE_USER_VERSION = "1.3.2";
+export const FORMAT_FILE_USER_VERSION = "1.3.4";
 
 export type ExportUser = {
   name: string;
@@ -55,6 +55,7 @@ export type ExportTeamsAndAliases = {
   aliasData: ExportUser[];
   aliases: [user: ExportUser, aliasedTo: ExportUser][];
   teams: ExportTeam[];
+  ignoredUsers: ExportUser[];
 };
 
 export type StandaloneExportTeamsAndAliases = {
@@ -127,11 +128,15 @@ function exportableTeamsAndAliases(
       };
     }
   );
+  const ignoredUsers: ExportUser[] = [...teamsAndAliases.ignoredUsers]
+    .sort()
+    .map((userId) => toExport(userId));
 
   return {
     aliasData,
     aliases: exportableAliases,
-    teams: teams,
+    teams,
+    ignoredUsers,
   };
 }
 
@@ -168,11 +173,8 @@ export function stateFromExportable(
     const { users } = metadata;
     let failed = false;
 
-    const {
-      aliasData,
-      aliases,
-      teams: teams,
-    } = exportableState.teamsAndAliases;
+    const { aliasData, aliases, teams, ignoredUsers } =
+      exportableState.teamsAndAliases;
 
     if (exportableState.formatVersion != FORMAT_FILE_VERSION) {
       messages.push(
@@ -197,7 +199,14 @@ export function stateFromExportable(
       newTeamsAndAliases,
       failed: newFailed,
       messages: newMessages,
-    } = teamsAndAliasesFromImport(users, aliases, aliasData, teams, tolerant);
+    } = teamsAndAliasesFromImport(
+      users,
+      aliases,
+      aliasData,
+      teams,
+      ignoredUsers,
+      tolerant
+    );
     if (newFailed) {
       failed = true;
     }
@@ -234,6 +243,7 @@ export function teamsAndAliasesFromImport(
   importedAliases: [user: ExportUser, aliasedTo: ExportUser][],
   importedAliasData: ExportUser[],
   importedTeams: ExportTeam[],
+  importedIgnoredUsers: ExportUser[],
   tolerant: boolean
 ): {
   newTeamsAndAliases?: TeamsAndAliases;
@@ -304,10 +314,16 @@ export function teamsAndAliasesFromImport(
         number
       ][]
     );
+    const newIgnoredUsers: Set<number> = new Set(
+      importedIgnoredUsers
+        .map((user) => lookupUser(user, false))
+        .filter((u) => u != undefined) as number[]
+    );
     const newTeamsAndAliases = {
       teams: newTeams,
       aliases: newAliases,
       aliasData: newAliasData,
+      ignoredUsers: newIgnoredUsers,
     };
     return { newTeamsAndAliases, failed, messages };
   } catch (e) {

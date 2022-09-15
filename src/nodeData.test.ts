@@ -41,19 +41,21 @@ function minimalNodeChangersParams() {
   const fileNode = minimalFileNode("foo", "bar");
   fileNode.data.git = minimalGitData();
   const aliases: UserAliases = new Map();
+  const ignoredUsers: Set<number> = new Set();
   const userTeams: UserTeams = new Map();
   const earliest = 0;
   const latest = 100;
-  return { fileNode, aliases, userTeams, earliest, latest };
+  return { fileNode, aliases, ignoredUsers, userTeams, earliest, latest };
 }
 
 describe("aggregating node info by team", () => {
   test("minimal data returns empty results", () => {
-    const { fileNode, aliases, userTeams, earliest, latest } =
+    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
       minimalNodeChangersParams();
     const nodeChangers = nodeChangersByTeam(
       fileNode,
       aliases,
+      ignoredUsers,
       userTeams,
       earliest,
       latest,
@@ -64,7 +66,7 @@ describe("aggregating node info by team", () => {
     expect(nodeChangers!).toEqual(expected);
   });
   test("can aggregate basic team stats", () => {
-    const { fileNode, aliases, userTeams, earliest, latest } =
+    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
       minimalNodeChangersParams();
     userTeams.set(0, new Set(["teamA", "teamB"]));
     fileNode.data.git!.details!.push({
@@ -77,6 +79,7 @@ describe("aggregating node info by team", () => {
     const nodeChangers = nodeChangersByTeam(
       fileNode,
       aliases,
+      ignoredUsers,
       userTeams,
       earliest,
       latest,
@@ -90,7 +93,7 @@ describe("aggregating node info by team", () => {
     expect(nodeChangers!).toEqual(expected);
   });
   test("can aggregate more complex team stats", () => {
-    const { fileNode, aliases, userTeams, earliest, latest } =
+    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
       minimalNodeChangersParams();
     userTeams.set(0, new Set(["teamA"]));
     userTeams.set(1, new Set(["teamB"]));
@@ -104,6 +107,7 @@ describe("aggregating node info by team", () => {
     const nodeChangers = nodeChangersByTeam(
       fileNode,
       aliases,
+      ignoredUsers,
       userTeams,
       earliest,
       latest,
@@ -117,7 +121,7 @@ describe("aggregating node info by team", () => {
     expect(nodeChangers!).toEqual(expected);
   });
   test("can aggregate overlapping teams", () => {
-    const { fileNode, aliases, userTeams, earliest, latest } =
+    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
       minimalNodeChangersParams();
     userTeams.set(0, new Set(["teamA"]));
     userTeams.set(1, new Set(["teamB"]));
@@ -146,6 +150,7 @@ describe("aggregating node info by team", () => {
     const nodeChangers = nodeChangersByTeam(
       fileNode,
       aliases,
+      ignoredUsers,
       userTeams,
       earliest,
       latest,
@@ -159,7 +164,7 @@ describe("aggregating node info by team", () => {
     expect(nodeChangers!).toEqual(expected);
   });
   test("users with no team get special 'no team' category", () => {
-    const { fileNode, aliases, userTeams, earliest, latest } =
+    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
       minimalNodeChangersParams();
     userTeams.set(0, new Set(["teamA"]));
     fileNode.data.git!.details!.push({
@@ -179,6 +184,7 @@ describe("aggregating node info by team", () => {
     const nodeChangers = nodeChangersByTeam(
       fileNode,
       aliases,
+      ignoredUsers,
       userTeams,
       earliest,
       latest,
@@ -192,7 +198,7 @@ describe("aggregating node info by team", () => {
     expect(nodeChangers!).toEqual(expected);
   });
   test("users with no team ignored if wanted", () => {
-    const { fileNode, aliases, userTeams, earliest, latest } =
+    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
       minimalNodeChangersParams();
     userTeams.set(0, new Set(["teamA"]));
     fileNode.data.git!.details!.push({
@@ -212,6 +218,7 @@ describe("aggregating node info by team", () => {
     const nodeChangers = nodeChangersByTeam(
       fileNode,
       aliases,
+      ignoredUsers,
       userTeams,
       earliest,
       latest,
@@ -220,6 +227,34 @@ describe("aggregating node info by team", () => {
     expect(nodeChangers).toBeDefined();
     const expected: Map<string, UserStatsAccumulator> = new Map([
       ["teamA", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
+    ]);
+    expect(nodeChangers!).toEqual(expected);
+  });
+  test("ignored users are ignored", () => {
+    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
+      minimalNodeChangersParams();
+    userTeams.set(0, new Set(["teamA", "teamB"]));
+    ignoredUsers.add(1);
+    fileNode.data.git!.details!.push({
+      commit_day: 1,
+      users: [0, 1],
+      commits: 1,
+      lines_added: 1,
+      lines_deleted: 1,
+    });
+    const nodeChangers = nodeChangersByTeam(
+      fileNode,
+      aliases,
+      ignoredUsers,
+      userTeams,
+      earliest,
+      latest,
+      true
+    );
+    expect(nodeChangers).toBeDefined();
+    const expected: Map<string, UserStatsAccumulator> = new Map([
+      ["teamA", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
+      ["teamB", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
     ]);
     expect(nodeChangers!).toEqual(expected);
   });

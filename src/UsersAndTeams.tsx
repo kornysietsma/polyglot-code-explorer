@@ -46,9 +46,11 @@ export type UsersAndTeamsPageState = {
   usersAndAliases: UserAndStatsAndAliases[];
   aliases: UserAliases;
   teams: Teams;
+  ignoredUsers: Set<number>;
   teamStats: Map<string, UserStats>;
   usersSort: { key: string; ascending: boolean };
   checkedUsers: Set<number>;
+  checkedIgnoredUsers: Set<number>;
   userFilter: string;
   showCheckedUsers: boolean;
   importMessages: Message[];
@@ -57,6 +59,8 @@ const initialPageState: () => UsersAndTeamsPageState = () => {
   return {
     usersAndAliases: [],
     teams: new Map(),
+    ignoredUsers: new Set(),
+    checkedIgnoredUsers: new Set(),
     teamStats: new Map(),
     hiddenTeams: new Set(),
     aliases: new Map(),
@@ -150,10 +154,17 @@ const UsersAndTeams = (props: DefaultProps) => {
     usersAndAliases: UserAndStatsAndAliases[];
     aliases: UserAliases;
     teams: Teams;
+    ignoredUsers: Set<number>;
     teamStats?: Map<string, UserStats>;
   } {
     const userStats = recalcStats
-      ? aggregateUserStats(tree, earliest, latest, teamsAndAliases.aliases)
+      ? aggregateUserStats(
+          tree,
+          earliest,
+          latest,
+          teamsAndAliases.aliases,
+          teamsAndAliases.ignoredUsers
+        )
       : undefined;
     const userTeams = buildUserTeams(teamsAndAliases.teams);
     const teamStats = recalcStats
@@ -162,6 +173,7 @@ const UsersAndTeams = (props: DefaultProps) => {
           earliest,
           latest,
           teamsAndAliases.aliases,
+          teamsAndAliases.ignoredUsers,
           userTeams,
           false
         )
@@ -200,6 +212,7 @@ const UsersAndTeams = (props: DefaultProps) => {
       usersAndAliases: [...usersWithStats, ...aliasUserData],
       aliases: teamsAndAliases.aliases,
       teams: teamsAndAliases.teams,
+      ignoredUsers: teamsAndAliases.ignoredUsers,
       teamStats,
     };
   }
@@ -208,7 +221,7 @@ const UsersAndTeams = (props: DefaultProps) => {
     // Need to re-initialise local state from parent state every time we open the modal
     const { earliest, latest } = state.config.filters.dateRange;
 
-    const { usersAndAliases, aliases, teams, teamStats } =
+    const { usersAndAliases, aliases, teams, ignoredUsers, teamStats } =
       usersAndTeamsToPageFormat(
         users,
         state.config.teamsAndAliases,
@@ -222,6 +235,7 @@ const UsersAndTeams = (props: DefaultProps) => {
       usersAndAliases,
       aliases,
       teams,
+      ignoredUsers,
       teamStats: teamStats ?? new Map(),
     });
 
@@ -232,14 +246,21 @@ const UsersAndTeams = (props: DefaultProps) => {
     workingPageState: UsersAndTeamsPageState,
     alreadyCloned: boolean
   ): UsersAndTeamsPageState {
-    const { aliases } = workingPageState;
-    const userStats = aggregateUserStats(tree, earliest, latest, aliases);
+    const { aliases, ignoredUsers } = workingPageState;
+    const userStats = aggregateUserStats(
+      tree,
+      earliest,
+      latest,
+      aliases,
+      ignoredUsers
+    );
     const userTeams = buildUserTeams(workingPageState.teams);
     const teamStats = aggregateTeamStats(
       tree,
       earliest,
       latest,
       workingPageState.aliases,
+      ignoredUsers,
       userTeams,
       false
     );
@@ -296,6 +317,7 @@ const UsersAndTeams = (props: DefaultProps) => {
       payload: {
         teams: pageState.teams,
         aliases: pageState.aliases,
+        ignoredUsers: pageState.ignoredUsers,
         aliasData,
       },
     });
@@ -337,6 +359,9 @@ const UsersAndTeams = (props: DefaultProps) => {
           hidden: team.hidden,
         };
       }),
+      ignoredUsers: [...pageState.ignoredUsers].map((userId) =>
+        toExportUser(userId)
+      ),
     };
     const standaloneExportData: StandaloneExportTeamsAndAliases = {
       formatVersion: FORMAT_FILE_USER_VERSION,
@@ -393,6 +418,7 @@ const UsersAndTeams = (props: DefaultProps) => {
         aliasData: importedAliasData,
         aliases: importedAliases,
         teams: importedTeams,
+        ignoredUsers: importedIgnoredUsers,
       } = data.teamsAndAliases;
 
       const {
@@ -404,6 +430,7 @@ const UsersAndTeams = (props: DefaultProps) => {
         importedAliases,
         importedAliasData,
         importedTeams,
+        importedIgnoredUsers,
         tolerant
       );
       if (newFailed) {
@@ -420,13 +447,14 @@ const UsersAndTeams = (props: DefaultProps) => {
         return;
       }
 
-      const { usersAndAliases, aliases, teams } = usersAndTeamsToPageFormat(
-        users,
-        newTeamsAndAliases,
-        earliest,
-        latest,
-        recalcStats
-      );
+      const { usersAndAliases, aliases, ignoredUsers, teams } =
+        usersAndTeamsToPageFormat(
+          users,
+          newTeamsAndAliases,
+          earliest,
+          latest,
+          recalcStats
+        );
 
       if (tolerant && messages.length > 0) {
         messages.push(infoMessage("Errors were found and ignored."));
@@ -438,6 +466,7 @@ const UsersAndTeams = (props: DefaultProps) => {
         usersAndAliases,
         teams,
         aliases,
+        ignoredUsers,
         importMessages: messages,
       });
     } catch (e) {
@@ -511,11 +540,22 @@ const UsersAndTeams = (props: DefaultProps) => {
     setPageState(maybeRecalc({ ...pageState, teams }, false));
   }
 
+  function handleIgnoredUserCheck(user: number, checked: boolean) {
+    const checkedIgnoredUsers = pageState.checkedIgnoredUsers;
+
+    if (checked) {
+      checkedIgnoredUsers.add(user);
+    } else {
+      checkedIgnoredUsers.delete(user);
+    }
+    setPageState({ ...pageState, checkedIgnoredUsers });
+  }
+
   const showCheckedUsersId = useId();
 
-  const userFilter: (user: UserAndStatsAndAliases) => boolean = (user) => {
-    if (pageState.aliases.has(user.id)) {
-      return false; // don't show aliased users at all
+  const filterUsers: (user: UserAndStatsAndAliases) => boolean = (user) => {
+    if (pageState.aliases.has(user.id) || pageState.ignoredUsers.has(user.id)) {
+      return false; // don't show ignored or aliased users at all
     }
     if (pageState.checkedUsers.has(user.id)) {
       return true; // always show checked users - too confusing otherwise!
@@ -702,6 +742,55 @@ const UsersAndTeams = (props: DefaultProps) => {
     setAliasBeingEdited(undefined);
     setAliasModalIsOpen(true);
   };
+
+  function ignoreCheckedUsers() {
+    const newPageState = _.cloneDeep(pageState);
+    for (const userId of pageState.checkedUsers) {
+      if (pageState.aliases.has(userId)) {
+        throw new Error("Logic error - can't ignore aliased user!");
+      }
+      if (pageState.usersAndAliases[userId]?.isAlias) {
+        throw new Error("Logic error - can't ignore alias user!");
+      }
+      newPageState.ignoredUsers.add(userId);
+    }
+    const newTeams: Teams = new Map(
+      [...newPageState.teams].map(([teamName, team]) => {
+        for (const userId of pageState.checkedUsers) {
+          team.users.delete(userId);
+        }
+        return [teamName, team];
+      })
+    );
+    setPageState(
+      maybeRecalc(
+        {
+          ...newPageState,
+          teams: newTeams,
+          checkedUsers: new Set(),
+          checkedIgnoredUsers: new Set(),
+        },
+        true
+      )
+    );
+  }
+
+  function unIgnoreCheckedUsers() {
+    const newIgnoredUsers = _.cloneDeep(pageState.ignoredUsers);
+    for (const userId of pageState.checkedIgnoredUsers) {
+      newIgnoredUsers.delete(userId);
+    }
+    setPageState(
+      maybeRecalc(
+        {
+          ...pageState,
+          ignoredUsers: newIgnoredUsers,
+          checkedIgnoredUsers: new Set(),
+        },
+        false
+      )
+    );
+  }
 
   // this is a bit different from normal UserTeams as hidden teams are shown
   function teamsForUserIncludingHidden(
@@ -983,6 +1072,55 @@ const UsersAndTeams = (props: DefaultProps) => {
           setParentState={setPageStateAndMaybeRecalc}
         />
         <ToggleablePanel
+          title="Ignored Users"
+          showInitially={true}
+          borderlessIfHidden={true}
+        >
+          {pageState.checkedIgnoredUsers.size > 0 ? (
+            <div className="buttonList">
+              <button onClick={unIgnoreCheckedUsers}>unignore user(s)</button>
+            </div>
+          ) : null}
+          <table>
+            <thead>
+              <tr>
+                <th>select</th>
+                <th>id</th>
+                <th>name</th>
+                <th>email</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...pageState.ignoredUsers].sort().map((userId) => {
+                const user = pageState.usersAndAliases[userId];
+                if (user == undefined) {
+                  throw new Error("Logic error - unknown user");
+                }
+                return (
+                  <tr key={userId}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        value={userId}
+                        onChange={(event) =>
+                          handleIgnoredUserCheck(
+                            parseInt(event.target.value),
+                            event.target.checked
+                          )
+                        }
+                        checked={pageState.checkedIgnoredUsers.has(userId)}
+                      ></input>
+                    </td>
+                    <td>{userId}</td>
+                    <td>{user.name}</td>
+                    <td>{user.email}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </ToggleablePanel>
+        <ToggleablePanel
           title="Users"
           showInitially={true}
           borderlessIfHidden={true}
@@ -999,6 +1137,12 @@ const UsersAndTeams = (props: DefaultProps) => {
               checkedNormalUsers.length > 0 ? (
                 <button onClick={editAlias(checkedAliasUsers[0]!)}>
                   Add users to alias
+                </button>
+              ) : null}
+              {checkedNormalUsers.length > 0 &&
+              checkedAliasUsers.length == 0 ? (
+                <button onClick={ignoreCheckedUsers}>
+                  Ignore user(s) (will remove from teams!)
                 </button>
               ) : null}
             </div>
@@ -1074,13 +1218,14 @@ const UsersAndTeams = (props: DefaultProps) => {
                 >
                   Lines changed total
                 </th>
+                <th>ignored?</th>
                 <th>Actions</th>
                 <th>Teams</th>
               </tr>
             </thead>
             <tbody>
               {sortUsers(pageState.usersAndAliases, pageState.usersSort)
-                .filter(userFilter)
+                .filter(filterUsers)
                 .map((user) => {
                   return (
                     <tr key={user.id}>
@@ -1104,6 +1249,7 @@ const UsersAndTeams = (props: DefaultProps) => {
                       <td>{user.commits}</td>
                       <td>{user.days}</td>
                       <td>{user.lines}</td>
+                      <td>{pageState.ignoredUsers.has(user.id) ? "Y" : ""}</td>
                       <td>
                         {user.isAlias ? (
                           <button onClick={editAlias(user.id)}>

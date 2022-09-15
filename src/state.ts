@@ -22,6 +22,7 @@ export type TeamsAndAliases = {
   aliases: UserAliases;
   // alias keys are sequential numbers starting with the users length
   aliasData: UserAliasData;
+  ignoredUsers: Set<number>;
 };
 
 export type Config = {
@@ -363,12 +364,13 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
         topChangersCount: 10, // show this many changers in NodeInspector
       },
       teamVisualisation: {
-        showNonTeamChanges: false,
+        showNonTeamChanges: true,
       },
       teamsAndAliases: {
         teams: new Map(),
         aliases: new Map(),
         aliasData: new Map(),
+        ignoredUsers: new Set(),
       },
       colours: {
         currentTheme: "dark", // also sets css on the body!
@@ -586,6 +588,7 @@ interface SetUserTeamAliasData {
   payload: {
     teams: Teams;
     aliases: UserAliases;
+    ignoredUsers: Set<number>;
     aliasData: UserAliasData;
   };
 }
@@ -735,6 +738,7 @@ function updateStateFromAction(state: State, action: Action): State {
       const result = _.cloneDeep(state);
       result.config.teamsAndAliases.teams = action.payload.teams;
       result.config.teamsAndAliases.aliases = action.payload.aliases;
+      result.config.teamsAndAliases.ignoredUsers = action.payload.ignoredUsers;
       result.config.teamsAndAliases.aliasData = action.payload.aliasData;
       return result;
     }

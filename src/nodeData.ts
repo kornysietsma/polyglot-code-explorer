@@ -108,10 +108,22 @@ export function nodeIndentation(
   return node.data.indentation[metric];
 }
 
-// Date range based data, mostly git details
+function filterDetailsIgnoringUsers(
+  details: GitDetails[],
+  ignoredUsers: Set<number>
+): GitDetails[] {
+  return details
+    .map((detail) => {
+      const notIgnoredUsers = detail.users.filter((u) => !ignoredUsers.has(u));
+      return { ...detail, users: notIgnoredUsers };
+    })
+    .filter((detail) => detail.users.length > 0);
+}
 
+// Date range based git details
 function nodeChangeDetails(
   node: FileNode,
+  ignoredUsers: Set<number>,
   earliest?: number,
   latest?: number
 ): GitDetails[] | undefined {
@@ -119,24 +131,32 @@ function nodeChangeDetails(
   if (!git) return undefined;
   const { details } = git;
   if (!details) return undefined;
-  if (earliest === undefined || latest === undefined) return details;
-  return details.filter(
+  if (earliest === undefined || latest === undefined)
+    return filterDetailsIgnoringUsers(details, ignoredUsers);
+  const detailsWithinDates = details.filter(
     (d) => d.commit_day >= earliest && d.commit_day <= latest
   );
+  return filterDetailsIgnoringUsers(detailsWithinDates, ignoredUsers);
 }
 
 export function nodeLastCommitDay(
   node: FileNode,
+  ignoredUsers: Set<number>,
   earliest: number,
   latest: number
 ) {
-  const details = nodeChangeDetails(node, earliest, latest);
+  const details = nodeChangeDetails(node, ignoredUsers, earliest, latest);
   if (!details || details.length === 0) return undefined; // TODO: distinguish no history from undefined!
   return details[details.length - 1]?.commit_day;
 }
 
-export function nodeAge(node: FileNode, earliest: number, latest: number) {
-  const lastCommit = nodeLastCommitDay(node, earliest, latest);
+export function nodeAge(
+  node: FileNode,
+  ignoredUsers: Set<number>,
+  earliest: number,
+  latest: number
+) {
+  const lastCommit = nodeLastCommitDay(node, ignoredUsers, earliest, latest);
   if (!lastCommit) return undefined;
   return Math.ceil((latest - lastCommit) / (24 * 60 * 60));
 }
@@ -144,10 +164,11 @@ export function nodeAge(node: FileNode, earliest: number, latest: number) {
 export function nodeNumberOfChangers(
   node: FileNode,
   aliases: UserAliases,
+  ignoredUsers: Set<number>,
   earliest: number,
   latest: number
 ) {
-  const details = nodeChangeDetails(node, earliest, latest);
+  const details = nodeChangeDetails(node, ignoredUsers, earliest, latest);
   if (!details) return undefined;
   const changers = _.uniq(
     details.flatMap((d) => d.users.map((u) => possiblyAlias(aliases, u)))
@@ -166,10 +187,11 @@ export type ChurnData = {
 
 export function nodeChurnData(
   node: FileNode,
+  ignoredUsers: Set<number>,
   earliest: number,
   latest: number
 ): ChurnData | undefined {
-  const details = nodeChangeDetails(node, earliest, latest);
+  const details = nodeChangeDetails(node, ignoredUsers, earliest, latest);
   if (!details) return undefined;
   let totalLines = 0;
   let totalCommits = 0;
@@ -193,30 +215,33 @@ export function nodeChurnData(
 
 export function nodeChurnDays(
   node: FileNode,
+  ignoredUsers: Set<number>,
   earliest: number,
   latest: number
 ) {
-  const data = nodeChurnData(node, earliest, latest);
+  const data = nodeChurnData(node, ignoredUsers, earliest, latest);
   if (!data) return undefined;
   return data.fractionalDays;
 }
 
 export function nodeChurnCommits(
   node: FileNode,
+  ignoredUsers: Set<number>,
   earliest: number,
   latest: number
 ) {
-  const data = nodeChurnData(node, earliest, latest);
+  const data = nodeChurnData(node, ignoredUsers, earliest, latest);
   if (!data) return undefined;
   return data.fractionalCommits;
 }
 
 export function nodeChurnLines(
   node: FileNode,
+  ignoredUsers: Set<number>,
   earliest: number,
   latest: number
 ) {
-  const data = nodeChurnData(node, earliest, latest);
+  const data = nodeChurnData(node, ignoredUsers, earliest, latest);
   if (!data) return undefined;
   return data.fractionalLines;
 }
@@ -386,10 +411,11 @@ export const DEFAULT_USER_STATS: UserStats = {
 export function nodeChangers(
   node: FileNode,
   aliases: UserAliases,
+  ignoredUsers: Set<number>,
   earliest: number,
   latest: number
 ): Map<number, UserStatsAccumulator> | undefined {
-  const details = nodeChangeDetails(node, earliest, latest);
+  const details = nodeChangeDetails(node, ignoredUsers, earliest, latest);
   if (!details) return undefined;
   const changerStats: Map<number, UserStatsAccumulator> = new Map();
 
@@ -418,12 +444,13 @@ export function nodeChangers(
 export function nodeChangersByTeam(
   node: FileNode,
   aliases: UserAliases,
+  ignoredUsers: Set<number>,
   userTeams: UserTeams,
   earliest: number,
   latest: number,
   includeNonTeamChanges: boolean
 ): Map<string, UserStatsAccumulator> | undefined {
-  const details = nodeChangeDetails(node, earliest, latest);
+  const details = nodeChangeDetails(node, ignoredUsers, earliest, latest);
   if (!details) return undefined;
   const changerStats: Map<string, UserStatsAccumulator> = new Map();
 
@@ -498,6 +525,7 @@ export function nodeTopTeam(
   node: FileNode,
   metric: FileChangeMetric,
   aliases: UserAliases,
+  ignoredUsers: Set<number>,
   userTeams: UserTeams,
   earliest: number,
   latest: number,
@@ -506,6 +534,7 @@ export function nodeTopTeam(
   const changers = nodeChangersByTeam(
     node,
     aliases,
+    ignoredUsers,
     userTeams,
     earliest,
     latest,
@@ -522,11 +551,18 @@ function addUserStats(
   userStats: Map<number, UserStatsAccumulator>,
   node: TreeNode,
   aliases: UserAliases,
+  ignoredUsers: Set<number>,
   earliest: number,
   latest: number
 ) {
   if (isFile(node)) {
-    const changers = nodeChangers(node, aliases, earliest, latest);
+    const changers = nodeChangers(
+      node,
+      aliases,
+      ignoredUsers,
+      earliest,
+      latest
+    );
     if (changers) {
       for (const [userId, { commits, lines, days }] of changers) {
         const stats = userStats.get(userId);
@@ -550,7 +586,7 @@ function addUserStats(
   }
   if (isDirectory(node)) {
     node.children.forEach((child) => {
-      addUserStats(userStats, child, aliases, earliest, latest);
+      addUserStats(userStats, child, aliases, ignoredUsers, earliest, latest);
     });
   }
 }
@@ -559,6 +595,7 @@ function addTeamStats(
   teamStats: Map<string, UserStatsAccumulator>,
   node: TreeNode,
   aliases: UserAliases,
+  ignoredUsers: Set<number>,
   userTeams: UserTeams,
   earliest: number,
   latest: number,
@@ -568,6 +605,7 @@ function addTeamStats(
     const changers = nodeChangersByTeam(
       node,
       aliases,
+      ignoredUsers,
       userTeams,
       earliest,
       latest,
@@ -600,6 +638,7 @@ function addTeamStats(
         teamStats,
         child,
         aliases,
+        ignoredUsers,
         userTeams,
         earliest,
         latest,
@@ -617,10 +656,11 @@ export function aggregateUserStats(
   node: TreeNode,
   earliest: number,
   latest: number,
-  aliases: UserAliases
+  aliases: UserAliases,
+  ignoredUsers: Set<number>
 ): Map<number, UserStats> {
   const userStats: Map<number, UserStatsAccumulator> = new Map();
-  addUserStats(userStats, node, aliases, earliest, latest);
+  addUserStats(userStats, node, aliases, ignoredUsers, earliest, latest);
   return new Map(
     [...userStats].map(([userId, { commits, files, lines, days }]) => [
       userId,
@@ -640,6 +680,7 @@ export function aggregateTeamStats(
   earliest: number,
   latest: number,
   aliases: UserAliases,
+  ignoredUsers: Set<number>,
   userTeams: UserTeams,
   includeNonTeamChanges: boolean
 ): Map<string, UserStats> {
@@ -648,6 +689,7 @@ export function aggregateTeamStats(
     teamStats,
     node,
     aliases,
+    ignoredUsers,
     userTeams,
     earliest,
     latest,
