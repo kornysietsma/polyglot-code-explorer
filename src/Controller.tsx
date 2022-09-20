@@ -143,6 +143,35 @@ const Controller = (props: DefaultProps) => {
               Days containing a change
             </option>
           </select>
+          <HelpPanel>
+            <p>
+              This metric is used anywhere we show &ldquo;top&rdquo; users or
+              teams, both in inspectors and in the Teams visualisations.
+            </p>
+            <p>The metrics are as follows:</p>
+            <dl>
+              <dt>Lines of code</dt>
+              <dd>This is the total lines changed - added or removed</dd>
+              <dt>File commits</dt>
+              <dd>
+                This is the individual file commits made. Note that 1 commit to
+                10 files counts as a value of 10 for this - we don&apos;t
+                currently have the data to identify a commit across multiple
+                files.
+              </dd>
+              <dt>Files changed</dt>
+              <dd>
+                Number of files changed by this user/team - will always be 1 for
+                a single file!
+              </dd>
+              <dt>Days with a change</dt>
+              <dd>
+                The number of days that a user made changes. Note this{" "}
+                <i>does</i> work across multiple files, so 10 files changed on
+                the same day have a value of 1.
+              </dd>
+            </dl>
+          </HelpPanel>
         </div>
         <label htmlFor={showNonTeamId}>
           Show changes by users without a team:&nbsp;
@@ -215,26 +244,26 @@ const Controller = (props: DefaultProps) => {
               <p>
                 Elements are bits of a remote URL - given an example{" "}
                 <pre>git@github.com:foocorp/blah/bat.git</pre> you can map:
-                <ul>
-                  <li>host - the host name e.g. github.com</li>
-                  <li>
-                    path - the url prefix to the actual project name, e.g.
-                    &apos;foocorp/blah
-                  </li>
-                  <li>
-                    project - the last bit of the URL, e.g &apos;bat&apos;
-                    (excluding .git)
-                  </li>
-                  <li>
-                    ref - the name or git hash of the HEAD when the code was
-                    scanned - usually a hex string
-                  </li>
-                  <li>
-                    file - the path within the project of the file you are
-                    browsing, e.g. &apos;src/main/baz.clj
-                  </li>
-                </ul>
               </p>
+              <ul>
+                <li>host - the host name e.g. github.com</li>
+                <li>
+                  path - the url prefix to the actual project name, e.g.
+                  &apos;foocorp/blah
+                </li>
+                <li>
+                  project - the last bit of the URL, e.g &apos;bat&apos;
+                  (excluding .git)
+                </li>
+                <li>
+                  ref - the name or git hash of the HEAD when the code was
+                  scanned - usually a hex string
+                </li>
+                <li>
+                  file - the path within the project of the file you are
+                  browsing, e.g. &apos;src/main/baz.clj
+                </li>
+              </ul>
               <p>
                 You can skip any element - if you want to see &apos;master&apos;
                 use &apos;master&apos; in the template, instead of the ref.

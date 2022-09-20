@@ -1,3 +1,4 @@
+import * as d3 from "d3";
 import _ from "lodash";
 import React, { useId } from "react";
 import ReactModal from "react-modal";
@@ -54,6 +55,8 @@ export type UsersAndTeamsPageState = {
   userFilter: string;
   showCheckedUsers: boolean;
   importMessages: Message[];
+  colourScheme: number;
+  noTeamColour: string;
 };
 const initialPageState: () => UsersAndTeamsPageState = () => {
   return {
@@ -69,6 +72,8 @@ const initialPageState: () => UsersAndTeamsPageState = () => {
     userFilter: "",
     showCheckedUsers: false,
     importMessages: [],
+    colourScheme: 0,
+    noTeamColour: "black",
   };
 };
 
@@ -237,6 +242,7 @@ const UsersAndTeams = (props: DefaultProps) => {
       teams,
       ignoredUsers,
       teamStats: teamStats ?? new Map(),
+      noTeamColour: themedColours(state.config).noTeamColour,
     });
 
     setIsOpen(true);
@@ -319,6 +325,7 @@ const UsersAndTeams = (props: DefaultProps) => {
         aliases: pageState.aliases,
         ignoredUsers: pageState.ignoredUsers,
         aliasData,
+        noTeamColour: pageState.noTeamColour,
       },
     });
     setIsOpen(false);
@@ -611,7 +618,7 @@ const UsersAndTeams = (props: DefaultProps) => {
   };
 
   // Generated with http://vrl.cs.brown.edu/color
-  const bigColourRange = [
+  const bigColourRange: readonly string[] = [
     "#a1def0",
     "#335862",
     "#8dfa9d",
@@ -633,6 +640,50 @@ const UsersAndTeams = (props: DefaultProps) => {
     "#efaa79",
     "#76480d",
   ];
+  const colourSchemes: [string, readonly string[]][] = [
+    ["Korny custom scheme", bigColourRange],
+    ["d3 schemeCategory10", d3.schemeCategory10],
+    ["d3 schemeAccent", d3.schemeAccent],
+    ["d3 schemeDark2", d3.schemeDark2],
+    ["d3 schemePaired", d3.schemePaired],
+    ["d3 schemePastel1", d3.schemePastel1],
+    ["d3 schemePastel2", d3.schemePastel2],
+    ["d3 schemeSet1", d3.schemeSet1],
+    ["d3 schemeSet2", d3.schemeSet2],
+    ["d3 schemeSet3", d3.schemeSet3],
+    ["d3 schemeTableau10", d3.schemeTableau10],
+  ];
+
+  function selectColourScheme(scheme: number) {
+    if (scheme < 0 || scheme >= colourSchemes.length) {
+      throw new Error("Logic error - impossible colour scheme");
+    }
+    setPageState({ ...pageState, colourScheme: scheme });
+  }
+
+  const colourSelectId = useId();
+  const colourSelector = (
+    <label htmlFor={colourSelectId}>
+      Colour scheme for auto-colour:
+      <select
+        id={colourSelectId}
+        value={pageState.colourScheme}
+        onChange={(event) =>
+          selectColourScheme(Number.parseInt(event.target.value))
+        }
+      >
+        {colourSchemes.map(([name, scheme], index) => (
+          <option key={name} value={index}>
+            {name} {`(${scheme.length} colours)`}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+  const [_schemeName, currentScheme] = colourSchemes[pageState.colourScheme]!;
+  const visibleTeamCount = [...pageState.teams].filter(
+    ([, team]) => !team.hidden
+  ).length;
 
   const reColourTeams = () => {
     let visibleTeams = [...pageState.teams].filter(([, team]) => !team.hidden);
@@ -643,12 +694,12 @@ const UsersAndTeams = (props: DefaultProps) => {
     const hiddenTeams = [...pageState.teams].filter(([, team]) => team.hidden);
     visibleTeams = _.shuffle(visibleTeams);
 
-    // note any colours outside the big colour range will be white!  Remap those yourself...
+    // note any colours outside the colour range will be white!  Remap those yourself...
     const { neutralColour } = themedColours(state.config);
 
     visibleTeams.forEach(([, team], index) => {
-      if (index < bigColourRange.length) {
-        team.colour = bigColourRange[index]!;
+      if (index < currentScheme.length) {
+        team.colour = currentScheme[index]!;
       } else {
         team.colour = neutralColour;
       }
@@ -659,10 +710,15 @@ const UsersAndTeams = (props: DefaultProps) => {
     });
   };
 
+  const noTeamId = useId();
+  function setNoTeamColour(value: string) {
+    setPageState({ ...pageState, noTeamColour: value });
+  }
+
   function changeTeamColour(name: string, value: string) {
     const teams = _.cloneDeep(pageState.teams);
     const team = teams.get(name);
-    if (team) team.colour = value;
+    if (team !== undefined) team.colour = value;
     setPageState({ ...pageState, teams });
   }
 
@@ -958,10 +1014,21 @@ const UsersAndTeams = (props: DefaultProps) => {
           borderlessIfHidden={true}
         >
           <div className="buttonList">
+            <label htmlFor={noTeamId}>
+              Colour for non-team users:
+              <input
+                type="color"
+                id={noTeamId}
+                name="No-team colour"
+                value={pageState.noTeamColour}
+                onChange={(evt) => setNoTeamColour(evt.target.value)}
+              />
+            </label>
             <button onClick={reColourTeams}>auto-colour teams</button>
-            {pageState.teams.size >= bigColourRange.length
-              ? `(only the first ${bigColourRange.length} teams will get colours, the rest will be neutral)`
+            {visibleTeamCount > currentScheme.length
+              ? `(only ${currentScheme.length} visible teams will get colours, the rest will be neutral) `
               : ""}
+            {colourSelector}
           </div>
           <table>
             <thead>

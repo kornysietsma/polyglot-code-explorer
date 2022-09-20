@@ -74,6 +74,12 @@ function themedColours(config: Config) {
 }
 
 export function teamScale(state: State) {
+  /* 
+    for crosshatching, we actually need to have element IDs for each pattern.
+    The fill function, which is what the scale returns, is something like:
+    "url(#diagonalHatch)"
+    So I'll need to generate IDs for all used team combinations.
+    */
   return (teamName: string) => {
     if (teamName == NO_TEAM_SYMBOL) {
       return themedColours(state.config).noTeamColour;

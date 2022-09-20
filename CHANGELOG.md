@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Team visualisation and team-based stats all over the place
 - Saving and loading state from file and browser local storage
 - Can ignore users (useful to stop bot users affecting stats)
-  
+- Patterned visualisation for viewing top teams
+
 ## [0.5.0] - 2021-04-03
 
 ### Changed

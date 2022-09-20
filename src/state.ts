@@ -3,6 +3,7 @@ import _ from "lodash";
 import moment from "moment";
 
 import { UserData } from "./polyglot_data.types";
+import { calculateSvgPatterns } from "./svgPatterns";
 import { isParentVisualization, Visualizations } from "./VisualizationData";
 import { VizDataRef } from "./viz.types";
 
@@ -186,10 +187,27 @@ export type ExpensiveConfig = {
 export type UserTeamData = Set<string>;
 export type UserTeams = Map<number, UserTeamData>;
 
+export type PatternId = number;
+/** ColourKey is needed for map IDs - it's created from a string[] of colours, tab separated */
+export type ColourKey = string;
+export function colourKeyToColours(key: ColourKey): string[] {
+  return key.split("\t");
+}
+export function coloursToColourKey(colours: string[]): ColourKey {
+  return colours.join("\t");
+}
+
 export type CalculatedState = {
   // team lookup for each user, calculated whenever teams or aliases change
   // aliased users will have no teams
   userTeams: UserTeams;
+  svgPatterns: {
+    // SVG patterns are pre-calculated as we need the IDs before we draw
+    // for each (calculated) ColourKey, stores the pattern ID (sequential unique numbers)
+    svgPatternIds: Map<ColourKey, PatternId>;
+    // for each file path in the tree, which pattern to use
+    svgPatternLookup: Map<string, PatternId>;
+  };
 };
 
 export type Message = {
@@ -446,6 +464,10 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
     calculated: {
       // this is mostly for state calculated in the postProcessState stage, based on data
       userTeams: new Map(),
+      svgPatterns: {
+        svgPatternIds: new Map(),
+        svgPatternLookup: new Map(),
+      },
     },
     messages: [],
   };
@@ -505,6 +527,39 @@ function postprocessState(
     resultingState.calculated.userTeams = buildUserTeams(
       resultingState.config.teamsAndAliases.teams
     );
+  }
+  if (newState.config.visualization == "teamPattern") {
+    console.time("checking for svg state change");
+    if (
+      oldState.config.visualization != newState.config.visualization ||
+      !_.isEqual(
+        oldState.config.teamVisualisation,
+        newState.config.teamVisualisation
+      ) ||
+      !_.isEqual(
+        oldState.config.teamsAndAliases,
+        newState.config.teamsAndAliases
+      ) ||
+      !_.isEqual(oldState.config.filters, newState.config.filters) ||
+      oldState.config.teamVisualisation.showNonTeamChanges !=
+        newState.config.teamVisualisation.showNonTeamChanges ||
+      themedColours(oldState.config).noTeamColour !=
+        themedColours(newState.config).noTeamColour
+    ) {
+      console.timeEnd("checking for svg state change");
+      console.time("precalculating svg patterns");
+      if (!alreadyCloned) {
+        resultingState = _.cloneDeep(resultingState);
+        alreadyCloned = true;
+      }
+      resultingState.calculated.svgPatterns = calculateSvgPatterns(
+        resultingState,
+        dataRef.current.files
+      );
+      console.timeEnd("precalculating svg patterns");
+    } else {
+      console.timeEnd("checking for svg state change");
+    }
   }
   console.timeEnd("postprocessing state");
   return resultingState;
@@ -590,6 +645,7 @@ interface SetUserTeamAliasData {
     aliases: UserAliases;
     ignoredUsers: Set<number>;
     aliasData: UserAliasData;
+    noTeamColour: string;
   };
 }
 interface SetFileChangeMetric {
@@ -740,6 +796,9 @@ function updateStateFromAction(state: State, action: Action): State {
       result.config.teamsAndAliases.aliases = action.payload.aliases;
       result.config.teamsAndAliases.ignoredUsers = action.payload.ignoredUsers;
       result.config.teamsAndAliases.aliasData = action.payload.aliasData;
+      result.config.colours[result.config.colours.currentTheme].noTeamColour =
+        action.payload.noTeamColour;
+
       return result;
     }
 

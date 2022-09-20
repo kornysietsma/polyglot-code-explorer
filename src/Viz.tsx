@@ -26,7 +26,7 @@ import {
 } from "./nodeData";
 import { Point, TreeNode } from "./polyglot_data.types";
 import { TimescaleIntervalData } from "./preprocess";
-import { Action, State, themedColours } from "./state";
+import { Action, colourKeyToColours, State, themedColours } from "./state";
 import { getCurrentVis } from "./VisualizationData";
 import { VizMetadata } from "./viz.types";
 
@@ -271,7 +271,7 @@ function drawCoupling(
       }
     )
     .append("svg:title")
-    .text(couplingLabel); // so zooming doesn't make thick lines
+    .text(couplingLabel);
 
   couplingNodes.exit().remove();
 }
@@ -396,7 +396,6 @@ const draw = (
     event: D3ZoomEvent<SVGSVGElement, HierarchyNode<TreeNode>>
   ) => {
     group.attr("transform", event.transform.toString());
-    //UPGRADE - does this work? Taken from https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/d3-zoom/d3-zoom-tests.ts
   };
 
   svg.call(
@@ -597,6 +596,56 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
     }
   }, [dataRef, state, dispatch, debouncedDispatch, prevState]);
 
+  function svgPatternDefs() {
+    const { svgPatternIds } = state.calculated.svgPatterns;
+    const { neutralColour } = themedColours(state.config);
+    /* sample
+        <linearGradient id="diagonalHatch" gradientUnits="userSpaceOnUse"
+                    x2="30" spreadMethod="repeat" gradientTransform="rotate(-45)">
+      <stop offset="0" stop-color="orange"/>
+      <stop offset="0.33" stop-color="orange"/>
+      <stop offset="0.33" stop-color="blue"/>
+      <stop offset="0.67" stop-color="blue"/>
+      <stop offset="0.67" stop-color="red"/>
+      <stop offset="1.0" stop-color="red"/>
+    </linearGradient>
+    */
+    return [...svgPatternIds].map(([colourKey, patternId]) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const colours = colourKeyToColours(colourKey);
+      if (
+        colours.length == 3 &&
+        colours[2] == colours[1] &&
+        colours[1] == colours[0]
+      ) {
+        // solid colour - build a simpler gradient
+        return (
+          <linearGradient key={patternId} id={`pattern${patternId}`}>
+            <stop stopColor={colours[0]} />
+          </linearGradient>
+        );
+      } else {
+        return (
+          <linearGradient
+            key={patternId}
+            id={`pattern${patternId}`}
+            gradientUnits="userSpaceOnUse"
+            x2="10"
+            spreadMethod="repeat"
+            gradientTransform="rotate(-45)"
+          >
+            <stop offset="0" stopColor={colours[0]} />
+            <stop offset="0.33" stopColor={colours[0]} />
+            <stop offset="0.33" stopColor={colours[1] ?? neutralColour} />
+            <stop offset="0.67" stopColor={colours[1] ?? neutralColour} />
+            <stop offset="0.67" stopColor={colours[2] ?? neutralColour} />
+            <stop offset="1.0" stopColor={colours[2] ?? neutralColour} />
+          </linearGradient>
+        );
+      }
+    });
+  }
+
   return (
     <aside className="Viz">
       <svg className="chart" ref={d3Container}>
@@ -616,6 +665,11 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
           >
             <path d="M0,0L4,2L0,4z" fill="#ff6300" />
           </marker>
+          {state.config.visualization == "teamPattern" ? (
+            svgPatternDefs()
+          ) : (
+            <></>
+          )}
         </defs>
         <g className="topGroup" />
       </svg>

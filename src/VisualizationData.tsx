@@ -36,7 +36,7 @@ import {
 } from "./polyglot_data.types";
 import {
   Config,
-  FileChangeMetric,
+  PatternId,
   sortTeamsByName,
   State,
   themedColours,
@@ -110,7 +110,7 @@ abstract class BaseVisualization<ScaleUnit> implements Visualization {
     const { config } = this.state;
     const { neutralColour } = themedColours(config);
     const override = overrideColourFunction(d, config);
-    if (override) return override;
+    if (override !== undefined) return override;
     const value = isHierarchyDirectory(d)
       ? this.parentFn(d)
       : this.dataFn(d as HierarchyNode<FileNode>);
@@ -361,11 +361,9 @@ class ChurnVisualization extends BaseVisualization<number> {
 }
 
 class TeamVisualization extends BaseVisualization<string> {
-  metric: FileChangeMetric;
   scale: (v: string) => string | undefined;
-  constructor(state: State, metadata: VizMetadata, metric: FileChangeMetric) {
+  constructor(state: State, metadata: VizMetadata) {
     super(state, metadata);
-    this.metric = metric;
     this.scale = teamScale(state);
   }
   dataFn(d: HierarchyNode<FileNode>): string | undefined {
@@ -375,7 +373,7 @@ class TeamVisualization extends BaseVisualization<string> {
     const { showNonTeamChanges } = this.state.config.teamVisualisation;
     return nodeTopTeam(
       d.data,
-      this.metric,
+      this.state.config.fileChangeMetric,
       aliases,
       ignoredUsers,
       userTeams,
@@ -385,6 +383,38 @@ class TeamVisualization extends BaseVisualization<string> {
     );
   }
   parentFn(): string | undefined {
+    // TODO: implement this!
+    return undefined;
+  }
+
+  colourKey(): [string, string][] {
+    const { teams } = this.state.config.teamsAndAliases;
+    const teamColours: [string, string][] = [...teams]
+      .filter(([, team]) => !team.hidden)
+      .sort(sortTeamsByName)
+      .map(([name, team]) => [name, team.colour]);
+    if (this.state.config.teamVisualisation.showNonTeamChanges) {
+      return [
+        ["Users with no team", themedColours(this.state.config).noTeamColour],
+        ...teamColours,
+      ];
+    } else {
+      return teamColours;
+    }
+  }
+}
+
+class TeamPatternVisualization extends BaseVisualization<PatternId> {
+  scale: (v: PatternId) => string | undefined = (v) => `url(#pattern${v})`;
+
+  constructor(state: State, metadata: VizMetadata) {
+    super(state, metadata);
+  }
+  dataFn(d: HierarchyNode<FileNode>): PatternId | undefined {
+    const { svgPatternLookup } = this.state.calculated.svgPatterns;
+    return svgPatternLookup.get(d.data.path);
+  }
+  parentFn(): PatternId | undefined {
     // TODO: implement this!
     return undefined;
   }
@@ -655,89 +685,42 @@ export const Visualizations: {
   },
   team: {
     displayOrder: 8,
-    title: "Team",
-    defaultChild: "lines",
-    children: {
-      lines: {
-        title: "Top team by lines changed",
-        displayOrder: 0,
-        help: (
-          <div>
-            <p>
-              Shows the team who has made the most changes in the selected date
-              range
-            </p>
-            <p>
-              This is the total lines changed, additions + deletions. Note that
-              reformatting or changes to line endings may show up as very large
-              despite being minimal code change.
-            </p>
-          </div>
-        ),
-        buildVisualization(state, metadata) {
-          return new TeamVisualization(state, metadata, "lines");
-        },
-      },
-      commits: {
-        title: "Top team by commits",
-        displayOrder: 1,
-        help: (
-          <div>
-            <p>
-              Shows the team who has made the most file commits in the selected
-              date range
-            </p>
-            <p>
-              Note that this uses the total of files committed - if you are
-              looking at a directory containing 10 files committed 10 times
-              each, it will show a value of 100 as it can&apos;t tell whether
-              the 10 files were committed together or not.
-            </p>
-          </div>
-        ),
-        buildVisualization(state, metadata) {
-          return new TeamVisualization(state, metadata, "commits");
-        },
-      },
-      files: {
-        title: "Top team by files changed",
-        displayOrder: 2,
-        help: (
-          <div>
-            <p>
-              Shows the team who has made the most changes in the selected date
-              range
-            </p>
-            <p>
-              This uses the number of files changed - this may include renames
-              or other changes with no actual file changed.
-            </p>
-          </div>
-        ),
-        buildVisualization(state, metadata) {
-          return new TeamVisualization(state, metadata, "files");
-        },
-      },
-      days: {
-        title: "Top team by days with a change",
-        displayOrder: 3,
-        help: (
-          <div>
-            <p>
-              Shows the team who has made changes on the most distinct days in
-              the selected date range
-            </p>
-            <p>
-              This does not distinguish between a day with 1 commit or 100
-              commit, it just counts days where any changes were made by any
-              team member.
-            </p>
-          </div>
-        ),
-        buildVisualization(state, metadata) {
-          return new TeamVisualization(state, metadata, "days");
-        },
-      },
+    title: "Top Team",
+    help: (
+      <div>
+        <p>
+          Shows the team who has made the most changes in the selected date
+          range
+        </p>
+        <p>
+          The metric used is chosen in &ldquo;Advanced Settings&rdquo; above.
+        </p>
+      </div>
+    ),
+    buildVisualization(state, metadata) {
+      return new TeamVisualization(state, metadata);
+    },
+  },
+  teamPattern: {
+    displayOrder: 9,
+    title: "Top Teams (patterned)",
+    help: (
+      <div>
+        <p>
+          Shows the teams who have made the most changes in the selected date
+          range, as a striped pattern
+        </p>
+        <p>
+          If one team has made 2/3 of changes, and another 1/3, they will get 2
+          and 1 stripes in the pattern
+        </p>
+        <p>
+          The metric used is chosen in &ldquo;Advanced Settings&rdquo; above.
+        </p>
+      </div>
+    ),
+    buildVisualization(state, metadata) {
+      return new TeamPatternVisualization(state, metadata);
     },
   },
 };

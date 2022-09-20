@@ -544,7 +544,70 @@ export function nodeTopTeam(
     return undefined;
   }
 
-  return sortedUserStatsAccumulators(changers, metric)[0]![0];
+  const sortedTeams = sortedUserStatsAccumulators(changers, metric).map(
+    ([team]) => team
+  );
+  return sortedTeams![0];
+}
+
+function singleStat(
+  stats: UserStatsAccumulator,
+  metric: FileChangeMetric
+): number {
+  switch (metric) {
+    case "lines":
+      return stats.lines;
+    case "commits":
+      return stats.commits;
+    case "files":
+      return stats.files;
+    case "days":
+      return stats.days.size;
+  }
+}
+
+/**
+ * finds the top teams by given metric, split into N partitions
+ * for striped patterns (so usually 2 for 2 stripes)
+ * @param teamStats
+ * @param metric
+ * @param partitions
+ * @returns
+ */
+export function topTeamsPartitioned(
+  teamStats: Map<string, UserStatsAccumulator>,
+  metric: FileChangeMetric,
+  partitions: number,
+  includeNonTeamChanges: boolean
+): string[] | undefined {
+  let statTotal = 0;
+  let workingStats: [string, number][] = [...teamStats]
+    .map(([teamName, stats]) => {
+      const stat = singleStat(stats, metric);
+      statTotal += stat;
+      return [teamName, stat] as [string, number];
+    })
+    .sort(([, statA], [, statB]) => statB - statA);
+  if (!includeNonTeamChanges) {
+    workingStats = workingStats.filter(
+      ([teamName]) => teamName != NO_TEAM_SYMBOL
+    );
+  }
+  if (statTotal == 0) {
+    return undefined;
+  }
+  const halfQuota = statTotal / (partitions * 2);
+  const results: string[] = [];
+  while (workingStats.length > 0 && workingStats[0]![1] >= halfQuota) {
+    results.push(workingStats[0]![0]);
+    workingStats[0]![1] -= halfQuota + halfQuota;
+    if (workingStats[0]![1] < 0) {
+      workingStats = workingStats.slice(1);
+    }
+    workingStats.sort(([, statA], [, statB]) => statB - statA);
+  }
+
+  return results.sort();
 }
 
 function addUserStats(
@@ -563,7 +626,7 @@ function addUserStats(
       earliest,
       latest
     );
-    if (changers) {
+    if (changers !== undefined) {
       for (const [userId, { commits, lines, days }] of changers) {
         const stats = userStats.get(userId);
         if (stats === undefined) {
@@ -591,7 +654,7 @@ function addUserStats(
   }
 }
 
-function addTeamStats(
+export function addTeamStats(
   teamStats: Map<string, UserStatsAccumulator>,
   node: TreeNode,
   aliases: UserAliases,

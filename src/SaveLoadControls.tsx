@@ -54,7 +54,7 @@ const SaveLoadControls = (props: DefaultProps) => {
       state.messages.push(infoMessage("Settings loaded."));
 
       dispatch({ type: "setAllState", payload: state });
-    } else if (messages) {
+    } else if (messages !== undefined) {
       console.log("Import failed with messages");
       if (!tolerant) {
         messages.push(

@@ -158,7 +158,7 @@ const EditAlias = (props: Props) => {
     userId: number
   ) {
     const oldAlias = parentState.aliases.get(userId);
-    if (oldAlias) {
+    if (oldAlias !== undefined) {
       if (oldAlias != oldAliasId) {
         throw new Error("logic error: removing alias but wasn't the right one");
       }
