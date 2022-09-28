@@ -2,6 +2,7 @@ import _ from "lodash";
 import { Dispatch, SetStateAction, useId, useState } from "react";
 import ReactModal from "react-modal";
 
+import { lastCommitDay } from "./nodeData";
 import { Teams } from "./state";
 import {
   UserAndStatsAndAliases,
@@ -202,9 +203,8 @@ const EditAlias = (props: Props) => {
         isAlias: true,
         commits: 0,
         lines: 0,
-        days: 0,
+        days: new Set(),
         files: 0,
-        lastCommitDay: undefined,
       };
       newParentState.usersAndAliases.push(aliasUser);
       newParentState.usersAndAliases.forEach((user, userId) => {
@@ -228,11 +228,11 @@ const EditAlias = (props: Props) => {
       throw new Error("Logic error: no users supplied");
     }
 
-    const sortedUsers = [...users].sort(
-      (a, b) =>
-        (parentState.usersAndAliases[b]!.lastCommitDay ?? 0) -
-        (parentState.usersAndAliases[a]!.lastCommitDay ?? 0)
-    );
+    const sortedUsers = [...users].sort((a, b) => {
+      const lastDayA = lastCommitDay(parentState.usersAndAliases[a]!);
+      const lastDayB = lastCommitDay(parentState.usersAndAliases[b]!);
+      return (lastDayB ?? 0) - (lastDayA ?? 0);
+    });
     return sortedUsers[0]!;
   }
   function setAliasName(value: string) {

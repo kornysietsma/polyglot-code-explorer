@@ -1,9 +1,9 @@
-import _uniqueId from "lodash/uniqueId";
 import React, { useId } from "react";
 
 import { couplingDateRange } from "./couplingBuckets";
 import { humanizeDate } from "./datetimes";
 import HelpPanel from "./HelpPanel";
+import { FeatureFlags } from "./polyglot_data.types";
 import { Action, State } from "./state";
 import ToggleablePanel from "./ToggleablePanel";
 import { VizMetadata } from "./viz.types";
@@ -11,27 +11,22 @@ import { VizMetadata } from "./viz.types";
 const CouplingController = (props: {
   state: State;
   metadata: VizMetadata;
+  features: FeatureFlags;
   dispatch: React.Dispatch<Action>;
 }) => {
-  const { dispatch, state, metadata } = props;
+  const { dispatch, state, metadata, features } = props;
   const { stats } = metadata;
   const {
-    couplingConfig: {
-      couplingAvailable,
-      shown,
-      minRatio,
-      minBursts,
-      maxCommonRoots,
-    },
+    couplingConfig: { shown, minRatio, minBursts, maxCommonRoots },
   } = state;
   const sliderId = useId();
   const minBurstsId = useId();
   const maxRootsId = useId();
 
-  if (!couplingAvailable) {
+  if (!features.coupling) {
     return (
       <div>
-        <p>(no coupling data in source)</p>
+        <p>(coupling not enabled)</p>
       </div>
     );
   }

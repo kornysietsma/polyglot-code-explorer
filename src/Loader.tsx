@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import semver from "semver";
 
 import App from "./App";
-import { SUPPORTED_FILE_VERSION, Tree } from "./polyglot_data.types";
+import { PolyglotData, SUPPORTED_FILE_VERSION } from "./polyglot_data.types";
 import {
   countLanguagesIn,
   gatherGlobalStats,
@@ -25,31 +25,36 @@ const useFetch = (
         const response = await fetch(url);
         const json = await response.json();
 
-        const tree = json as Tree;
-        if (tree.version === undefined) {
+        const data = json as PolyglotData;
+        if (data.version === undefined) {
           throw new Error(
             `No version in JSON data file at ${url} - this supports data versions ${SUPPORTED_FILE_VERSION}`
           );
         }
-        if (!semver.satisfies(tree.version, SUPPORTED_FILE_VERSION)) {
+        if (!semver.satisfies(data.version, SUPPORTED_FILE_VERSION)) {
           throw new Error(
-            `Invalid version ${tree.version} in JSON data file at ${url} - this supports data versions ${SUPPORTED_FILE_VERSION}`
+            `Invalid version ${data.version} in JSON data file at ${url} - this supports data versions ${SUPPORTED_FILE_VERSION}`
+          );
+        }
+        if (!data.features.file_stats && !data.features.git) {
+          throw new Error(
+            "Data file must have file stats or git details enabled"
           );
         }
         console.log("linking parents");
-        linkParents(tree);
+        linkParents(data);
         console.log("postprocessing languages");
-        const languages = countLanguagesIn(tree);
+        const languages = countLanguagesIn(data);
         console.log("postprocessing global stats");
-        const stats = gatherGlobalStats(tree);
+        const stats = gatherGlobalStats(data);
         console.log("building node index");
-        const nodesByPath = gatherNodesByPath(tree);
+        const nodesByPath = gatherNodesByPath(data);
         console.log("building date scale data");
-        const timescaleData = gatherTimescaleData(tree, "week");
+        const timescaleData = gatherTimescaleData(data, "week");
         console.log("postprocessing complete");
-        const users = postprocessUsers(tree.metadata.git?.users);
-        if (tree.metadata.coupling) {
-          const bucketConfig = tree.metadata.coupling.buckets;
+        const users = postprocessUsers(data.metadata.git?.users);
+        if (data.metadata.coupling) {
+          const bucketConfig = data.metadata.coupling.buckets;
           stats.coupling = {
             bucketCount: bucketConfig.bucket_count,
             bucketSize: bucketConfig.bucket_size,
@@ -63,7 +68,7 @@ const useFetch = (
           nodesByPath,
           timescaleData,
         };
-        setData({ files: tree, metadata });
+        setData({ data: data, metadata });
       } catch (e) {
         if (e instanceof Error) {
           const errors = [`Error ${e.name}:`, e.message];

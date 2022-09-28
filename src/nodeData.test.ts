@@ -39,6 +39,7 @@ function minimalGitData(): GitData {
     user_count: 0,
     users: [],
     details: [],
+    activity: [],
   };
 }
 

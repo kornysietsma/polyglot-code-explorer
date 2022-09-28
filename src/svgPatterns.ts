@@ -3,7 +3,12 @@ import {
   nodeChangersByTeam,
   topTeamsPartitioned,
 } from "./nodeData";
-import { FileNode, isFile, Tree, TreeNode } from "./polyglot_data.types";
+import {
+  FileNode,
+  isFile,
+  PolyglotData,
+  TreeNode,
+} from "./polyglot_data.types";
 import {
   ColourKey,
   coloursToColourKey,
@@ -130,7 +135,7 @@ function calculateNodePatterns(
 
 export function calculateSvgPatterns(
   state: State,
-  files: Tree
+  files: PolyglotData
 ): {
   svgPatternIds: Map<ColourKey, PatternId>;
   svgPatternLookup: Map<string, PatternId>;

@@ -1,5 +1,3 @@
-import React from "react";
-
 const ColourKey = ({
   title,
   keyData,
@@ -18,9 +16,9 @@ const ColourKey = ({
           </tr>
         </thead>
         <tbody>
-          {keyData.map(([value, colour]) => {
+          {keyData.map(([value, colour], index) => {
             return (
-              <tr key={value}>
+              <tr key={index}>
                 <td>{value}</td>
                 <td
                   className="colourSample"

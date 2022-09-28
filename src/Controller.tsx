@@ -17,7 +17,8 @@ import {
 
 const Controller = (props: DefaultProps) => {
   const { dataRef, state, dispatch } = props;
-  const { metadata } = dataRef.current;
+  const { metadata, data } = dataRef.current;
+  const { features } = data;
   const { maxDepth } = metadata.stats;
   const { config } = state;
   const { currentTheme } = config.colours;
@@ -31,9 +32,11 @@ const Controller = (props: DefaultProps) => {
   const remoteUrlTemplateId = useId();
   const showNonTeamId = useId();
 
-  const sortedVis = Object.entries(Visualizations).sort(
-    ([, v1], [, v2]) => v1.displayOrder - v2.displayOrder
-  );
+  const sortedVis = Object.entries(Visualizations)
+    .sort(([, v1], [, v2]) => v1.displayOrder - v2.displayOrder)
+    .filter(
+      ([, vis]) => vis.featureCheck == undefined || vis.featureCheck(features)
+    );
   const currentParentVisData = Visualizations[state.config.visualization];
   if (currentParentVisData == undefined) {
     throw new Error("invalid visualization");
@@ -51,9 +54,12 @@ const Controller = (props: DefaultProps) => {
   }
 
   const sortedSubVis = isParentVisualization(currentParentVisData)
-    ? Object.entries(currentParentVisData.children).sort(
-        ([, v1], [, v2]) => v1.displayOrder - v2.displayOrder
-      )
+    ? Object.entries(currentParentVisData.children)
+        .sort(([, v1], [, v2]) => v1.displayOrder - v2.displayOrder)
+        .filter(
+          ([, vis]) =>
+            vis.featureCheck == undefined || vis.featureCheck(features)
+        )
     : undefined;
 
   const debouncedDispatch = useMemo(
@@ -98,7 +104,16 @@ const Controller = (props: DefaultProps) => {
       </ToggleablePanel>
       <ToggleablePanel title="advanced settings" showInitially={false}>
         <div>
-          <UsersAndTeams dataRef={dataRef} state={state} dispatch={dispatch} />
+          {features.git ? (
+            <UsersAndTeams
+              dataRef={dataRef}
+              state={state}
+              dispatch={dispatch}
+            />
+          ) : (
+            <p>(no users as git disabled)</p>
+          )}
+
           <label htmlFor={depthId}>
             Display maximum depth:
             <select
@@ -119,74 +134,80 @@ const Controller = (props: DefaultProps) => {
             </select>
           </label>
         </div>
-        <div>
-          <label>Metric for sorting user/team changes:</label>
-          <select
-            value={state.config.fileChangeMetric}
-            onChange={(event) =>
-              debouncedDispatch({
-                type: "setFileChangeMetric",
-                payload: event.target.value,
-              })
-            }
-          >
-            <option key="lines" value="lines">
-              Lines of code
-            </option>
-            <option key="commits" value="commits">
-              File commits
-            </option>
-            <option key="files" value="files">
-              Files changed
-            </option>
-            <option key="days" value="days">
-              Days containing a change
-            </option>
-          </select>
-          <HelpPanel>
-            <p>
-              This metric is used anywhere we show &ldquo;top&rdquo; users or
-              teams, both in inspectors and in the Teams visualisations.
-            </p>
-            <p>The metrics are as follows:</p>
-            <dl>
-              <dt>Lines of code</dt>
-              <dd>This is the total lines changed - added or removed</dd>
-              <dt>File commits</dt>
-              <dd>
-                This is the individual file commits made. Note that 1 commit to
-                10 files counts as a value of 10 for this - we don&apos;t
-                currently have the data to identify a commit across multiple
-                files.
-              </dd>
-              <dt>Files changed</dt>
-              <dd>
-                Number of files changed by this user/team - will always be 1 for
-                a single file!
-              </dd>
-              <dt>Days with a change</dt>
-              <dd>
-                The number of days that a user made changes. Note this{" "}
-                <i>does</i> work across multiple files, so 10 files changed on
-                the same day have a value of 1.
-              </dd>
-            </dl>
-          </HelpPanel>
-        </div>
-        <label htmlFor={showNonTeamId}>
-          Show changes by users without a team:&nbsp;
-          <input
-            type="checkbox"
-            id={showNonTeamId}
-            checked={state.config.teamVisualisation.showNonTeamChanges}
-            onChange={(evt) => {
-              dispatch({
-                type: "setShowNonTeamChanges",
-                payload: evt.target.checked,
-              });
-            }}
-          />
-        </label>
+        {features.git ? (
+          <div>
+            <div>
+              <label>Metric for sorting user/team changes:</label>
+              <select
+                value={state.config.fileChangeMetric}
+                onChange={(event) =>
+                  debouncedDispatch({
+                    type: "setFileChangeMetric",
+                    payload: event.target.value,
+                  })
+                }
+              >
+                <option key="lines" value="lines">
+                  Lines of code
+                </option>
+                <option key="commits" value="commits">
+                  File commits
+                </option>
+                <option key="files" value="files">
+                  Files changed
+                </option>
+                <option key="days" value="days">
+                  Days containing a change
+                </option>
+              </select>
+              <HelpPanel>
+                <p>
+                  This metric is used anywhere we show &ldquo;top&rdquo; users
+                  or teams, both in inspectors and in the Teams visualisations.
+                </p>
+                <p>The metrics are as follows:</p>
+                <dl>
+                  <dt>Lines of code</dt>
+                  <dd>This is the total lines changed - added or removed</dd>
+                  <dt>File commits</dt>
+                  <dd>
+                    This is the individual file commits made. Note that 1 commit
+                    to 10 files counts as a value of 10 for this - we don&apos;t
+                    currently have the data to identify a commit across multiple
+                    files.
+                  </dd>
+                  <dt>Files changed</dt>
+                  <dd>
+                    Number of files changed by this user/team - will always be 1
+                    for a single file!
+                  </dd>
+                  <dt>Days with a change</dt>
+                  <dd>
+                    The number of days that a user made changes. Note this{" "}
+                    <i>does</i> work across multiple files, so 10 files changed
+                    on the same day have a value of 1.
+                  </dd>
+                </dl>
+              </HelpPanel>
+            </div>
+            <label htmlFor={showNonTeamId}>
+              Show changes by users without a team:&nbsp;
+              <input
+                type="checkbox"
+                id={showNonTeamId}
+                checked={state.config.teamVisualisation.showNonTeamChanges}
+                onChange={(evt) => {
+                  dispatch({
+                    type: "setShowNonTeamChanges",
+                    payload: evt.target.checked,
+                  });
+                }}
+              />
+            </label>
+          </div>
+        ) : (
+          <></>
+        )}
 
         <div>
           <label htmlFor={codeServerId}>
@@ -275,6 +296,7 @@ const Controller = (props: DefaultProps) => {
           dispatch={dispatch}
           state={state}
           metadata={metadata}
+          features={features}
         />
       </ToggleablePanel>
       <div>
@@ -320,7 +342,12 @@ const Controller = (props: DefaultProps) => {
       ) : (
         ""
       )}
-      <VisColourKey vis={currentVisOrSub} state={state} metadata={metadata} />
+      <VisColourKey
+        vis={currentVisOrSub}
+        state={state}
+        metadata={metadata}
+        features={features}
+      />
       {themeButton}
     </aside>
   );

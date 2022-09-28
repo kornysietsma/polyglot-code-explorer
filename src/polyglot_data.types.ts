@@ -1,9 +1,24 @@
 import { HierarchyNode } from "d3";
 
 /** these types should match this file version, semver style */
-export const SUPPORTED_FILE_VERSION = "1.0";
+export const SUPPORTED_FILE_VERSION = "1.0.4";
 
-export type Tree = {
+export type FeatureFlags = {
+  git: boolean;
+  coupling: boolean;
+  git_details: boolean;
+  file_stats: boolean;
+};
+
+/// shortcut for asserting a flag - use when logically the flag should be set but
+/// you want a safety check
+export function assertFlag(flags: FeatureFlags, flag: keyof FeatureFlags) {
+  if (!flags[flag]) {
+    throw new Error(`Assertion failed - flag ${flag} not set`);
+  }
+}
+
+export type PolyglotData = {
   version: string;
   name: string;
   id: string;
@@ -14,6 +29,7 @@ export type Tree = {
     };
     coupling?: CouplingMetadata;
   };
+  features: FeatureFlags;
 };
 
 type AbstractTreeNode = {
@@ -29,7 +45,8 @@ export type TreeNode = DirectoryNode | FileNode;
 export type DirectoryNode = AbstractTreeNode & {
   children: TreeNode[];
   data?: {
-    git: GitRepoData;
+    git?: GitRepoData;
+    file_stats?: FileStats;
   };
 };
 
@@ -128,6 +145,7 @@ export type FileData = {
   loc: LocData;
   git?: GitData;
   coupling?: CouplingData;
+  file_stats?: FileStats;
 };
 
 export type IndentationData = {
@@ -160,7 +178,10 @@ export type GitData = {
   user_count: number;
   //TODO: do we need this?
   users: number[];
+  //note - if feature 'git_details' is false, this will be empty
   details: GitDetails[];
+  //activity is actually always stripped out at the moment!
+  activity: [];
 };
 
 export type GitDetails = {
@@ -181,3 +202,8 @@ export type CouplingBucket = {
   coupled_files: CoupledFile[];
 };
 export type CoupledFile = [string, number];
+
+export type FileStats = {
+  created: number;
+  modified: number;
+};

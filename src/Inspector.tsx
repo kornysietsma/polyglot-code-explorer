@@ -6,7 +6,10 @@ import { errorMessage } from "./state";
 
 const Inspector = (props: DefaultProps) => {
   const { state, dispatch, dataRef } = props;
-  const { metadata } = dataRef.current;
+  const {
+    metadata,
+    data: { features },
+  } = dataRef.current;
   const { selectedNode: selectedNodePath } = state.config;
 
   const selectedNode = metadata.nodesByPath.get(selectedNodePath);
@@ -26,6 +29,7 @@ const Inspector = (props: DefaultProps) => {
       node={selectedNode}
       state={state}
       metadata={metadata}
+      features={features}
       dispatch={dispatch}
     />
   ) : (
@@ -33,6 +37,7 @@ const Inspector = (props: DefaultProps) => {
       node={selectedNode}
       state={state}
       metadata={metadata}
+      features={features}
       dispatch={dispatch}
     />
   );

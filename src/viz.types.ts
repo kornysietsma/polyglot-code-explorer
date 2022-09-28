@@ -1,6 +1,6 @@
 import { MutableRefObject } from "react";
 
-import { Tree, TreeNode, UserData } from "./polyglot_data.types";
+import { PolyglotData, TreeNode, UserData } from "./polyglot_data.types";
 import { TimescaleIntervalData } from "./preprocess";
 
 export type LanguagesMetadata = {
@@ -21,8 +21,8 @@ export type CouplingStats = {
 };
 
 export type TreeStats = {
-  earliestCommit?: number;
-  latestCommit?: number;
+  earliest?: number;
+  latest?: number;
   maxDepth: number;
   maxLoc: number;
   churn: {
@@ -43,7 +43,7 @@ export type VizMetadata = {
 };
 
 export type VizData = {
-  files: Tree;
+  data: PolyglotData;
   metadata: VizMetadata;
 };
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { HierarchyNode, interpolatePlasma, scaleSequential } from "d3";
 import { ReactElement } from "react";
 
@@ -29,6 +30,7 @@ import {
 } from "./nodeData";
 import {
   DirectoryNode,
+  FeatureFlags,
   FileNode,
   isFile,
   isHierarchyDirectory,
@@ -65,12 +67,14 @@ interface Visualization {
 abstract class BaseVisualization<ScaleUnit> implements Visualization {
   state: State;
   metadata: VizMetadata;
+  features: FeatureFlags;
   /**
    * Constructs a Visualization.  Note these should be short-lived as state and metadata change all the time.
    */
-  constructor(state: State, metadata: VizMetadata) {
+  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
     this.state = state;
     this.metadata = metadata;
+    this.features = features;
   }
 
   /**
@@ -109,7 +113,7 @@ abstract class BaseVisualization<ScaleUnit> implements Visualization {
   fillFn(d: HierarchyNode<TreeNode>): string {
     const { config } = this.state;
     const { neutralColour } = themedColours(config);
-    const override = overrideColourFunction(d, config);
+    const override = overrideColourFunction(d, config, this.features);
     if (override !== undefined) return override;
     const value = isHierarchyDirectory(d)
       ? this.parentFn(d)
@@ -125,13 +129,15 @@ abstract class BaseVisualization<ScaleUnit> implements Visualization {
 // returns a colour, or undefined if there is no override
 function overrideColourFunction(
   node: HierarchyNode<TreeNode>,
-  config: Config
+  config: Config,
+  features: FeatureFlags
 ): string | undefined {
   const { nonexistentColour, circlePackBackground } = themedColours(config);
   const { latest } = config.filters.dateRange;
 
   if (node.data.layout.algorithm === "circlePack") return circlePackBackground;
-  const creationDate = isFile(node.data) && nodeCreationDate(node.data);
+  const creationDate =
+    isFile(node.data) && nodeCreationDate(node.data, features);
   if (creationDate && creationDate > latest) return nonexistentColour;
   return undefined;
 }
@@ -143,13 +149,19 @@ function overrideColourFunction(
 export type VisualizationData = {
   displayOrder: number;
   title: string;
+  featureCheck?: (features: FeatureFlags) => boolean;
   help: ReactElement;
-  buildVisualization: (state: State, metadata: VizMetadata) => Visualization;
+  buildVisualization: (
+    state: State,
+    metadata: VizMetadata,
+    features: FeatureFlags
+  ) => Visualization;
 };
 
 type ParentVisualizationData = {
   displayOrder: number;
   title: string;
+  featureCheck?: (features: FeatureFlags) => boolean;
   defaultChild: string;
   children: { [subname: string]: VisualizationData };
 };
@@ -161,8 +173,8 @@ export function isParentVisualization(
 }
 
 class LanguageVisualization extends BaseVisualization<string> {
-  constructor(state: State, metadata: VizMetadata) {
-    super(state, metadata);
+  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
+    super(state, metadata, features);
   }
   dataFn(d: HierarchyNode<FileNode>): string {
     return nodeLanguage(d.data);
@@ -184,8 +196,8 @@ class LanguageVisualization extends BaseVisualization<string> {
 
 class LinesOfCodeVisualization extends BaseVisualization<number> {
   scale: (v: number) => string | undefined;
-  constructor(state: State, metadata: VizMetadata) {
-    super(state, metadata);
+  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
+    super(state, metadata, features);
     this.scale = goodBadUglyScale(state.config, state.config.loc);
   }
   dataFn(d: HierarchyNode<FileNode>): number {
@@ -206,8 +218,8 @@ class LinesOfCodeVisualization extends BaseVisualization<number> {
 
 class NestingDepthVisualization extends BaseVisualization<number> {
   scale: (v: number) => string | undefined;
-  constructor(state: State, metadata: VizMetadata) {
-    super(state, metadata);
+  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
+    super(state, metadata, features);
     const { maxDepth } = this.metadata.stats;
     this.scale = scaleSequential(interpolatePlasma)
       .domain([0, maxDepth])
@@ -230,8 +242,13 @@ type IndentationMetric = "sum" | "p99" | "stddev";
 class IndentationVisualization extends BaseVisualization<number> {
   metric: IndentationMetric;
   scale: (v: number) => string | undefined;
-  constructor(state: State, metadata: VizMetadata, metric: IndentationMetric) {
-    super(state, metadata);
+  constructor(
+    state: State,
+    metadata: VizMetadata,
+    features: FeatureFlags,
+    metric: IndentationMetric
+  ) {
+    super(state, metadata, features);
     this.metric = metric;
     this.scale = goodBadUglyScale(
       state.config,
@@ -256,15 +273,17 @@ class IndentationVisualization extends BaseVisualization<number> {
 
 class AgeVisualization extends BaseVisualization<number> {
   scale: (v: number) => string | undefined;
-  constructor(state: State, metadata: VizMetadata) {
-    super(state, metadata);
+  features: FeatureFlags;
+  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
+    super(state, metadata, features);
     this.scale = goodBadUglyScale(state.config, state.config.age);
+    this.features = features;
   }
   dataFn(d: HierarchyNode<FileNode>): number | undefined {
     const { earliest, latest } = this.state.config.filters.dateRange;
     const { ignoredUsers } = this.state.config.teamsAndAliases;
 
-    return nodeAge(d.data, ignoredUsers, earliest, latest);
+    return nodeAge(d.data, this.features, ignoredUsers, earliest, latest);
   }
   parentFn(): number | undefined {
     return undefined;
@@ -280,14 +299,16 @@ class AgeVisualization extends BaseVisualization<number> {
 
 class CreationDateVisualization extends BaseVisualization<number> {
   scale: (v: number) => string | undefined;
-  constructor(state: State, metadata: VizMetadata) {
-    super(state, metadata);
+  features: FeatureFlags;
+  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
+    super(state, metadata, features);
     this.scale = earlyLateScaleBuilder(state);
+    this.features = features;
   }
   dataFn(d: HierarchyNode<FileNode>): number | undefined {
     const { earliest, latest } = this.state.config.filters.dateRange;
     if (earliest && latest) {
-      return nodeCreationDateClipped(d.data, earliest, latest);
+      return nodeCreationDateClipped(d.data, this.features, earliest, latest);
     }
     return undefined;
   }
@@ -301,8 +322,8 @@ class CreationDateVisualization extends BaseVisualization<number> {
 
 class NumberOfChangersVisualization extends BaseVisualization<number> {
   scale: (v: number) => string | undefined;
-  constructor(state: State, metadata: VizMetadata) {
-    super(state, metadata);
+  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
+    super(state, metadata, features);
     this.scale = numberOfChangersScale(state);
   }
   dataFn(d: HierarchyNode<FileNode>): number | undefined {
@@ -329,8 +350,13 @@ type ChurnMetric = "days" | "commits" | "lines";
 class ChurnVisualization extends BaseVisualization<number> {
   metric: ChurnMetric;
   scale: (v: number) => string | undefined;
-  constructor(state: State, metadata: VizMetadata, metric: ChurnMetric) {
-    super(state, metadata);
+  constructor(
+    state: State,
+    metadata: VizMetadata,
+    features: FeatureFlags,
+    metric: ChurnMetric
+  ) {
+    super(state, metadata, features);
     this.metric = metric;
     this.scale = goodBadUglyScale(state.config, state.config.churn[metric]);
   }
@@ -362,8 +388,8 @@ class ChurnVisualization extends BaseVisualization<number> {
 
 class TeamVisualization extends BaseVisualization<string> {
   scale: (v: string) => string | undefined;
-  constructor(state: State, metadata: VizMetadata) {
-    super(state, metadata);
+  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
+    super(state, metadata, features);
     this.scale = teamScale(state);
   }
   dataFn(d: HierarchyNode<FileNode>): string | undefined {
@@ -407,8 +433,8 @@ class TeamVisualization extends BaseVisualization<string> {
 class TeamPatternVisualization extends BaseVisualization<PatternId> {
   scale: (v: PatternId) => string | undefined = (v) => `url(#pattern${v})`;
 
-  constructor(state: State, metadata: VizMetadata) {
-    super(state, metadata);
+  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
+    super(state, metadata, features);
   }
   dataFn(d: HierarchyNode<FileNode>): PatternId | undefined {
     const { svgPatternLookup } = this.state.calculated.svgPatterns;
@@ -445,8 +471,8 @@ export const Visualizations: {
     help: <p>Shows the most common programming languages</p>,
     // dataFn: unHierarchyAdapter(nodeLanguage),
     // parentFn: blankParent,
-    buildVisualization(state, metadata) {
-      return new LanguageVisualization(state, metadata);
+    buildVisualization(state, metadata, features) {
+      return new LanguageVisualization(state, metadata, features);
     },
   },
   loc: {
@@ -464,16 +490,16 @@ export const Visualizations: {
         </p>
       </div>
     ),
-    buildVisualization(state, metadata) {
-      return new LinesOfCodeVisualization(state, metadata);
+    buildVisualization(state, metadata, features) {
+      return new LinesOfCodeVisualization(state, metadata, features);
     },
   },
   depth: {
     displayOrder: 2,
     title: "Nesting depth",
     help: <p>Shows nesting depth in the directory structure</p>,
-    buildVisualization(state, metadata) {
-      return new NestingDepthVisualization(state, metadata);
+    buildVisualization(state, metadata, features) {
+      return new NestingDepthVisualization(state, metadata, features);
     },
   },
   indentation: {
@@ -498,8 +524,8 @@ export const Visualizations: {
             </p>
           </div>
         ),
-        buildVisualization(state, metadata) {
-          return new IndentationVisualization(state, metadata, "sum");
+        buildVisualization(state, metadata, features) {
+          return new IndentationVisualization(state, metadata, features, "sum");
         },
       },
       p99: {
@@ -519,8 +545,8 @@ export const Visualizations: {
             </p>
           </div>
         ),
-        buildVisualization(state, metadata) {
-          return new IndentationVisualization(state, metadata, "p99");
+        buildVisualization(state, metadata, features) {
+          return new IndentationVisualization(state, metadata, features, "p99");
         },
       },
       stddev: {
@@ -539,8 +565,13 @@ export const Visualizations: {
             </p>
           </div>
         ),
-        buildVisualization(state, metadata) {
-          return new IndentationVisualization(state, metadata, "stddev");
+        buildVisualization(state, metadata, features) {
+          return new IndentationVisualization(
+            state,
+            metadata,
+            features,
+            "stddev"
+          );
         },
       },
     },
@@ -548,6 +579,8 @@ export const Visualizations: {
   age: {
     displayOrder: 4,
     title: "Age of last change",
+    featureCheck: (features: FeatureFlags) =>
+      features.git || features.file_stats,
     help: (
       <div>
         <p>Highlights code which has had no changes for some time.</p>
@@ -562,13 +595,15 @@ export const Visualizations: {
         </p>
       </div>
     ),
-    buildVisualization(state, metadata) {
-      return new AgeVisualization(state, metadata);
+    buildVisualization(state, metadata, features) {
+      return new AgeVisualization(state, metadata, features);
     },
   },
   creation: {
     displayOrder: 5,
     title: "Creation date",
+    featureCheck: (features: FeatureFlags) =>
+      features.git || features.file_stats,
     help: (
       <div>
         <p>
@@ -585,13 +620,14 @@ export const Visualizations: {
         </p>
       </div>
     ),
-    buildVisualization(state, metadata) {
-      return new CreationDateVisualization(state, metadata);
+    buildVisualization(state, metadata, features) {
+      return new CreationDateVisualization(state, metadata, features);
     },
   },
   numberOfChangers: {
     displayOrder: 6,
     title: "Number of unique changers",
+    featureCheck: (features: FeatureFlags) => features.git,
     help: (
       <div>
         <p>
@@ -606,14 +642,16 @@ export const Visualizations: {
         </p>
       </div>
     ),
-    buildVisualization(state, metadata) {
-      return new NumberOfChangersVisualization(state, metadata);
+    buildVisualization(state, metadata, features) {
+      return new NumberOfChangersVisualization(state, metadata, features);
     },
   },
 
   churn: {
     displayOrder: 7,
     title: "Churn",
+    featureCheck: (features: FeatureFlags) => features.git,
+
     defaultChild: "days",
     children: {
       days: {
@@ -632,8 +670,8 @@ export const Visualizations: {
             </p>
           </div>
         ),
-        buildVisualization(state, metadata) {
-          return new ChurnVisualization(state, metadata, "days");
+        buildVisualization(state, metadata, features) {
+          return new ChurnVisualization(state, metadata, features, "days");
         },
       },
       commits: {
@@ -652,8 +690,8 @@ export const Visualizations: {
             </p>
           </div>
         ),
-        buildVisualization(state, metadata) {
-          return new ChurnVisualization(state, metadata, "commits");
+        buildVisualization(state, metadata, features) {
+          return new ChurnVisualization(state, metadata, features, "commits");
         },
       },
       lines: {
@@ -677,8 +715,8 @@ export const Visualizations: {
             </p>
           </div>
         ),
-        buildVisualization(state, metadata) {
-          return new ChurnVisualization(state, metadata, "lines");
+        buildVisualization(state, metadata, features) {
+          return new ChurnVisualization(state, metadata, features, "lines");
         },
       },
     },
@@ -686,6 +724,8 @@ export const Visualizations: {
   team: {
     displayOrder: 8,
     title: "Top Team",
+    featureCheck: (features: FeatureFlags) => features.git,
+
     help: (
       <div>
         <p>
@@ -697,13 +737,14 @@ export const Visualizations: {
         </p>
       </div>
     ),
-    buildVisualization(state, metadata) {
-      return new TeamVisualization(state, metadata);
+    buildVisualization(state, metadata, features) {
+      return new TeamVisualization(state, metadata, features);
     },
   },
   teamPattern: {
     displayOrder: 9,
     title: "Top Teams (patterned)",
+    featureCheck: (features: FeatureFlags) => features.git,
     help: (
       <div>
         <p>
@@ -719,8 +760,8 @@ export const Visualizations: {
         </p>
       </div>
     ),
-    buildVisualization(state, metadata) {
-      return new TeamPatternVisualization(state, metadata);
+    buildVisualization(state, metadata, features) {
+      return new TeamPatternVisualization(state, metadata, features);
     },
   },
 };

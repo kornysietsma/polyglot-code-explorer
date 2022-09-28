@@ -24,7 +24,7 @@ import {
   nodeHasCouplingData,
   nodePath,
 } from "./nodeData";
-import { Point, TreeNode } from "./polyglot_data.types";
+import { FeatureFlags, Point, TreeNode } from "./polyglot_data.types";
 import { TimescaleIntervalData } from "./preprocess";
 import { Action, colourKeyToColours, State, themedColours } from "./state";
 import { getCurrentVis } from "./VisualizationData";
@@ -38,13 +38,15 @@ const redrawPolygons = (
     unknown
   >,
   metadata: VizMetadata,
+  features: FeatureFlags,
   state: State
 ) => {
   const { config } = state;
 
   const visualization = getCurrentVis(config).buildVisualization(
     state,
-    metadata
+    metadata,
+    features
   );
 
   const strokeWidthFn = (d: HierarchyNode<TreeNode>) => {
@@ -120,6 +122,7 @@ const update = (
   d3Container: React.RefObject<SVGSVGElement>,
   files: TreeNode,
   metadata: VizMetadata,
+  features: FeatureFlags,
   state: State
 ) => {
   if (!d3Container.current) {
@@ -130,7 +133,7 @@ const update = (
   // if (!svg instanceof SVGElement) {
   //   throw new Error("Invalid root SVG element");
   // }
-  redrawPolygons(svg.selectAll(".cell"), metadata, state);
+  redrawPolygons(svg.selectAll(".cell"), metadata, features, state);
 
   // TODO: DRY this up - or should selecting just be expensive config?
   if (!metadata.hierarchyNodesByPath) {
@@ -297,6 +300,7 @@ const draw = (
   d3Container: React.RefObject<SVGSVGElement>,
   files: TreeNode,
   metadata: VizMetadata,
+  features: FeatureFlags,
   state: State,
   dispatch: React.Dispatch<Action>
 ) => {
@@ -354,7 +358,7 @@ const draw = (
   // TODO - consider reworking this with join which seems to be the new hotness?
   const newNodes = nodes.enter().append("path").classed("cell", true);
 
-  redrawPolygons(nodes.merge(newNodes), metadata, state)
+  redrawPolygons(nodes.merge(newNodes), metadata, features, state)
     // eslint-disable-next-line no-unused-vars
     .on(
       "click",
@@ -419,6 +423,7 @@ function addDays(date: Date, days: number) {
 function drawTimescale(
   d3TimescaleContainer: React.RefObject<SVGSVGElement>,
   timescaleData: TimescaleIntervalData[],
+  features: FeatureFlags,
   state: State,
   dispatch: React.Dispatch<Action>
 ) {
@@ -441,7 +446,9 @@ function drawTimescale(
     .attr("viewBox", [0, 0, width, height])
     .style("height", `${height}px`);
 
-  const valueFn = (d: TimescaleIntervalData) => d.commits; // abstracted so we can pick a differnt one
+  const valueFn = features.git
+    ? (d: TimescaleIntervalData) => d.commits
+    : (d: TimescaleIntervalData) => d.files; // if we have no git, we count files modified
 
   // we might simplify these, from an overly generic example
   const area = (
@@ -467,8 +474,8 @@ function drawTimescale(
   if (dateRange[0] === undefined || dateRange[1] === undefined) {
     throw new Error("No date range in timescale data");
   }
-  dateRange[0] = addDays(dateRange[0], -1);
-  dateRange[1] = addDays(dateRange[1], 1);
+  dateRange[0] = addDays(dateRange[0], -7);
+  dateRange[1] = addDays(dateRange[1], 7);
 
   const xScale: ScaleTime<number, number, never> = scaleUtc()
     .domain(dateRange)
@@ -562,18 +569,20 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
     const {
       metadata: { timescaleData },
       metadata,
-      files,
+      data,
     } = dataRef.current;
     const { config, expensiveConfig, couplingConfig } = state;
+    const { features } = data;
     if (
       prevState === undefined ||
       !_.isEqual(prevState.expensiveConfig, expensiveConfig)
     ) {
       console.log("expensive config change - rebuild all");
-      draw(d3Container, files.tree, metadata, state, dispatch);
+      draw(d3Container, data.tree, metadata, features, state, dispatch);
       drawTimescale(
         d3TimescaleContainer,
         timescaleData,
+        features,
         state,
         debouncedDispatch
       );
@@ -581,7 +590,7 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
     } else {
       if (!_.isEqual(prevState.config, config)) {
         console.log("cheap config change - just redraw");
-        update(d3Container, files.tree, metadata, state);
+        update(d3Container, data.tree, metadata, features, state);
         if (
           prevState.config.colours.currentTheme !==
           state.config.colours.currentTheme
@@ -591,7 +600,7 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
       }
       if (!_.isEqual(prevState.couplingConfig, couplingConfig)) {
         console.log("coupling change");
-        updateCoupling(d3Container, files.tree, metadata, state, dispatch);
+        updateCoupling(d3Container, data.tree, metadata, state, dispatch);
       }
     }
   }, [dataRef, state, dispatch, debouncedDispatch, prevState]);

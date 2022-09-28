@@ -3,13 +3,14 @@ import * as d3 from "d3";
 import _ from "lodash";
 import moment, { unitOfTime } from "moment";
 
-import { nodeGitData, nodeLinesOfCode, nodeLocData } from "./nodeData";
+import { nodeLinesOfCode, nodeLocData } from "./nodeData";
 import {
   DirectoryNode,
+  FeatureFlags,
   GitUser,
   isDirectory,
   isFile,
-  Tree,
+  PolyglotData,
   TreeNode,
   UserData,
 } from "./polyglot_data.types";
@@ -24,7 +25,7 @@ function linkParentRecursively(node: TreeNode, parent: DirectoryNode) {
   }
 }
 
-export function linkParents(data: Tree) {
+export function linkParents(data: PolyglotData) {
   const rootNode = data.tree;
   if (!isDirectory(rootNode)) {
     throw new Error("Root of tree is not a directory!");
@@ -54,7 +55,7 @@ function addLanguagesFromNode(
 }
 
 /* eslint-enable no-param-reassign */
-export function countLanguagesIn(data: Tree): LanguagesMetadata {
+export function countLanguagesIn(data: PolyglotData): LanguagesMetadata {
   const counts: Map<string, { count: number; loc: number }> = new Map();
   addLanguagesFromNode(counts, data.tree);
   const sortedMap = [...counts].sort(([, k1], [, k2]) => k2.loc - k1.loc);
@@ -80,7 +81,21 @@ export function countLanguagesIn(data: Tree): LanguagesMetadata {
   return { languageKey, languageMap, otherColour };
 }
 
-function gatherNodeStats(node: TreeNode, statsSoFar: TreeStats, depth: number) {
+function updateEarliestLatest(stats: TreeStats, newDate: number) {
+  if (stats.earliest === undefined || newDate < stats.earliest) {
+    stats.earliest = newDate;
+  }
+  if (stats.latest === undefined || newDate > stats.latest) {
+    stats.latest = newDate;
+  }
+}
+
+function gatherNodeStats(
+  node: TreeNode,
+  features: FeatureFlags,
+  statsSoFar: TreeStats,
+  depth: number
+) {
   let stats = _.cloneDeep(statsSoFar);
   if (stats.maxDepth < depth) {
     stats.maxDepth = depth;
@@ -89,40 +104,44 @@ function gatherNodeStats(node: TreeNode, statsSoFar: TreeStats, depth: number) {
   if (loc && loc > stats.maxLoc) {
     stats.maxLoc = loc;
   }
-  const gitData = isFile(node) ? nodeGitData(node) : undefined;
-  if (gitData && (gitData?.details?.length ?? 0 > 0)) {
-    const days = gitData.details.map((d) => d.commit_day);
-    if (gitData.last_update) {
-      days.push(gitData.last_update);
+  if (features.git) {
+    const gitData = isFile(node) ? node.data.git : undefined;
+    if (gitData && (gitData?.details?.length ?? 0 > 0)) {
+      const days = gitData.details.map((d) => d.commit_day);
+      if (gitData.last_update) {
+        days.push(gitData.last_update);
+      }
+      if (gitData.creation_date) {
+        days.push(gitData.creation_date);
+      }
+      if (days.length == 0) {
+        throw new Error("No days in git data");
+      }
+      days.sort();
+      const earliest = days[0]!;
+      const latest = days[days.length - 1]!;
+      updateEarliestLatest(stats, earliest);
+      updateEarliestLatest(stats, latest);
     }
-    if (gitData.creation_date) {
-      days.push(gitData.creation_date);
-    }
-    if (days.length == 0) {
-      throw new Error("No days in git data");
-    }
-    days.sort();
-    const earliest = days[0]!;
-    const latest = days[days.length - 1]!;
-    if (stats.earliestCommit === undefined || earliest < stats.earliestCommit) {
-      stats.earliestCommit = earliest;
-    }
-    if (stats.latestCommit === undefined || latest > stats.latestCommit) {
-      stats.latestCommit = latest;
+  }
+  if (features.file_stats) {
+    if (node.data?.file_stats) {
+      updateEarliestLatest(stats, node.data.file_stats.created);
+      updateEarliestLatest(stats, node.data.file_stats.modified);
     }
   }
   if (isDirectory(node)) {
     stats = node.children.reduce((memo, child) => {
-      return gatherNodeStats(child, memo, depth + 1);
+      return gatherNodeStats(child, features, memo, depth + 1);
     }, stats);
   }
   return stats;
 }
 
-export function gatherGlobalStats(data: Tree) {
+export function gatherGlobalStats(data: PolyglotData) {
   const statsSoFar: TreeStats = {
-    earliestCommit: undefined,
-    latestCommit: undefined,
+    earliest: undefined,
+    latest: undefined,
     maxDepth: 0,
     maxLoc: 0,
     churn: {
@@ -131,7 +150,7 @@ export function gatherGlobalStats(data: Tree) {
       maxDays: 0,
     },
   };
-  return gatherNodeStats(data.tree, statsSoFar, 0);
+  return gatherNodeStats(data.tree, data.features, statsSoFar, 0);
 }
 
 type TimescaleData = {
@@ -154,40 +173,59 @@ export type TimescaleIntervalData = {
 function addTimescaleData(
   timescaleData: Map<number, TimescaleData>,
   node: TreeNode,
+  features: FeatureFlags,
   timeUnit: unitOfTime.StartOf
 ) {
-  const gitData = isFile(node) && nodeGitData(node);
-  if (gitData && gitData.details && gitData.details.length > 0) {
-    gitData.details.forEach((data) => {
-      const startDate = moment.unix(data.commit_day).startOf(timeUnit).unix();
-      let dateData = timescaleData.get(startDate);
-      if (!dateData)
+  if (features.git) {
+    const gitData = isFile(node) && node.data.git;
+    if (gitData && gitData.details && gitData.details.length > 0) {
+      gitData.details.forEach((data) => {
+        const startDate = moment.unix(data.commit_day).startOf(timeUnit).unix();
+        let dateData = timescaleData.get(startDate);
+        if (!dateData) {
+          dateData = {
+            files: 0,
+            commits: 0,
+            lines_added: 0,
+            lines_deleted: 0,
+          };
+        }
+        dateData.files += 1;
+        dateData.commits += data.commits;
+        dateData.lines_added += data.lines_added;
+        dateData.lines_deleted += data.lines_deleted;
+        timescaleData.set(startDate, dateData);
+      });
+    }
+  } else if (features.file_stats) {
+    const date = node.data?.file_stats?.modified;
+    if (date !== undefined) {
+      let dateData = timescaleData.get(date);
+      if (!dateData) {
         dateData = {
           files: 0,
           commits: 0,
           lines_added: 0,
           lines_deleted: 0,
         };
+      }
       dateData.files += 1;
-      dateData.commits += data.commits;
-      dateData.lines_added += data.lines_added;
-      dateData.lines_deleted += data.lines_deleted;
-      timescaleData.set(startDate, dateData);
-    });
+      timescaleData.set(date, dateData);
+    }
   }
   if (isDirectory(node)) {
     node.children.forEach((child) => {
-      addTimescaleData(timescaleData, child, timeUnit);
+      addTimescaleData(timescaleData, child, features, timeUnit);
     });
   }
 }
 
 export function gatherTimescaleData(
-  data: Tree,
+  data: PolyglotData,
   timeUnit: unitOfTime.StartOf
 ): TimescaleIntervalData[] {
   const timescaleData: Map<number, TimescaleData> = new Map();
-  addTimescaleData(timescaleData, data.tree, timeUnit);
+  addTimescaleData(timescaleData, data.tree, data.features, timeUnit);
   // convert to a simple sorted array, as that's all we need really
   return [...timescaleData]
     .map(([day, dayData]) => {
@@ -208,7 +246,7 @@ function addNodesByPath(nodesByPath: Map<string, TreeNode>, node: TreeNode) {
   }
 }
 
-export function gatherNodesByPath(data: Tree): Map<string, TreeNode> {
+export function gatherNodesByPath(data: PolyglotData): Map<string, TreeNode> {
   const nodesByPath = new Map();
   addNodesByPath(nodesByPath, data.tree);
   return nodesByPath;

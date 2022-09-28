@@ -3,8 +3,8 @@ import _ from "lodash";
 
 import {
   DirectoryNode,
+  FeatureFlags,
   FileNode,
-  GitData,
   GitDetails,
   IndentationData,
   isDirectory,
@@ -62,24 +62,26 @@ export function nodeDepth(
   return d.depth;
 }
 
-// TODO: inline this
-export function nodeGitData(node: FileNode): GitData | undefined {
-  return node.data.git;
-}
-
-export function nodeCreationDate(node: FileNode): number | undefined {
-  const git = nodeGitData(node);
-  if (!git) return undefined;
-
-  return git.creation_date;
+export function nodeCreationDate(
+  node: FileNode,
+  features: FeatureFlags
+): number | undefined {
+  if (features.git) {
+    return node.data.git?.creation_date;
+  } else if (features.file_stats) {
+    return node.data.file_stats?.created;
+  } else {
+    throw new Error("Must have git or file_stats feature enabled");
+  }
 }
 
 export function nodeCreationDateClipped(
   node: FileNode,
+  features: FeatureFlags,
   earliest: number,
   latest: number
 ): number | undefined {
-  const creationDate = nodeCreationDate(node);
+  const creationDate = nodeCreationDate(node, features);
   if (!creationDate) return undefined;
   if (creationDate > latest) return undefined;
   if (creationDate < earliest) return undefined;
@@ -87,11 +89,11 @@ export function nodeCreationDateClipped(
 }
 
 export function nodeRemoteUrl(node: DirectoryNode): string | undefined {
-  return node.data?.git.remote_url;
+  return node.data?.git?.remote_url;
 }
 
 export function nodeRemoteHead(node: DirectoryNode): string | undefined {
-  return node.data?.git.head;
+  return node.data?.git?.head;
 }
 
 export function nodeIndentationData(
@@ -127,9 +129,7 @@ function nodeChangeDetails(
   earliest?: number,
   latest?: number
 ): GitDetails[] | undefined {
-  const git = nodeGitData(node);
-  if (!git) return undefined;
-  const { details } = git;
+  const details = node.data.git?.details;
   if (!details) return undefined;
   if (earliest === undefined || latest === undefined)
     return filterDetailsIgnoringUsers(details, ignoredUsers);
@@ -139,26 +139,39 @@ function nodeChangeDetails(
   return filterDetailsIgnoringUsers(detailsWithinDates, ignoredUsers);
 }
 
-export function nodeLastCommitDay(
+export function nodeLastChangeDay(
   node: FileNode,
+  features: FeatureFlags,
   ignoredUsers: Set<number>,
   earliest: number,
   latest: number
 ) {
-  const details = nodeChangeDetails(node, ignoredUsers, earliest, latest);
-  if (!details || details.length === 0) return undefined; // TODO: distinguish no history from undefined!
-  return details[details.length - 1]?.commit_day;
+  if (features.git) {
+    const details = nodeChangeDetails(node, ignoredUsers, earliest, latest);
+    if (!details || details.length === 0) return undefined; // TODO: distinguish no history from undefined!
+    return details[details.length - 1]?.commit_day;
+  } else {
+    return node.data.file_stats?.modified;
+  }
 }
 
+// Node age in days  (not seconds!)
 export function nodeAge(
   node: FileNode,
+  features: FeatureFlags,
   ignoredUsers: Set<number>,
   earliest: number,
   latest: number
 ) {
-  const lastCommit = nodeLastCommitDay(node, ignoredUsers, earliest, latest);
-  if (!lastCommit) return undefined;
-  return Math.ceil((latest - lastCommit) / (24 * 60 * 60));
+  const lastDay = nodeLastChangeDay(
+    node,
+    features,
+    ignoredUsers,
+    earliest,
+    latest
+  );
+  if (!lastDay) return undefined;
+  return Math.ceil((latest - lastDay) / (24 * 60 * 60));
 }
 
 export function nodeNumberOfChangers(
@@ -362,18 +375,15 @@ export type UserStatsAccumulator = {
   days: Set<number>;
   files: number;
 };
-
-function isAccumulator(
-  stats: UserStatsAccumulator | UserStats
-): stats is UserStatsAccumulator {
-  return stats.days instanceof Set;
-}
-function statsDays(stats: UserStatsAccumulator | UserStats): number {
-  return isAccumulator(stats) ? stats.days.size : stats.days;
-}
+export const DEFAULT_USER_STATS_ACCUMULATOR: UserStatsAccumulator = {
+  commits: 0,
+  lines: 0,
+  days: new Set(),
+  files: 0,
+};
 
 export function metricFrom(
-  stats: UserStatsAccumulator | UserStats,
+  stats: UserStatsAccumulator,
   metric: FileChangeMetric
 ) {
   switch (metric) {
@@ -382,7 +392,7 @@ export function metricFrom(
     case "lines":
       return stats.lines;
     case "days":
-      return statsDays(stats);
+      return stats.days.size;
     case "files":
       return stats.files;
   }
@@ -390,22 +400,6 @@ export function metricFrom(
 
 /** when aggregating by team, we flag changes by users with no team */
 export const NO_TEAM_SYMBOL = "<NO TEAM>";
-
-export type UserStats = {
-  commits: number;
-  lines: number;
-  days: number;
-  files: number;
-  lastCommitDay?: number;
-};
-
-export const DEFAULT_USER_STATS: UserStats = {
-  commits: 0,
-  lines: 0,
-  days: 0,
-  files: 0,
-  lastCommitDay: undefined,
-};
 
 // accumulates all changes within a date range by user
 export function nodeChangers(
@@ -499,24 +493,6 @@ export function sortedUserStatsAccumulators<KeyType>(
         return userB.files - userA.files;
       case "days":
         return userB.days.size - userA.days.size;
-    }
-  })!;
-}
-
-export function sortedUserStats<KeyType>(
-  changers: Map<KeyType, UserStats>,
-  metric: FileChangeMetric
-): [KeyType, UserStats][] {
-  return [...changers].sort(([, userA], [, userB]) => {
-    switch (metric) {
-      case "lines":
-        return userB.lines - userA.lines;
-      case "commits":
-        return userB.commits - userA.commits;
-      case "files":
-        return userB.files - userA.files;
-      case "days":
-        return userB.days - userA.days;
     }
   })!;
 }
@@ -714,6 +690,9 @@ export function addTeamStats(
 function lastDay(days: number[]): number | undefined {
   return days.sort((a, b) => b - a)[0];
 }
+export function lastCommitDay(stats: UserStatsAccumulator): number | undefined {
+  return lastDay([...stats.days]);
+}
 
 export function aggregateUserStats(
   node: TreeNode,
@@ -721,21 +700,10 @@ export function aggregateUserStats(
   latest: number,
   aliases: UserAliases,
   ignoredUsers: Set<number>
-): Map<number, UserStats> {
+): Map<number, UserStatsAccumulator> {
   const userStats: Map<number, UserStatsAccumulator> = new Map();
   addUserStats(userStats, node, aliases, ignoredUsers, earliest, latest);
-  return new Map(
-    [...userStats].map(([userId, { commits, files, lines, days }]) => [
-      userId,
-      {
-        commits,
-        files,
-        lines,
-        days: days.size,
-        lastCommitDay: lastDay([...days]),
-      },
-    ])
-  );
+  return userStats;
 }
 
 export function aggregateTeamStats(
@@ -746,7 +714,7 @@ export function aggregateTeamStats(
   ignoredUsers: Set<number>,
   userTeams: UserTeams,
   includeNonTeamChanges: boolean
-): Map<string, UserStats> {
+): Map<string, UserStatsAccumulator> {
   const teamStats: Map<string, UserStatsAccumulator> = new Map();
   addTeamStats(
     teamStats,
@@ -758,16 +726,5 @@ export function aggregateTeamStats(
     latest,
     includeNonTeamChanges
   );
-  return new Map(
-    [...teamStats].map(([teamName, { commits, files, lines, days }]) => [
-      teamName,
-      {
-        commits,
-        files,
-        lines,
-        days: days.size,
-        lastCommitDay: lastDay([...days]),
-      },
-    ])
-  );
+  return teamStats;
 }

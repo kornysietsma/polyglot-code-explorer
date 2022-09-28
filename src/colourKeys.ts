@@ -54,14 +54,16 @@ export function creationKeyData(
   const { config } = state;
   const { earliest, latest } = config.filters.dateRange;
   const dateRange = latest - earliest;
+  const days = Math.ceil(dateRange / (24 * 60 * 60));
+  const scaleSize = Math.min(20, days);
 
   const keyText = (value: number) => `${humanizeDate(value)}`;
 
   const key: [string, string][] = [
     ["Outside date range", themedColours(config).neutralColour],
   ];
-  for (let ix = 0; ix <= 20; ix += 1) {
-    const age = earliest + Math.floor((ix * dateRange) / 20);
+  for (let ix = 0; ix <= scaleSize; ix += 1) {
+    const age = earliest + Math.floor((ix * dateRange) / scaleSize);
     key.push([keyText(age), scale(age) ?? themedErrorColour(config)]);
   }
   return key;

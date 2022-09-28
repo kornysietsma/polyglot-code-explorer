@@ -12,22 +12,22 @@ import { errorMessage, infoMessage, warnMessage } from "./state";
 const SaveLoadControls = (props: DefaultProps) => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { dataRef, state, dispatch } = props;
-  const { files, metadata } = dataRef.current;
+  const { data: data, metadata } = dataRef.current;
   const [tolerant, setTolerant] = useState<boolean>(false);
   const tolerantCheckId = useId();
-  const currentId = files.id;
+  const currentId = data.id;
   const hiddenFileInput = React.useRef<HTMLInputElement>(null);
 
   const savedKeys = new Set(Object.keys(localStorage));
   const previousSaveExists = savedKeys.has(currentId);
 
   function saveToBrowser() {
-    const exportable = stateToExportable(files, state, metadata);
+    const exportable = stateToExportable(data, state, metadata);
     const json = exportableStateToJson(exportable);
     localStorage.setItem(currentId, json);
   }
   function saveToFile() {
-    const exportable = stateToExportable(files, state, metadata);
+    const exportable = stateToExportable(data, state, metadata);
     const json = exportableStateToJson(exportable);
     const file = new Blob([json], {
       type: "application/json",

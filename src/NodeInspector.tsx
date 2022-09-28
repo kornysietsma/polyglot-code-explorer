@@ -4,33 +4,28 @@ import React from "react";
 
 import CouplingInspector from "./CouplingInspector";
 import { humanizeDate, humanizeDays } from "./datetimes";
+import NodeChangeInspector from "./NodeChangeInspector";
 import {
   ChurnData,
-  metricFrom,
   nodeAge,
-  nodeChangers,
-  nodeChangersByTeam,
   nodeChurnData,
   nodeCreationDate,
   nodeIndentationData,
-  nodeLastCommitDay,
+  nodeLastChangeDay,
   nodeLocData,
   nodeRemoteHead,
   nodeRemoteUrl,
-  sortedUserStatsAccumulators,
 } from "./nodeData";
 import PathInspector from "./PathInspector";
 import {
-  displayUser,
+  FeatureFlags,
   FileNode,
   isDirectory,
   TreeNode,
 } from "./polyglot_data.types";
 import SourceCodeInspector from "./SourceCodeInspector";
-import { Action, getUserData, State } from "./state";
-import { teamOrNoTeamWidget } from "./TeamWidget";
+import { Action, State } from "./state";
 import ToggleablePanel from "./ToggleablePanel";
-import { userTeamListForUser } from "./UserTeamList";
 import { VizMetadata } from "./viz.types";
 
 function findGitUrl(node: TreeNode, remoteUrlTemplate: string) {
@@ -134,27 +129,31 @@ const NodeInspector = ({
   dispatch,
   state,
   metadata,
+  features,
 }: {
   node: FileNode;
   dispatch: React.Dispatch<Action>;
   state: State;
   metadata: VizMetadata;
+  features: FeatureFlags;
 }) => {
-  const { stats, users } = metadata;
+  const { stats } = metadata;
   const locData = nodeLocData(node);
   const indentationData = nodeIndentationData(node);
   const gitUrl = findGitUrl(node, state.config.remoteUrlTemplate);
   const { earliest, latest } = state.config.filters.dateRange;
-  const { topChangersCount } = state.config.numberOfChangers;
-  const { couplingAvailable } = state.couplingConfig;
-  const { teams, aliases, ignoredUsers } = state.config.teamsAndAliases;
-  const { fileChangeMetric } = state.config;
-  const { userTeams } = state.calculated;
-  const { showNonTeamChanges } = state.config.teamVisualisation;
 
-  const age = nodeAge(node, ignoredUsers, earliest, latest);
-  const lastCommit = nodeLastCommitDay(node, ignoredUsers, earliest, latest);
-  const creationDate = nodeCreationDate(node);
+  const { ignoredUsers } = state.config.teamsAndAliases;
+
+  const age = nodeAge(node, features, ignoredUsers, earliest, latest);
+  const lastChange = nodeLastChangeDay(
+    node,
+    features,
+    ignoredUsers,
+    earliest,
+    latest
+  );
+  const creationDate = nodeCreationDate(node, features);
   let creationText = creationDate
     ? `File created on ${humanizeDate(creationDate)}`
     : "";
@@ -162,94 +161,11 @@ const NodeInspector = ({
     creationText += " (after current date selection)";
   }
   const ageText =
-    age && lastCommit
+    age && lastChange
       ? `file last changed ${age} days ago on ${humanizeDate(
-          lastCommit
+          lastChange
         )} (${humanizeDays(age)})`
       : "";
-  const userChangers = sortedUserStatsAccumulators(
-    nodeChangers(node, aliases, ignoredUsers, earliest, latest) ?? new Map(),
-    fileChangeMetric
-  );
-  const topUserChangers = userChangers.slice(0, topChangersCount);
-
-  const teamChangers = sortedUserStatsAccumulators(
-    nodeChangersByTeam(
-      node,
-      aliases,
-      ignoredUsers,
-      userTeams,
-      earliest,
-      latest,
-      showNonTeamChanges
-    ) ?? new Map(),
-    fileChangeMetric
-  );
-  const topTeamChangers = teamChangers.slice(0, topChangersCount);
-
-  const topChangerTable =
-    topUserChangers.length > 0 ? (
-      <div>
-        <h5>Top {topChangersCount} changers:</h5>
-        <table>
-          <thead>
-            <tr>
-              <th>User</th>
-              <th>Metric ({fileChangeMetric})</th>
-              <th>Teams</th>
-            </tr>
-          </thead>
-          <tbody>
-            {topUserChangers.map(([user, stats]) => {
-              return (
-                <tr key={user}>
-                  <td>{displayUser(getUserData(users, state, user))}</td>
-                  <td>{metricFrom(stats, fileChangeMetric)}</td>
-                  <td>{userTeamListForUser(state, user, false)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    ) : (
-      ""
-    );
-
-  const topTeamChangerTable =
-    topTeamChangers.length > 0 ? (
-      <div>
-        <h5>Top {topChangersCount} teams:</h5>
-        <table>
-          <thead>
-            <tr>
-              <th>Team</th>
-              <th>Metric ({fileChangeMetric})</th>
-            </tr>
-          </thead>
-          <tbody>
-            {topTeamChangers.map(([teamName, stats]) => {
-              return (
-                <tr key={teamName}>
-                  <td>
-                    {teamOrNoTeamWidget(
-                      teamName,
-                      teamName,
-                      teams,
-                      state,
-                      teamName
-                    )}
-                  </td>
-                  <td>{metricFrom(stats, fileChangeMetric)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    ) : (
-      ""
-    );
 
   const churnData = nodeChurnData(node, ignoredUsers, earliest, latest);
 
@@ -295,24 +211,18 @@ const NodeInspector = ({
       ) : (
         ""
       )}
-      <ToggleablePanel title="file changers" showInitially={false}>
-        {userChangers.length > 0 ? (
-          <h5>Unique users: {userChangers.length}</h5>
-        ) : (
-          ""
-        )}
-        {topChangerTable}
-      </ToggleablePanel>
-      <ToggleablePanel title="file changers by team" showInitially={false}>
-        {teamChangers.length > 0 ? (
-          <h5>Unique teams: {teamChangers.length}</h5>
-        ) : (
-          ""
-        )}
-        {topTeamChangerTable}
-      </ToggleablePanel>
+      {features.git ? (
+        <NodeChangeInspector
+          node={node}
+          state={state}
+          metadata={metadata}
+          features={features}
+        ></NodeChangeInspector>
+      ) : (
+        <></>
+      )}
       {churnReport(churnData)}
-      {couplingAvailable && stats.coupling ? (
+      {features.coupling && stats.coupling ? (
         <CouplingInspector node={node} state={state} stats={stats.coupling} />
       ) : (
         ""

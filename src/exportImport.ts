@@ -6,7 +6,11 @@
 
 import semver from "semver";
 
-import { SUPPORTED_FILE_VERSION, Tree, UserData } from "./polyglot_data.types";
+import {
+  PolyglotData,
+  SUPPORTED_FILE_VERSION,
+  UserData,
+} from "./polyglot_data.types";
 import {
   Config,
   CouplingConfig,
@@ -141,7 +145,7 @@ function exportableTeamsAndAliases(
 }
 
 export function stateToExportable(
-  files: Tree,
+  files: PolyglotData,
   state: State,
   metadata: VizMetadata
 ): ExportableState {

@@ -165,7 +165,6 @@ export type Config = {
 };
 
 export type CouplingConfig = {
-  couplingAvailable: boolean;
   shown: boolean;
   minBursts: number;
   minRatio: number;
@@ -282,25 +281,24 @@ export function sortTeamsByName(
 function initialiseGlobalState(initialDataRef: VizDataRef) {
   const {
     metadata: {
-      stats: { maxDepth, earliestCommit, latestCommit, coupling },
+      stats: { maxDepth, earliest: earliestData, latest: latestData },
     },
-    files,
+    data: data,
   } = initialDataRef.current;
 
-  const hasDates = earliestCommit !== undefined && latestCommit !== undefined;
+  const hasDates = earliestData !== undefined && latestData !== undefined;
 
   let earliest: number;
   let latest: number;
   if (hasDates) {
-    const twoYearsAgo = moment.unix(latestCommit).subtract(2, "year").unix();
+    const twoYearsAgo = moment.unix(latestData).subtract(2, "year").unix();
 
-    earliest = twoYearsAgo < earliestCommit ? earliestCommit : twoYearsAgo;
-    latest = moment.unix(latestCommit).add(1, "day").unix(); // otherwise files committed today get confused
+    earliest = twoYearsAgo < earliestData ? earliestData : twoYearsAgo;
+    latest = moment.unix(latestData).add(2, "day").unix(); // a bit of leeway for selecting all dates easily
   } else {
     earliest = moment().subtract(2, "year").unix();
-    latest = moment().add(1, "day").unix();
+    latest = moment().add(2, "day").unix();
   }
-  const couplingAvailable = coupling !== undefined;
 
   const defaults: State = {
     config: {
@@ -444,7 +442,6 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
       selectedNode: "",
     },
     couplingConfig: {
-      couplingAvailable,
       shown: false,
       minBursts: 10,
       minRatio: 0.9,
@@ -455,7 +452,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
       dateRange: {
         // TODO: use buckets instead!
         earliest,
-        latest: latestCommit || latest,
+        latest: latestData || latest,
       },
     },
     expensiveConfig: {
@@ -473,7 +470,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
   };
   defaults.messages.push(
     infoMessage(
-      `Loaded data file: ${files.name} version ${files.version} ID ${files.id}`
+      `Loaded data file: ${data.name} version ${data.version} ID ${data.id}`
     )
   );
   // could precalculate ownerData here - but it isn't needed until you select the 'owners' visualisation
@@ -554,7 +551,7 @@ function postprocessState(
       }
       resultingState.calculated.svgPatterns = calculateSvgPatterns(
         resultingState,
-        dataRef.current.files
+        dataRef.current.data
       );
       console.timeEnd("precalculating svg patterns");
     } else {

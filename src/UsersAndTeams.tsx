@@ -20,8 +20,8 @@ import HelpPanel from "./HelpPanel";
 import {
   aggregateTeamStats,
   aggregateUserStats,
-  DEFAULT_USER_STATS,
-  UserStats,
+  DEFAULT_USER_STATS_ACCUMULATOR,
+  UserStatsAccumulator,
 } from "./nodeData";
 import { displayUser, UserData } from "./polyglot_data.types";
 import {
@@ -41,14 +41,14 @@ import ToggleablePanel from "./ToggleablePanel";
 import { UserTeamList } from "./UserTeamList";
 
 export type UserAndStatsAndAliases = UserData &
-  UserStats & { isAlias: boolean };
+  UserStatsAccumulator & { isAlias: boolean };
 
 export type UsersAndTeamsPageState = {
   usersAndAliases: UserAndStatsAndAliases[];
   aliases: UserAliases;
   teams: Teams;
   ignoredUsers: Set<number>;
-  teamStats: Map<string, UserStats>;
+  teamStats: Map<string, UserStatsAccumulator>;
   usersSort: { key: string; ascending: boolean };
   checkedUsers: Set<number>;
   checkedIgnoredUsers: Set<number>;
@@ -113,9 +113,12 @@ function sortUsers(
       case "id":
       case "files":
       case "commits":
-      case "days":
       case "lines":
         return usersSort.ascending ? b[key] - a[key] : a[key] - b[key];
+      case "days":
+        return usersSort.ascending
+          ? b.days.size - a.days.size
+          : a.days.size - b.days.size;
       default:
         throw new Error(`Unknown sort key ${key}`);
     }
@@ -132,7 +135,7 @@ const UsersAndTeams = (props: DefaultProps) => {
     initialPageState()
   );
 
-  const tree = dataRef.current.files.tree;
+  const tree = dataRef.current.data.tree;
 
   const [modalIsOpen, setIsOpen] = React.useState(false);
 
@@ -160,7 +163,7 @@ const UsersAndTeams = (props: DefaultProps) => {
     aliases: UserAliases;
     teams: Teams;
     ignoredUsers: Set<number>;
-    teamStats?: Map<string, UserStats>;
+    teamStats?: Map<string, UserStatsAccumulator>;
   } {
     const userStats = recalcStats
       ? aggregateUserStats(
@@ -191,7 +194,7 @@ const UsersAndTeams = (props: DefaultProps) => {
       } else {
         return {
           ...user,
-          ...DEFAULT_USER_STATS,
+          ...DEFAULT_USER_STATS_ACCUMULATOR,
           isAlias: false,
         };
       }
@@ -207,7 +210,7 @@ const UsersAndTeams = (props: DefaultProps) => {
         } else {
           return {
             ...userData,
-            ...DEFAULT_USER_STATS,
+            ...DEFAULT_USER_STATS_ACCUMULATOR,
             isAlias: true,
           };
         }
@@ -280,7 +283,7 @@ const UsersAndTeams = (props: DefaultProps) => {
       if (stats) {
         arr[index] = { ...user, ...stats };
       } else {
-        arr[index] = { ...user, ...DEFAULT_USER_STATS };
+        arr[index] = { ...user, ...DEFAULT_USER_STATS_ACCUMULATOR };
       }
     });
     newPageState.teamStats = teamStats;
@@ -1122,7 +1125,7 @@ const UsersAndTeams = (props: DefaultProps) => {
                       </td>
                       <td>{stats ? stats.files : 0}</td>
                       <td>{stats ? stats.commits : 0}</td>
-                      <td>{stats ? stats.days : 0}</td>
+                      <td>{stats ? stats.days.size : 0}</td>
                       <td>{stats ? stats.lines : 0}</td>
                     </tr>
                   );
@@ -1314,7 +1317,7 @@ const UsersAndTeams = (props: DefaultProps) => {
                       <td>{user.email}</td>
                       <td>{user.files}</td>
                       <td>{user.commits}</td>
-                      <td>{user.days}</td>
+                      <td>{user.days.size}</td>
                       <td>{user.lines}</td>
                       <td>{pageState.ignoredUsers.has(user.id) ? "Y" : ""}</td>
                       <td>
