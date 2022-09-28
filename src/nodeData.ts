@@ -369,23 +369,20 @@ export function nodeCenter(node: TreeNode) {
   return nodeLayoutData(node)?.center;
 }
 
-export type UserStatsAccumulator = {
+export type UserStats = {
   commits: number;
   lines: number;
   days: Set<number>;
   files: number;
 };
-export const DEFAULT_USER_STATS_ACCUMULATOR: UserStatsAccumulator = {
+export const DEFAULT_USER_STATS: UserStats = {
   commits: 0,
   lines: 0,
   days: new Set(),
   files: 0,
 };
 
-export function metricFrom(
-  stats: UserStatsAccumulator,
-  metric: FileChangeMetric
-) {
+export function metricFrom(stats: UserStats, metric: FileChangeMetric) {
   switch (metric) {
     case "commits":
       return stats.commits;
@@ -408,10 +405,10 @@ export function nodeChangers(
   ignoredUsers: Set<number>,
   earliest: number,
   latest: number
-): Map<number, UserStatsAccumulator> | undefined {
+): Map<number, UserStats> | undefined {
   const details = nodeChangeDetails(node, ignoredUsers, earliest, latest);
   if (!details) return undefined;
-  const changerStats: Map<number, UserStatsAccumulator> = new Map();
+  const changerStats: Map<number, UserStats> = new Map();
 
   details.forEach(
     ({ users, commits, lines_added, lines_deleted, commit_day }) => {
@@ -443,10 +440,10 @@ export function nodeChangersByTeam(
   earliest: number,
   latest: number,
   includeNonTeamChanges: boolean
-): Map<string, UserStatsAccumulator> | undefined {
+): Map<string, UserStats> | undefined {
   const details = nodeChangeDetails(node, ignoredUsers, earliest, latest);
   if (!details) return undefined;
-  const changerStats: Map<string, UserStatsAccumulator> = new Map();
+  const changerStats: Map<string, UserStats> = new Map();
 
   const noTeamEntry = includeNonTeamChanges ? [NO_TEAM_SYMBOL] : [];
 
@@ -480,9 +477,9 @@ export function nodeChangersByTeam(
 }
 
 export function sortedUserStatsAccumulators<KeyType>(
-  changers: Map<KeyType, UserStatsAccumulator>,
+  changers: Map<KeyType, UserStats>,
   metric: FileChangeMetric
-): [KeyType, UserStatsAccumulator][] {
+): [KeyType, UserStats][] {
   return [...changers].sort(([, userA], [, userB]) => {
     switch (metric) {
       case "lines":
@@ -526,10 +523,7 @@ export function nodeTopTeam(
   return sortedTeams![0];
 }
 
-function singleStat(
-  stats: UserStatsAccumulator,
-  metric: FileChangeMetric
-): number {
+function singleStat(stats: UserStats, metric: FileChangeMetric): number {
   switch (metric) {
     case "lines":
       return stats.lines;
@@ -551,7 +545,7 @@ function singleStat(
  * @returns
  */
 export function topTeamsPartitioned(
-  teamStats: Map<string, UserStatsAccumulator>,
+  teamStats: Map<string, UserStats>,
   metric: FileChangeMetric,
   partitions: number,
   includeNonTeamChanges: boolean
@@ -587,7 +581,7 @@ export function topTeamsPartitioned(
 }
 
 function addUserStats(
-  userStats: Map<number, UserStatsAccumulator>,
+  userStats: Map<number, UserStats>,
   node: TreeNode,
   aliases: UserAliases,
   ignoredUsers: Set<number>,
@@ -631,7 +625,7 @@ function addUserStats(
 }
 
 export function addTeamStats(
-  teamStats: Map<string, UserStatsAccumulator>,
+  teamStats: Map<string, UserStats>,
   node: TreeNode,
   aliases: UserAliases,
   ignoredUsers: Set<number>,
@@ -690,7 +684,7 @@ export function addTeamStats(
 function lastDay(days: number[]): number | undefined {
   return days.sort((a, b) => b - a)[0];
 }
-export function lastCommitDay(stats: UserStatsAccumulator): number | undefined {
+export function lastCommitDay(stats: UserStats): number | undefined {
   return lastDay([...stats.days]);
 }
 
@@ -700,8 +694,8 @@ export function aggregateUserStats(
   latest: number,
   aliases: UserAliases,
   ignoredUsers: Set<number>
-): Map<number, UserStatsAccumulator> {
-  const userStats: Map<number, UserStatsAccumulator> = new Map();
+): Map<number, UserStats> {
+  const userStats: Map<number, UserStats> = new Map();
   addUserStats(userStats, node, aliases, ignoredUsers, earliest, latest);
   return userStats;
 }
@@ -714,8 +708,8 @@ export function aggregateTeamStats(
   ignoredUsers: Set<number>,
   userTeams: UserTeams,
   includeNonTeamChanges: boolean
-): Map<string, UserStatsAccumulator> {
-  const teamStats: Map<string, UserStatsAccumulator> = new Map();
+): Map<string, UserStats> {
+  const teamStats: Map<string, UserStats> = new Map();
   addTeamStats(
     teamStats,
     node,

@@ -620,7 +620,6 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
     </linearGradient>
     */
     return [...svgPatternIds].map(([colourKey, patternId]) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const colours = colourKeyToColours(colourKey);
       if (
         colours.length == 3 &&

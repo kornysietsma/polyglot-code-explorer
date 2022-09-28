@@ -10,7 +10,6 @@ import {
 import { errorMessage, infoMessage, warnMessage } from "./state";
 
 const SaveLoadControls = (props: DefaultProps) => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { dataRef, state, dispatch } = props;
   const { data: data, metadata } = dataRef.current;
   const [tolerant, setTolerant] = useState<boolean>(false);

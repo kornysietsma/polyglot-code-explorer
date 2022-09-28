@@ -20,8 +20,8 @@ import HelpPanel from "./HelpPanel";
 import {
   aggregateTeamStats,
   aggregateUserStats,
-  DEFAULT_USER_STATS_ACCUMULATOR,
-  UserStatsAccumulator,
+  DEFAULT_USER_STATS,
+  UserStats,
 } from "./nodeData";
 import { displayUser, UserData } from "./polyglot_data.types";
 import {
@@ -41,14 +41,14 @@ import ToggleablePanel from "./ToggleablePanel";
 import { UserTeamList } from "./UserTeamList";
 
 export type UserAndStatsAndAliases = UserData &
-  UserStatsAccumulator & { isAlias: boolean };
+  UserStats & { isAlias: boolean };
 
 export type UsersAndTeamsPageState = {
   usersAndAliases: UserAndStatsAndAliases[];
   aliases: UserAliases;
   teams: Teams;
   ignoredUsers: Set<number>;
-  teamStats: Map<string, UserStatsAccumulator>;
+  teamStats: Map<string, UserStats>;
   usersSort: { key: string; ascending: boolean };
   checkedUsers: Set<number>;
   checkedIgnoredUsers: Set<number>;
@@ -163,7 +163,7 @@ const UsersAndTeams = (props: DefaultProps) => {
     aliases: UserAliases;
     teams: Teams;
     ignoredUsers: Set<number>;
-    teamStats?: Map<string, UserStatsAccumulator>;
+    teamStats?: Map<string, UserStats>;
   } {
     const userStats = recalcStats
       ? aggregateUserStats(
@@ -194,7 +194,7 @@ const UsersAndTeams = (props: DefaultProps) => {
       } else {
         return {
           ...user,
-          ...DEFAULT_USER_STATS_ACCUMULATOR,
+          ...DEFAULT_USER_STATS,
           isAlias: false,
         };
       }
@@ -210,7 +210,7 @@ const UsersAndTeams = (props: DefaultProps) => {
         } else {
           return {
             ...userData,
-            ...DEFAULT_USER_STATS_ACCUMULATOR,
+            ...DEFAULT_USER_STATS,
             isAlias: true,
           };
         }
@@ -277,13 +277,12 @@ const UsersAndTeams = (props: DefaultProps) => {
     const newPageState = alreadyCloned
       ? workingPageState
       : _.cloneDeep(workingPageState);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     newPageState.usersAndAliases.forEach((user, index, arr) => {
       const stats = userStats.get(user.id);
       if (stats) {
         arr[index] = { ...user, ...stats };
       } else {
-        arr[index] = { ...user, ...DEFAULT_USER_STATS_ACCUMULATOR };
+        arr[index] = { ...user, ...DEFAULT_USER_STATS };
       }
     });
     newPageState.teamStats = teamStats;

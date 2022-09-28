@@ -1,4 +1,3 @@
-/* eslint-disable no-param-reassign */
 import * as d3 from "d3";
 import _ from "lodash";
 import moment, { unitOfTime } from "moment";
@@ -54,7 +53,6 @@ function addLanguagesFromNode(
   }
 }
 
-/* eslint-enable no-param-reassign */
 export function countLanguagesIn(data: PolyglotData): LanguagesMetadata {
   const counts: Map<string, { count: number; loc: number }> = new Map();
   addLanguagesFromNode(counts, data.tree);
@@ -237,7 +235,6 @@ export function gatherTimescaleData(
 
 // yes, I'm modifying a parameter, it's hard to avoid in JavaScript with big data structures
 function addNodesByPath(nodesByPath: Map<string, TreeNode>, node: TreeNode) {
-  // eslint-disable-next-line no-param-reassign
   nodesByPath.set(node.path, node);
   if (isDirectory(node)) {
     node.children.forEach((child) => {

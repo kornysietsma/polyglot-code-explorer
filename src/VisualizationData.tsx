@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { HierarchyNode, interpolatePlasma, scaleSequential } from "d3";
 import { ReactElement } from "react";
 

@@ -2,7 +2,7 @@ import {
   NO_TEAM_SYMBOL,
   nodeChangersByTeam,
   topTeamsPartitioned,
-  UserStatsAccumulator,
+  UserStats,
 } from "./nodeData";
 import { FileNode, GitData, LocData, NodeLayout } from "./polyglot_data.types";
 import { UserAliases, UserTeams } from "./state";
@@ -68,7 +68,7 @@ describe("aggregating node info by team", () => {
       false
     );
     expect(nodeChangers).toBeDefined();
-    const expected: Map<string, UserStatsAccumulator> = new Map();
+    const expected: Map<string, UserStats> = new Map();
     expect(nodeChangers!).toEqual(expected);
   });
   test("can aggregate basic team stats", () => {
@@ -92,7 +92,7 @@ describe("aggregating node info by team", () => {
       true
     );
     expect(nodeChangers).toBeDefined();
-    const expected: Map<string, UserStatsAccumulator> = new Map([
+    const expected: Map<string, UserStats> = new Map([
       ["teamA", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
       ["teamB", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
     ]);
@@ -120,7 +120,7 @@ describe("aggregating node info by team", () => {
       true
     );
     expect(nodeChangers).toBeDefined();
-    const expected: Map<string, UserStatsAccumulator> = new Map([
+    const expected: Map<string, UserStats> = new Map([
       ["teamA", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
       ["teamB", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
     ]);
@@ -163,7 +163,7 @@ describe("aggregating node info by team", () => {
       true
     );
     expect(nodeChangers).toBeDefined();
-    const expected: Map<string, UserStatsAccumulator> = new Map([
+    const expected: Map<string, UserStats> = new Map([
       ["teamA", { commits: 2, lines: 4, days: new Set([1, 2]), files: 1 }],
       ["teamB", { commits: 3, lines: 6, days: new Set([1, 2, 3]), files: 1 }],
     ]);
@@ -197,7 +197,7 @@ describe("aggregating node info by team", () => {
       true
     );
     expect(nodeChangers).toBeDefined();
-    const expected: Map<string, UserStatsAccumulator> = new Map([
+    const expected: Map<string, UserStats> = new Map([
       ["teamA", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
       ["<NO TEAM>", { commits: 3, lines: 7, days: new Set([2]), files: 1 }],
     ]);
@@ -231,7 +231,7 @@ describe("aggregating node info by team", () => {
       false
     );
     expect(nodeChangers).toBeDefined();
-    const expected: Map<string, UserStatsAccumulator> = new Map([
+    const expected: Map<string, UserStats> = new Map([
       ["teamA", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
     ]);
     expect(nodeChangers!).toEqual(expected);
@@ -258,7 +258,7 @@ describe("aggregating node info by team", () => {
       true
     );
     expect(nodeChangers).toBeDefined();
-    const expected: Map<string, UserStatsAccumulator> = new Map([
+    const expected: Map<string, UserStats> = new Map([
       ["teamA", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
       ["teamB", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
     ]);
@@ -269,15 +269,13 @@ describe("aggregating node info by team", () => {
 function testTeamStat(
   teamname: string,
   commits: number
-): [name: string, stats: UserStatsAccumulator] {
+): [name: string, stats: UserStats] {
   return [teamname, { commits, lines: 1, days: new Set(), files: 1 }];
 }
 
 describe("finding top teams as partitions", () => {
   test("returns single team if only one team returned", () => {
-    const stats: Map<string, UserStatsAccumulator> = new Map([
-      testTeamStat("foo", 1),
-    ]);
+    const stats: Map<string, UserStats> = new Map([testTeamStat("foo", 1)]);
     const partitioned: string[] | undefined = topTeamsPartitioned(
       stats,
       "commits",
@@ -290,7 +288,7 @@ describe("finding top teams as partitions", () => {
     // empty map
     expect(topTeamsPartitioned(new Map(), "commits", 3, true)).toBeUndefined();
     // no stats in map
-    const stats: Map<string, UserStatsAccumulator> = new Map([
+    const stats: Map<string, UserStats> = new Map([
       testTeamStat("foo", 0),
       testTeamStat("bar", 0),
     ]);
@@ -303,7 +301,7 @@ describe("finding top teams as partitions", () => {
     expect(partitioned).toBeUndefined();
   });
   test("returns three teams in alphabetical order if stats split evenly", () => {
-    const stats: Map<string, UserStatsAccumulator> = new Map([
+    const stats: Map<string, UserStats> = new Map([
       testTeamStat("foo", 1),
       testTeamStat("baz", 1),
       testTeamStat("bar", 1),
@@ -317,7 +315,7 @@ describe("finding top teams as partitions", () => {
     expect(partitioned!).toEqual(["bar", "baz", "foo"]);
   });
   test("returns team with 67% of total twice", () => {
-    const stats: Map<string, UserStatsAccumulator> = new Map([
+    const stats: Map<string, UserStats> = new Map([
       testTeamStat("foo", 67),
       testTeamStat("bar", 32),
       testTeamStat("baz", 1),
@@ -331,7 +329,7 @@ describe("finding top teams as partitions", () => {
     expect(partitioned!).toEqual(["bar", "foo", "foo"]);
   });
   test("won't include teams with less than 1/6 of total", () => {
-    const stats: Map<string, UserStatsAccumulator> = new Map([
+    const stats: Map<string, UserStats> = new Map([
       testTeamStat("foo", 9),
       testTeamStat("baz", 1),
       testTeamStat("bat", 1),
@@ -346,7 +344,7 @@ describe("finding top teams as partitions", () => {
     expect(partitioned!).toEqual(["foo", "foo"]);
   });
   test("will include teams with quota of 1/6 of total", () => {
-    const stats: Map<string, UserStatsAccumulator> = new Map([
+    const stats: Map<string, UserStats> = new Map([
       testTeamStat("foo", 10),
       testTeamStat("baz", 1),
       testTeamStat("bat", 1),
@@ -360,7 +358,7 @@ describe("finding top teams as partitions", () => {
     expect(partitioned!).toEqual(["foo", "foo", "foo"]);
   });
   test("won't include NO_TEAM team if not wanted, though NO_TEAM stats used in totalling", () => {
-    const stats: Map<string, UserStatsAccumulator> = new Map([
+    const stats: Map<string, UserStats> = new Map([
       testTeamStat("foo", 9),
       testTeamStat(NO_TEAM_SYMBOL, 3),
     ]);
@@ -373,7 +371,7 @@ describe("finding top teams as partitions", () => {
     expect(partitioned!).toEqual(["foo", "foo"]);
   });
   test("will include NO_TEAM team requested", () => {
-    const stats: Map<string, UserStatsAccumulator> = new Map([
+    const stats: Map<string, UserStats> = new Map([
       testTeamStat("foo", 9),
       testTeamStat(NO_TEAM_SYMBOL, 3),
     ]);
