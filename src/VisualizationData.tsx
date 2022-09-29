@@ -1,5 +1,5 @@
 import { HierarchyNode, interpolatePlasma, scaleSequential } from "d3";
-import { ReactElement } from "react";
+import { ReactElement, useId } from "react";
 
 import {
   creationKeyData,
@@ -36,6 +36,7 @@ import {
   TreeNode,
 } from "./polyglot_data.types";
 import {
+  Action,
   Config,
   PatternId,
   sortTeamsByName,
@@ -53,6 +54,7 @@ import { VizMetadata } from "./viz.types";
 interface Visualization {
   fillFn: (d: HierarchyNode<TreeNode>) => string;
   colourKey: () => [string, string][];
+  extraControls: () => ReactElement | undefined;
 }
 
 /**
@@ -67,13 +69,20 @@ abstract class BaseVisualization<ScaleUnit> implements Visualization {
   state: State;
   metadata: VizMetadata;
   features: FeatureFlags;
+  dispatch: React.Dispatch<Action> | undefined;
   /**
    * Constructs a Visualization.  Note these should be short-lived as state and metadata change all the time.
    */
-  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
+  constructor(
+    state: State,
+    metadata: VizMetadata,
+    features: FeatureFlags,
+    dispatch: React.Dispatch<Action> | undefined
+  ) {
     this.state = state;
     this.metadata = metadata;
     this.features = features;
+    this.dispatch = dispatch;
   }
 
   /**
@@ -101,6 +110,12 @@ abstract class BaseVisualization<ScaleUnit> implements Visualization {
    * The colour key as passed to the ColourKey component to show the key
    */
   abstract colourKey(): [string, string][];
+
+  /**
+   *  any extra controls to insert in the control panel */
+  extraControls(): ReactElement | undefined {
+    return undefined;
+  }
 
   /**
    * For a given node (directory or file), returns the colour used to fill that node.
@@ -153,7 +168,8 @@ export type VisualizationData = {
   buildVisualization: (
     state: State,
     metadata: VizMetadata,
-    features: FeatureFlags
+    features: FeatureFlags,
+    dispatch: React.Dispatch<Action> | undefined
   ) => Visualization;
 };
 
@@ -172,8 +188,13 @@ export function isParentVisualization(
 }
 
 class LanguageVisualization extends BaseVisualization<string> {
-  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
-    super(state, metadata, features);
+  constructor(
+    state: State,
+    metadata: VizMetadata,
+    features: FeatureFlags,
+    dispatch: React.Dispatch<Action> | undefined
+  ) {
+    super(state, metadata, features, dispatch);
   }
   dataFn(d: HierarchyNode<FileNode>): string {
     return nodeLanguage(d.data);
@@ -191,12 +212,23 @@ class LanguageVisualization extends BaseVisualization<string> {
       ["Other languages", otherColour],
     ];
   }
+
+  extraControls(): ReactElement | undefined {
+    {
+      return undefined;
+    }
+  }
 }
 
 class LinesOfCodeVisualization extends BaseVisualization<number> {
   scale: (v: number) => string | undefined;
-  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
-    super(state, metadata, features);
+  constructor(
+    state: State,
+    metadata: VizMetadata,
+    features: FeatureFlags,
+    dispatch: React.Dispatch<Action> | undefined
+  ) {
+    super(state, metadata, features, dispatch);
     this.scale = goodBadUglyScale(state.config, state.config.loc);
   }
   dataFn(d: HierarchyNode<FileNode>): number {
@@ -217,8 +249,13 @@ class LinesOfCodeVisualization extends BaseVisualization<number> {
 
 class NestingDepthVisualization extends BaseVisualization<number> {
   scale: (v: number) => string | undefined;
-  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
-    super(state, metadata, features);
+  constructor(
+    state: State,
+    metadata: VizMetadata,
+    features: FeatureFlags,
+    dispatch: React.Dispatch<Action> | undefined
+  ) {
+    super(state, metadata, features, dispatch);
     const { maxDepth } = this.metadata.stats;
     this.scale = scaleSequential(interpolatePlasma)
       .domain([0, maxDepth])
@@ -245,9 +282,10 @@ class IndentationVisualization extends BaseVisualization<number> {
     state: State,
     metadata: VizMetadata,
     features: FeatureFlags,
+    dispatch: React.Dispatch<Action> | undefined,
     metric: IndentationMetric
   ) {
-    super(state, metadata, features);
+    super(state, metadata, features, dispatch);
     this.metric = metric;
     this.scale = goodBadUglyScale(
       state.config,
@@ -273,8 +311,13 @@ class IndentationVisualization extends BaseVisualization<number> {
 class AgeVisualization extends BaseVisualization<number> {
   scale: (v: number) => string | undefined;
   features: FeatureFlags;
-  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
-    super(state, metadata, features);
+  constructor(
+    state: State,
+    metadata: VizMetadata,
+    features: FeatureFlags,
+    dispatch: React.Dispatch<Action> | undefined
+  ) {
+    super(state, metadata, features, dispatch);
     this.scale = goodBadUglyScale(state.config, state.config.age);
     this.features = features;
   }
@@ -299,8 +342,13 @@ class AgeVisualization extends BaseVisualization<number> {
 class CreationDateVisualization extends BaseVisualization<number> {
   scale: (v: number) => string | undefined;
   features: FeatureFlags;
-  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
-    super(state, metadata, features);
+  constructor(
+    state: State,
+    metadata: VizMetadata,
+    features: FeatureFlags,
+    dispatch: React.Dispatch<Action> | undefined
+  ) {
+    super(state, metadata, features, dispatch);
     this.scale = earlyLateScaleBuilder(state);
     this.features = features;
   }
@@ -321,8 +369,13 @@ class CreationDateVisualization extends BaseVisualization<number> {
 
 class NumberOfChangersVisualization extends BaseVisualization<number> {
   scale: (v: number) => string | undefined;
-  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
-    super(state, metadata, features);
+  constructor(
+    state: State,
+    metadata: VizMetadata,
+    features: FeatureFlags,
+    dispatch: React.Dispatch<Action> | undefined
+  ) {
+    super(state, metadata, features, dispatch);
     this.scale = numberOfChangersScale(state);
   }
   dataFn(d: HierarchyNode<FileNode>): number | undefined {
@@ -353,9 +406,10 @@ class ChurnVisualization extends BaseVisualization<number> {
     state: State,
     metadata: VizMetadata,
     features: FeatureFlags,
+    dispatch: React.Dispatch<Action> | undefined,
     metric: ChurnMetric
   ) {
-    super(state, metadata, features);
+    super(state, metadata, features, dispatch);
     this.metric = metric;
     this.scale = goodBadUglyScale(state.config, state.config.churn[metric]);
   }
@@ -385,10 +439,43 @@ class ChurnVisualization extends BaseVisualization<number> {
   }
 }
 
+const TeamExtraControls = ({
+  state,
+  dispatch,
+}: {
+  state: State;
+  dispatch: React.Dispatch<Action>;
+}) => {
+  const showNonTeamId = useId();
+  return (
+    <div>
+      <label htmlFor={showNonTeamId}>
+        Show changes by users without a team:&nbsp;
+        <input
+          type="checkbox"
+          id={showNonTeamId}
+          checked={state.config.teamVisualisation.showNonTeamChanges}
+          onChange={(evt) => {
+            dispatch({
+              type: "setShowNonTeamChanges",
+              payload: evt.target.checked,
+            });
+          }}
+        />
+      </label>
+    </div>
+  );
+};
+
 class TeamVisualization extends BaseVisualization<string> {
   scale: (v: string) => string | undefined;
-  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
-    super(state, metadata, features);
+  constructor(
+    state: State,
+    metadata: VizMetadata,
+    features: FeatureFlags,
+    dispatch: React.Dispatch<Action> | undefined
+  ) {
+    super(state, metadata, features, dispatch);
     this.scale = teamScale(state);
   }
   dataFn(d: HierarchyNode<FileNode>): string | undefined {
@@ -427,13 +514,30 @@ class TeamVisualization extends BaseVisualization<string> {
       return teamColours;
     }
   }
+
+  extraControls() {
+    if (this.dispatch) {
+      return (
+        <TeamExtraControls
+          state={this.state}
+          dispatch={this.dispatch}
+        ></TeamExtraControls>
+      );
+    }
+    return undefined;
+  }
 }
 
 class TeamPatternVisualization extends BaseVisualization<PatternId> {
   scale: (v: PatternId) => string | undefined = (v) => `url(#pattern${v})`;
 
-  constructor(state: State, metadata: VizMetadata, features: FeatureFlags) {
-    super(state, metadata, features);
+  constructor(
+    state: State,
+    metadata: VizMetadata,
+    features: FeatureFlags,
+    dispatch: React.Dispatch<Action> | undefined
+  ) {
+    super(state, metadata, features, dispatch);
   }
   dataFn(d: HierarchyNode<FileNode>): PatternId | undefined {
     const { svgPatternLookup } = this.state.calculated.svgPatterns;
@@ -459,6 +563,17 @@ class TeamPatternVisualization extends BaseVisualization<PatternId> {
       return teamColours;
     }
   }
+  extraControls() {
+    if (this.dispatch) {
+      return (
+        <TeamExtraControls
+          state={this.state}
+          dispatch={this.dispatch}
+        ></TeamExtraControls>
+      );
+    }
+    return undefined;
+  }
 }
 
 export const Visualizations: {
@@ -470,8 +585,8 @@ export const Visualizations: {
     help: <p>Shows the most common programming languages</p>,
     // dataFn: unHierarchyAdapter(nodeLanguage),
     // parentFn: blankParent,
-    buildVisualization(state, metadata, features) {
-      return new LanguageVisualization(state, metadata, features);
+    buildVisualization(state, metadata, features, dispatch) {
+      return new LanguageVisualization(state, metadata, features, dispatch);
     },
   },
   loc: {
@@ -489,16 +604,16 @@ export const Visualizations: {
         </p>
       </div>
     ),
-    buildVisualization(state, metadata, features) {
-      return new LinesOfCodeVisualization(state, metadata, features);
+    buildVisualization(state, metadata, features, dispatch) {
+      return new LinesOfCodeVisualization(state, metadata, features, dispatch);
     },
   },
   depth: {
     displayOrder: 2,
     title: "Nesting depth",
     help: <p>Shows nesting depth in the directory structure</p>,
-    buildVisualization(state, metadata, features) {
-      return new NestingDepthVisualization(state, metadata, features);
+    buildVisualization(state, metadata, features, dispatch) {
+      return new NestingDepthVisualization(state, metadata, features, dispatch);
     },
   },
   indentation: {
@@ -523,8 +638,14 @@ export const Visualizations: {
             </p>
           </div>
         ),
-        buildVisualization(state, metadata, features) {
-          return new IndentationVisualization(state, metadata, features, "sum");
+        buildVisualization(state, metadata, features, dispatch) {
+          return new IndentationVisualization(
+            state,
+            metadata,
+            features,
+            dispatch,
+            "sum"
+          );
         },
       },
       p99: {
@@ -544,8 +665,14 @@ export const Visualizations: {
             </p>
           </div>
         ),
-        buildVisualization(state, metadata, features) {
-          return new IndentationVisualization(state, metadata, features, "p99");
+        buildVisualization(state, metadata, features, dispatch) {
+          return new IndentationVisualization(
+            state,
+            metadata,
+            features,
+            dispatch,
+            "p99"
+          );
         },
       },
       stddev: {
@@ -564,11 +691,12 @@ export const Visualizations: {
             </p>
           </div>
         ),
-        buildVisualization(state, metadata, features) {
+        buildVisualization(state, metadata, features, dispatch) {
           return new IndentationVisualization(
             state,
             metadata,
             features,
+            dispatch,
             "stddev"
           );
         },
@@ -594,8 +722,8 @@ export const Visualizations: {
         </p>
       </div>
     ),
-    buildVisualization(state, metadata, features) {
-      return new AgeVisualization(state, metadata, features);
+    buildVisualization(state, metadata, features, dispatch) {
+      return new AgeVisualization(state, metadata, features, dispatch);
     },
   },
   creation: {
@@ -619,8 +747,8 @@ export const Visualizations: {
         </p>
       </div>
     ),
-    buildVisualization(state, metadata, features) {
-      return new CreationDateVisualization(state, metadata, features);
+    buildVisualization(state, metadata, features, dispatch) {
+      return new CreationDateVisualization(state, metadata, features, dispatch);
     },
   },
   numberOfChangers: {
@@ -641,8 +769,13 @@ export const Visualizations: {
         </p>
       </div>
     ),
-    buildVisualization(state, metadata, features) {
-      return new NumberOfChangersVisualization(state, metadata, features);
+    buildVisualization(state, metadata, features, dispatch) {
+      return new NumberOfChangersVisualization(
+        state,
+        metadata,
+        features,
+        dispatch
+      );
     },
   },
 
@@ -669,8 +802,14 @@ export const Visualizations: {
             </p>
           </div>
         ),
-        buildVisualization(state, metadata, features) {
-          return new ChurnVisualization(state, metadata, features, "days");
+        buildVisualization(state, metadata, features, dispatch) {
+          return new ChurnVisualization(
+            state,
+            metadata,
+            features,
+            dispatch,
+            "days"
+          );
         },
       },
       commits: {
@@ -689,8 +828,14 @@ export const Visualizations: {
             </p>
           </div>
         ),
-        buildVisualization(state, metadata, features) {
-          return new ChurnVisualization(state, metadata, features, "commits");
+        buildVisualization(state, metadata, features, dispatch) {
+          return new ChurnVisualization(
+            state,
+            metadata,
+            features,
+            dispatch,
+            "commits"
+          );
         },
       },
       lines: {
@@ -714,8 +859,14 @@ export const Visualizations: {
             </p>
           </div>
         ),
-        buildVisualization(state, metadata, features) {
-          return new ChurnVisualization(state, metadata, features, "lines");
+        buildVisualization(state, metadata, features, dispatch) {
+          return new ChurnVisualization(
+            state,
+            metadata,
+            features,
+            dispatch,
+            "lines"
+          );
         },
       },
     },
@@ -736,8 +887,8 @@ export const Visualizations: {
         </p>
       </div>
     ),
-    buildVisualization(state, metadata, features) {
-      return new TeamVisualization(state, metadata, features);
+    buildVisualization(state, metadata, features, dispatch) {
+      return new TeamVisualization(state, metadata, features, dispatch);
     },
   },
   teamPattern: {
@@ -759,8 +910,8 @@ export const Visualizations: {
         </p>
       </div>
     ),
-    buildVisualization(state, metadata, features) {
-      return new TeamPatternVisualization(state, metadata, features);
+    buildVisualization(state, metadata, features, dispatch) {
+      return new TeamPatternVisualization(state, metadata, features, dispatch);
     },
   },
 };

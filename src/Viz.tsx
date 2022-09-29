@@ -46,7 +46,8 @@ const redrawPolygons = (
   const visualization = getCurrentVis(config).buildVisualization(
     state,
     metadata,
-    features
+    features,
+    undefined
   );
 
   const strokeWidthFn = (d: HierarchyNode<TreeNode>) => {

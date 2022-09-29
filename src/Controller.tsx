@@ -8,7 +8,7 @@ import HelpPanel from "./HelpPanel";
 import SaveLoadControls from "./SaveLoadControls";
 import ToggleablePanel from "./ToggleablePanel";
 import UsersAndTeams from "./UsersAndTeams";
-import VisColourKey from "./VisColourKey";
+import VisControlPanel from "./VisControlPanel";
 import {
   isParentVisualization,
   VisualizationData,
@@ -342,11 +342,12 @@ const Controller = (props: DefaultProps) => {
       ) : (
         ""
       )}
-      <VisColourKey
+      <VisControlPanel
         vis={currentVisOrSub}
         state={state}
         metadata={metadata}
         features={features}
+        dispatch={dispatch}
       />
       {themeButton}
     </aside>
