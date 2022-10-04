@@ -8,6 +8,7 @@ import {
   numberOfChangersKeyData,
   singleTeamColourScaleKey,
 } from "./colourKeys";
+import { ColourPicker } from "./ColourPicker";
 import {
   earlyLateScaleBuilder,
   goodBadUglyScale,
@@ -453,20 +454,40 @@ const TeamExtraControls = ({
   const showNonTeamId = useId();
   return (
     <div>
-      <label htmlFor={showNonTeamId}>
-        Show changes by users without a team:&nbsp;
-        <input
-          type="checkbox"
-          id={showNonTeamId}
-          checked={state.config.teamVisualisation.showNonTeamChanges}
-          onChange={(evt) => {
-            dispatch({
-              type: "setShowNonTeamChanges",
-              payload: evt.target.checked,
-            });
-          }}
-        />
-      </label>
+      <div>
+        <label htmlFor={showNonTeamId}>
+          Show changes by users without a team:&nbsp;
+          <input
+            type="checkbox"
+            id={showNonTeamId}
+            checked={state.config.teamVisualisation.showNonTeamChanges}
+            onChange={(evt) => {
+              dispatch({
+                type: "setShowNonTeamChanges",
+                payload: evt.target.checked,
+              });
+            }}
+          />
+        </label>
+      </div>
+      {state.config.teamVisualisation.showNonTeamChanges ? (
+        <div>
+          <label>
+            No team colour:
+            <ColourPicker
+              colour={themedColours(state.config).teams.noTeamColour}
+              onChange={(newColour: string) => {
+                dispatch({
+                  type: "setColour",
+                  payload: { name: "teams.noTeamColour", value: newColour },
+                });
+              }}
+            ></ColourPicker>
+          </label>
+        </div>
+      ) : (
+        <></>
+      )}
     </div>
   );
 };
@@ -507,7 +528,34 @@ const SingleTeamExtraControls = ({
         </select>
       </label>
       <div>
-        Show more change as lighter colours?&nbsp;
+        <label>
+          This team:
+          <ColourPicker
+            colour={themedColours(state.config).teams.selectedTeamColour}
+            onChange={(newColour: string) => {
+              dispatch({
+                type: "setColour",
+                payload: { name: "teams.selectedTeamColour", value: newColour },
+              });
+            }}
+          ></ColourPicker>
+        </label>
+        <label>
+          {" "}
+          Other users:
+          <ColourPicker
+            colour={themedColours(state.config).teams.otherUsersColour}
+            onChange={(newColour: string) => {
+              dispatch({
+                type: "setColour",
+                payload: { name: "teams.otherUsersColour", value: newColour },
+              });
+            }}
+          ></ColourPicker>
+        </label>
+      </div>
+      <div>
+        Use lightness to show amount of change?&nbsp;
         <label htmlFor={showLevelAsLightnessId}>
           <input
             type="checkbox"
@@ -1054,7 +1102,16 @@ export const Visualizations: {
     help: (
       <div>
         <p>Shows the impact of a single team, relative to all other users</p>
-        <p>TODO: more help!</p>
+        <p>
+          If you select &ldquo;Use lightness to show amount of change?&rdquo;
+          then files with greater change are at selected colour, files with less
+          change will be darker.
+        </p>
+        <p>
+          You can set a cap to avoid too-dark visualisations - e.g. if the file
+          with the greatest number of commits has 1000 commits, setting the cap
+          to 10% will show 100 commits (or more) as fully bright.
+        </p>
         <p>
           The metric used is chosen in &ldquo;Advanced Settings&rdquo; above.
         </p>

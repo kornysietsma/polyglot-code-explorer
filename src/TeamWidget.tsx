@@ -10,7 +10,7 @@ export const TeamWidget = (props: {
 }) => {
   const { team, bodyText, hoverText } = props;
   const hsl = d3.hsl(d3.color(team.colour)!);
-  const textColour = hsl.l > 0.5 ? "black" : "white";
+  const textColour = hsl.l > 0.5 ? "#000000" : "#ffffff";
   return (
     <span
       className="teamWidget"
@@ -29,7 +29,7 @@ const NoTeamWidget = (props: {
 }) => {
   const { bodyText, hoverText, noTeamColour } = props;
   const hsl = d3.hsl(d3.color(noTeamColour)!);
-  const textColour = hsl.l > 0.5 ? "black" : "white";
+  const textColour = hsl.l > 0.5 ? "#000000" : "#ffffff";
   const fixedBodyText =
     bodyText == undefined
       ? undefined

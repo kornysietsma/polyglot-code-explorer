@@ -97,7 +97,7 @@ export function singleTeamScale(state: State) {
   ).teams;
   const { neutralColour } = themedColours(state.config);
 
-  const interpolator = d3.interpolateLab(selectedTeamColour, otherUsersColour);
+  const interpolator = d3.interpolateLab(otherUsersColour, selectedTeamColour);
   const max = fileMaxima[state.config.fileChangeMetric];
   return ([ownTotal, otherTotal]: [number, number]) => {
     const total = ownTotal + otherTotal;

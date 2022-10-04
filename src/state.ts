@@ -394,13 +394,13 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
       },
       numberOfChangers: {
         // more of a colour thing than a scale really
-        noChangersColour: "cyan",
-        oneChangerColour: "brown",
-        fewChangersMinColour: "green",
-        fewChangersMaxColour: "blue",
+        noChangersColour: "#00ffff",
+        oneChangerColour: "#a52a2a",
+        fewChangersMinColour: "#00ff00",
+        fewChangersMaxColour: "#0000ff",
         fewChangersMin: 2,
         fewChangersMax: 8, // this is a candidate to configure!
-        manyChangersColour: "yellow",
+        manyChangersColour: "#ffff00",
         manyChangersMax: 30, // starting to feel like a crowd
         precision: 0,
         topChangersCount: 10, // show this many changers in NodeInspector
@@ -423,11 +423,11 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
           defaultStroke: "#111111",
           selectedStroke: "#fffa00",
           couplingStroke: "#ff6300", // need to change the arrow colour as well if you change this!
-          goodColour: "blue",
-          badColour: "red",
-          uglyColour: "yellow",
-          earlyColour: "blue",
-          lateColour: "green",
+          goodColour: "#0000ff",
+          badColour: "#ff0000",
+          uglyColour: "#ffff00",
+          earlyColour: "#0000ff",
+          lateColour: "#00ff00",
           neutralColour: "#808080",
           nonexistentColour: "#111111",
           errorColour: "#ff0000",
@@ -448,11 +448,11 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
           defaultStroke: "#f7f7f7",
           selectedStroke: "#fffa00",
           couplingStroke: "#ff6300", // need to change the arrow colour as well if you change this!
-          goodColour: "blue",
-          badColour: "red",
-          uglyColour: "yellow",
-          earlyColour: "blue",
-          lateColour: "green",
+          goodColour: "#0000ff",
+          badColour: "#ff0000",
+          uglyColour: "#ffff00",
+          earlyColour: "#0000ff",
+          lateColour: "#00ff00",
           neutralColour: "#808080",
           nonexistentColour: "#f7f7f7",
           errorColour: "#ff0000",
@@ -733,6 +733,11 @@ interface SetShowLevelAsLightness {
   payload: boolean;
 }
 
+interface SetColour {
+  type: "setColour";
+  payload: { name: string; value: string };
+}
+
 interface SetLightnessCap {
   type: "setLightnessCap";
   payload: number;
@@ -766,6 +771,7 @@ export type Action =
   | SelectTeam
   | SetShowLevelAsLightness
   | SetLightnessCap
+  | SetColour
   | SetAllState;
 
 function updateStateFromAction(state: State, action: Action): State {
@@ -916,6 +922,16 @@ function updateStateFromAction(state: State, action: Action): State {
     }
     case "setAllState": {
       return action.payload;
+    }
+
+    case "setColour": {
+      const result = _.cloneDeep(state);
+      _.set(
+        themedColours(result.config),
+        action.payload.name,
+        action.payload.value
+      );
+      return result;
     }
 
     default: {

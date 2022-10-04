@@ -73,7 +73,7 @@ const initialPageState: () => UsersAndTeamsPageState = () => {
     showCheckedUsers: false,
     importMessages: [],
     colourScheme: 0,
-    noTeamColour: "black",
+    noTeamColour: "#ffffff",
   };
 };
 
