@@ -17,6 +17,7 @@ import {
   teamScale,
 } from "./ColourScales";
 import DelayedInputRange from "./DelayedInputRange";
+import { FileChangeMetricChooser } from "./FileChangeMetricChooser";
 import {
   nodeAge,
   nodeChurnCommits,
@@ -488,6 +489,7 @@ const TeamExtraControls = ({
       ) : (
         <></>
       )}
+      <FileChangeMetricChooser state={state} dispatch={dispatch} />
     </div>
   );
 };
@@ -587,6 +589,7 @@ const SingleTeamExtraControls = ({
       ) : (
         <></>
       )}
+      <FileChangeMetricChooser state={state} dispatch={dispatch} />
     </div>
   );
 };
@@ -1063,9 +1066,6 @@ export const Visualizations: {
           Shows the team who has made the most changes in the selected date
           range
         </p>
-        <p>
-          The metric used is chosen in &ldquo;Advanced Settings&rdquo; above.
-        </p>
       </div>
     ),
     buildVisualization(state, metadata, features, dispatch) {
@@ -1085,9 +1085,6 @@ export const Visualizations: {
         <p>
           If one team has made 2/3 of changes, and another 1/3, they will get 2
           and 1 stripes in the pattern
-        </p>
-        <p>
-          The metric used is chosen in &ldquo;Advanced Settings&rdquo; above.
         </p>
       </div>
     ),
@@ -1111,9 +1108,6 @@ export const Visualizations: {
           You can set a cap to avoid too-dark visualisations - e.g. if the file
           with the greatest number of commits has 1000 commits, setting the cap
           to 10% will show 100 commits (or more) as fully bright.
-        </p>
-        <p>
-          The metric used is chosen in &ldquo;Advanced Settings&rdquo; above.
         </p>
       </div>
     ),

@@ -2,12 +2,18 @@ import React from "react";
 
 import ToggleablePanel from "./ToggleablePanel";
 
-const HelpPanel = ({ children }: { children: React.ReactNode }) => {
+const HelpPanel = ({
+  children,
+  buttonText,
+}: {
+  children: React.ReactNode;
+  buttonText?: string;
+}) => {
   return (
     <ToggleablePanel
       title=""
       showInitially={false}
-      showText="help"
+      showText={buttonText ?? "help"}
       borderlessIfHidden={true}
     >
       {children}
