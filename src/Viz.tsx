@@ -579,7 +579,10 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
       !_.isEqual(prevState.expensiveConfig, expensiveConfig)
     ) {
       console.log("expensive config change - rebuild all");
+      console.time("redraw");
       draw(d3Container, data.tree, metadata, features, state, dispatch);
+      console.timeEnd("redraw");
+      console.time("redrawTimescale");
       drawTimescale(
         d3TimescaleContainer,
         timescaleData,
@@ -587,11 +590,14 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
         state,
         debouncedDispatch
       );
+      console.timeEnd("redrawTimescale");
       updateBodyTheme(state.config.colours.currentTheme);
     } else {
       if (!_.isEqual(prevState.config, config)) {
         console.log("cheap config change - just redraw");
+        console.time("update");
         update(d3Container, data.tree, metadata, features, state);
+        console.timeEnd("update");
         if (
           prevState.config.colours.currentTheme !==
           state.config.colours.currentTheme
@@ -601,7 +607,9 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
       }
       if (!_.isEqual(prevState.couplingConfig, couplingConfig)) {
         console.log("coupling change");
+        console.time("update coupling");
         updateCoupling(d3Container, data.tree, metadata, state, dispatch);
+        console.timeEnd("update coupling");
       }
     }
   }, [dataRef, state, dispatch, debouncedDispatch, prevState]);

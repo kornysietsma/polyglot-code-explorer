@@ -142,11 +142,6 @@ export function gatherGlobalStats(data: PolyglotData) {
     latest: undefined,
     maxDepth: 0,
     maxLoc: 0,
-    churn: {
-      maxLines: 0,
-      maxCommits: 0,
-      maxDays: 0,
-    },
   };
   return gatherNodeStats(data.tree, data.features, statsSoFar, 0);
 }

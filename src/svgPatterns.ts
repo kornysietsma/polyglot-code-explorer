@@ -146,7 +146,7 @@ export function calculateSvgPatterns(
   const { userTeams } = state.calculated;
   const { earliest, latest } = config.filters.dateRange;
   const { showNonTeamChanges } = config.teamVisualisation;
-  const noTeamColour = themedColours(config).noTeamColour;
+  const noTeamColour = themedColours(config).teams.noTeamColour;
 
   console.time("calculating svg patterns");
   const svgPatternIds: Map<ColourKey, PatternId> = new Map();

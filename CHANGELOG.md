@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 
 - Visualisations can have extra controls in the control panel
+- new Single Team Impact visualisation, to show the impact of a single team
 
 ## [0.6.0] - 2022-09-28
 

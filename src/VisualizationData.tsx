@@ -6,13 +6,16 @@ import {
   depthKey,
   goodBadUglyColourKeyData,
   numberOfChangersKeyData,
+  singleTeamColourScaleKey,
 } from "./colourKeys";
 import {
   earlyLateScaleBuilder,
   goodBadUglyScale,
   numberOfChangersScale,
+  singleTeamScale,
   teamScale,
 } from "./ColourScales";
+import DelayedInputRange from "./DelayedInputRange";
 import {
   nodeAge,
   nodeChurnCommits,
@@ -25,6 +28,7 @@ import {
   nodeIndentation,
   nodeLanguage,
   nodeNumberOfChangers,
+  nodeSingleTeam,
   nodeTopTeam,
 } from "./nodeData";
 import {
@@ -467,6 +471,78 @@ const TeamExtraControls = ({
   );
 };
 
+const SingleTeamExtraControls = ({
+  state,
+  dispatch,
+}: {
+  state: State;
+  dispatch: React.Dispatch<Action>;
+}) => {
+  const teamSelectionId = useId();
+  const showLevelAsLightnessId = useId();
+  return (
+    <div>
+      <label htmlFor={teamSelectionId}>
+        Select team:
+        <select
+          id={teamSelectionId}
+          value={state.config.teamVisualisation.selectedTeam ?? ""}
+          onChange={(evt) => {
+            dispatch({
+              type: "selectTeam",
+              payload: evt.target.value,
+            });
+          }}
+        >
+          <option key="" value="">
+            Please choose a team
+          </option>
+          {[...state.config.teamsAndAliases.teams.keys()]
+            .sort()
+            .map((teamName) => (
+              <option key={teamName} value={teamName}>
+                {teamName}
+              </option>
+            ))}
+        </select>
+      </label>
+      <div>
+        Show more change as lighter colours?&nbsp;
+        <label htmlFor={showLevelAsLightnessId}>
+          <input
+            type="checkbox"
+            id={showLevelAsLightnessId}
+            checked={state.config.teamVisualisation.showLevelAsLightness}
+            onChange={(evt) => {
+              dispatch({
+                type: "setShowLevelAsLightness",
+                payload: evt.target.checked,
+              });
+            }}
+          />
+        </label>
+      </div>
+      {state.config.teamVisualisation.showLevelAsLightness ? (
+        <DelayedInputRange
+          value={state.config.teamVisualisation.lightnessCap * 100}
+          minValue={1}
+          maxValue={100}
+          label={"Lightness Cap:"}
+          onChange={(oldValue: number, newValue: number) => {
+            dispatch({
+              type: "setLightnessCap",
+              payload: newValue / 100,
+            });
+          }}
+          postLabel={(value: number) => `${Math.trunc(value)}%`}
+        ></DelayedInputRange>
+      ) : (
+        <></>
+      )}
+    </div>
+  );
+};
+
 class TeamVisualization extends BaseVisualization<string> {
   scale: (v: string) => string | undefined;
   constructor(
@@ -507,7 +583,10 @@ class TeamVisualization extends BaseVisualization<string> {
       .map(([name, team]) => [name, team.colour]);
     if (this.state.config.teamVisualisation.showNonTeamChanges) {
       return [
-        ["Users with no team", themedColours(this.state.config).noTeamColour],
+        [
+          "Users with no team",
+          themedColours(this.state.config).teams.noTeamColour,
+        ],
         ...teamColours,
       ];
     } else {
@@ -556,7 +635,10 @@ class TeamPatternVisualization extends BaseVisualization<PatternId> {
       .map(([name, team]) => [name, team.colour]);
     if (this.state.config.teamVisualisation.showNonTeamChanges) {
       return [
-        ["Users with no team", themedColours(this.state.config).noTeamColour],
+        [
+          "Users with no team",
+          themedColours(this.state.config).teams.noTeamColour,
+        ],
         ...teamColours,
       ];
     } else {
@@ -570,6 +652,57 @@ class TeamPatternVisualization extends BaseVisualization<PatternId> {
           state={this.state}
           dispatch={this.dispatch}
         ></TeamExtraControls>
+      );
+    }
+    return undefined;
+  }
+}
+
+// The key of SingleTeamVisualisation is [own count, other count]
+class SingleTeamVisualization extends BaseVisualization<[number, number]> {
+  scale: (v: [number, number]) => string | undefined;
+  constructor(
+    state: State,
+    metadata: VizMetadata,
+    features: FeatureFlags,
+    dispatch: React.Dispatch<Action> | undefined
+  ) {
+    super(state, metadata, features, dispatch);
+    this.scale = singleTeamScale(state);
+  }
+  dataFn(d: HierarchyNode<FileNode>): [number, number] | undefined {
+    const { aliases, ignoredUsers } = this.state.config.teamsAndAliases;
+    const { userTeams } = this.state.calculated;
+    const { earliest, latest } = this.state.config.filters.dateRange;
+    const thisTeam = this.state.config.teamVisualisation.selectedTeam;
+    if (thisTeam == undefined) return undefined;
+    return nodeSingleTeam(
+      d.data,
+      thisTeam,
+      this.state.config.fileChangeMetric,
+      aliases,
+      ignoredUsers,
+      userTeams,
+      earliest,
+      latest
+    );
+  }
+  parentFn(): [number, number] | undefined {
+    // TODO: implement this!
+    return undefined;
+  }
+
+  colourKey(): [string, string][] {
+    return singleTeamColourScaleKey(this.scale, this.state);
+  }
+
+  extraControls() {
+    if (this.dispatch) {
+      return (
+        <SingleTeamExtraControls
+          state={this.state}
+          dispatch={this.dispatch}
+        ></SingleTeamExtraControls>
       );
     }
     return undefined;
@@ -912,6 +1045,23 @@ export const Visualizations: {
     ),
     buildVisualization(state, metadata, features, dispatch) {
       return new TeamPatternVisualization(state, metadata, features, dispatch);
+    },
+  },
+  singleTeam: {
+    displayOrder: 10,
+    title: "Single Team Impact",
+    featureCheck: (features: FeatureFlags) => features.git,
+    help: (
+      <div>
+        <p>Shows the impact of a single team, relative to all other users</p>
+        <p>TODO: more help!</p>
+        <p>
+          The metric used is chosen in &ldquo;Advanced Settings&rdquo; above.
+        </p>
+      </div>
+    ),
+    buildVisualization(state, metadata, features, dispatch) {
+      return new SingleTeamVisualization(state, metadata, features, dispatch);
     },
   },
 };

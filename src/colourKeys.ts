@@ -98,3 +98,41 @@ export function numberOfChangersKeyData(
   }
   return key;
 }
+
+export function singleTeamColourScaleKey(
+  scale: (v: [number, number]) => string | undefined,
+  state: State
+): [string, string][] {
+  const { lightnessCap, showLevelAsLightness } = state.config.teamVisualisation;
+  const { fileChangeMetric } = state.config;
+
+  const key: [string, string][] = [];
+
+  const max = state.calculated.fileMaxima[fileChangeMetric];
+  const errorColour = themedErrorColour(state.config);
+
+  const blendPoints = 10;
+  const divisor = showLevelAsLightness ? lightnessCap : 1;
+
+  for (let n = 0; n <= blendPoints; n++) {
+    const thisValue = ((n / blendPoints) * max) / divisor;
+    const otherValue = ((1 - n / blendPoints) * max) / divisor;
+    key.push([
+      `${n * blendPoints}% this team`,
+      scale([thisValue, otherValue]) ?? errorColour,
+    ]);
+  }
+  if (lightnessCap && showLevelAsLightness) {
+    const limit = lightnessCap < 1 ? max * lightnessCap : max;
+    const boostPoints = 10;
+    for (let n = 0; n <= boostPoints; n++) {
+      const thisValue = (n / boostPoints) * limit;
+      key.push([
+        `${Math.floor(thisValue)} ${fileChangeMetric}`,
+        scale([thisValue, 0]) ?? errorColour,
+      ]);
+    }
+  }
+
+  return key;
+}

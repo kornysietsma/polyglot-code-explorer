@@ -342,7 +342,7 @@ const EditAlias = (props: Props) => {
                 <td>{user.email}</td>
                 <td>{user.files}</td>
                 <td>{user.commits}</td>
-                <td>{user.days}</td>
+                <td>{user.days.size}</td>
                 <td>{user.lines}</td>
               </tr>
             );

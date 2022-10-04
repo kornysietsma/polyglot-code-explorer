@@ -25,11 +25,6 @@ export type TreeStats = {
   latest?: number;
   maxDepth: number;
   maxLoc: number;
-  churn: {
-    maxLines: number;
-    maxCommits: number;
-    maxDays: number;
-  };
   coupling?: CouplingStats;
 };
 

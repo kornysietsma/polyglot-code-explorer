@@ -245,7 +245,7 @@ const UsersAndTeams = (props: DefaultProps) => {
       teams,
       ignoredUsers,
       teamStats: teamStats ?? new Map(),
-      noTeamColour: themedColours(state.config).noTeamColour,
+      noTeamColour: themedColours(state.config).teams.noTeamColour,
     });
 
     setIsOpen(true);

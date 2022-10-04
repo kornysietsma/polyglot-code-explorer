@@ -14,7 +14,9 @@ import {
 } from "./polyglot_data.types";
 import {
   FileChangeMetric,
+  FileMaxima,
   possiblyAlias,
+  State,
   UserAliases,
   UserTeams,
 } from "./state";
@@ -114,6 +116,9 @@ function filterDetailsIgnoringUsers(
   details: GitDetails[],
   ignoredUsers: Set<number>
 ): GitDetails[] {
+  if (ignoredUsers.size == 0) {
+    return details;
+  }
   return details
     .map((detail) => {
       const notIgnoredUsers = detail.users.filter((u) => !ignoredUsers.has(u));
@@ -208,21 +213,22 @@ export function nodeChurnData(
   if (!details) return undefined;
   let totalLines = 0;
   let totalCommits = 0;
-  const totalDays = details.length;
+  const totalDays = new Set<number>();
   details.forEach((d) => {
     const changeSize = d.lines_added + d.lines_deleted;
     totalCommits += d.commits;
     totalLines += changeSize;
+    totalDays.add(d.commit_day);
   });
   const duration = (latest - earliest) / (24 * 60 * 60);
 
   return {
     totalLines,
     totalCommits,
-    totalDays,
+    totalDays: totalDays.size,
     fractionalLines: totalLines / duration,
     fractionalCommits: totalCommits / duration,
-    fractionalDays: totalDays / duration,
+    fractionalDays: totalDays.size / duration,
   };
 }
 
@@ -580,6 +586,68 @@ export function topTeamsPartitioned(
   return results.sort();
 }
 
+export function nodeSingleTeam(
+  node: FileNode,
+  thisTeamName: string,
+  metric: FileChangeMetric,
+  aliases: UserAliases,
+  ignoredUsers: Set<number>,
+  userTeams: UserTeams,
+  earliest: number,
+  latest: number
+): [ownContribution: number, otherContribution: number] | undefined {
+  const details = nodeChangeDetails(node, ignoredUsers, earliest, latest);
+  if (!details || details.length == 0) return undefined;
+
+  const myStats: UserStats = {
+    commits: 0,
+    lines: 0,
+    days: new Set(),
+    files: 0,
+  };
+  const otherStats: UserStats = {
+    commits: 0,
+    lines: 0,
+    days: new Set(),
+    files: 0,
+  };
+
+  details.forEach(
+    ({ users, commits, lines_added, lines_deleted, commit_day }) => {
+      // this change counts to the current team if any users are in the team
+      const isThisTeam =
+        users.find((user) => {
+          const realUser = possiblyAlias(aliases, user);
+          const teams = userTeams.get(realUser);
+          if (teams == undefined) return false;
+          return teams.has(thisTeamName);
+        }) != undefined;
+      if (isThisTeam) {
+        myStats.commits += commits;
+        myStats.lines += lines_added + lines_deleted;
+        myStats.days.add(commit_day);
+        myStats.files = 1;
+      } else {
+        otherStats.commits += commits;
+        otherStats.lines += lines_added + lines_deleted;
+        otherStats.days.add(commit_day);
+        otherStats.files = 1;
+      }
+    }
+  );
+  switch (metric) {
+    case "commits":
+      return [myStats.commits, otherStats.commits];
+    case "lines":
+      return [myStats.lines, otherStats.lines];
+    case "days":
+      return [myStats.days.size, otherStats.days.size];
+    case "files":
+      // kind of pointless?
+      return [myStats.files, otherStats.files];
+  }
+}
+
 function addUserStats(
   userStats: Map<number, UserStats>,
   node: TreeNode,
@@ -721,4 +789,51 @@ export function aggregateTeamStats(
     includeNonTeamChanges
   );
   return teamStats;
+}
+
+export function findMaxima(
+  node: TreeNode,
+  maxima: FileMaxima,
+  ignoredUsers: Set<number>,
+  earliest: number,
+  latest: number
+): void {
+  if (isFile(node)) {
+    const details = nodeChangeDetails(node, ignoredUsers, earliest, latest);
+    if (!details) return undefined;
+    maxima.files = 1;
+    let totalLines = 0;
+    let totalCommits = 0;
+    const totalDays = new Set<number>();
+    details.forEach((d) => {
+      const changeSize = d.lines_added + d.lines_deleted;
+      totalCommits += d.commits;
+      totalLines += changeSize;
+      totalDays.add(d.commit_day);
+    });
+    if (totalLines > maxima.lines) {
+      maxima.lines = totalLines;
+    }
+    if (totalCommits > maxima.commits) {
+      maxima.commits = totalCommits;
+    }
+    if (totalDays.size > maxima.days) {
+      maxima.days = totalDays.size;
+    }
+  } else {
+    node.children.forEach((child) => {
+      findMaxima(child, maxima, ignoredUsers, earliest, latest);
+    });
+  }
+}
+
+export function calculateFileMaxima(state: State, tree: TreeNode): FileMaxima {
+  const { config } = state;
+  const { ignoredUsers } = config.teamsAndAliases;
+
+  const { earliest, latest } = config.filters.dateRange;
+  const maxima: FileMaxima = { days: 0, commits: 0, lines: 0, files: 0 };
+  findMaxima(tree, maxima, ignoredUsers, earliest, latest);
+  console.log("found maxima:", maxima);
+  return maxima;
 }

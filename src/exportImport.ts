@@ -28,7 +28,7 @@ import {
 import { VizMetadata } from "./viz.types";
 
 /** the version of the format file - changes whenever state format changes */
-export const FORMAT_FILE_VERSION = "1.3.5";
+export const FORMAT_FILE_VERSION = "1.4.1";
 
 /** User data can be saved on it's own, in which case it has it's own format version */
 export const FORMAT_FILE_USER_VERSION = "1.3.4";
@@ -230,9 +230,11 @@ export function stateFromExportable(
       couplingConfig: exportableState.couplingConfig,
       expensiveConfig: exportableState.expensiveConfig,
       calculated: {
+        forceRecalculateAll: true,
         // calculated in dispatcher
         userTeams: new Map(),
         svgPatterns: { svgPatternIds: new Map(), svgPatternLookup: new Map() },
+        fileMaxima: { lines: 0, days: 0, commits: 0, files: 0 },
       },
       messages,
     };

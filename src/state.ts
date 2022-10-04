@@ -2,6 +2,7 @@ import * as d3 from "d3";
 import _ from "lodash";
 import moment from "moment";
 
+import { calculateFileMaxima } from "./nodeData";
 import { UserData } from "./polyglot_data.types";
 import { calculateSvgPatterns } from "./svgPatterns";
 import { isParentVisualization, Visualizations } from "./VisualizationData";
@@ -107,6 +108,9 @@ export type Config = {
   };
   teamVisualisation: {
     showNonTeamChanges: boolean; // do we show non-team changes when they exceed team changes?
+    selectedTeam: string | undefined;
+    showLevelAsLightness: boolean; // do we scale lightness by amount of change?
+    lightnessCap: number; // scale for lightness in dark places
   };
   teamsAndAliases: TeamsAndAliases;
   colours: {
@@ -123,7 +127,11 @@ export type Config = {
       neutralColour: string;
       nonexistentColour: string;
       errorColour: string; // used for logic errors - should never appear
-      noTeamColour: string; // when a file is changed by users not in teams
+      teams: {
+        noTeamColour: string; // when a file is changed by users not in teams
+        selectedTeamColour: string;
+        otherUsersColour: string;
+      };
       circlePackBackground: string;
       ownerColours: {
         noOwnersColour: string;
@@ -144,7 +152,11 @@ export type Config = {
       neutralColour: string;
       nonexistentColour: string;
       errorColour: string; // used for logic errors - should never appear
-      noTeamColour: string; // when a file is changed by users not in teams
+      teams: {
+        noTeamColour: string; // when a file is changed by users not in teams
+        selectedTeamColour: string;
+        otherUsersColour: string;
+      };
       circlePackBackground: string;
       ownerColours: {
         noOwnersColour: string;
@@ -196,10 +208,24 @@ export function coloursToColourKey(colours: string[]): ColourKey {
   return colours.join("\t");
 }
 
+export type FileMaxima = {
+  days: number;
+  commits: number;
+  lines: number;
+  files: number;
+};
+
 export type CalculatedState = {
+  // if set to true, always recalculate (and set flag back to false!)
+  // this is a bit of a hack, but sometimes easier than fiddling with
+  // diffing state
+  forceRecalculateAll: boolean;
   // team lookup for each user, calculated whenever teams or aliases change
   // aliased users will have no teams
   userTeams: UserTeams;
+  // maximum level of change per file in selected range
+  // used for single team vis, and maybe should be for churn?
+  fileMaxima: FileMaxima;
   svgPatterns: {
     // SVG patterns are pre-calculated as we need the IDs before we draw
     // for each (calculated) ColourKey, stores the pattern ID (sequential unique numbers)
@@ -381,6 +407,9 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
       },
       teamVisualisation: {
         showNonTeamChanges: true,
+        selectedTeam: undefined,
+        showLevelAsLightness: true,
+        lightnessCap: 1,
       },
       teamsAndAliases: {
         teams: new Map(),
@@ -402,7 +431,11 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
           neutralColour: "#808080",
           nonexistentColour: "#111111",
           errorColour: "#ff0000",
-          noTeamColour: "#8080ff",
+          teams: {
+            noTeamColour: "#8080ff",
+            selectedTeamColour: "#00ff00",
+            otherUsersColour: "#ff0000",
+          },
           circlePackBackground: "#111111",
           ownerColours: {
             noOwnersColour: "#222222",
@@ -423,7 +456,11 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
           neutralColour: "#808080",
           nonexistentColour: "#f7f7f7",
           errorColour: "#ff0000",
-          noTeamColour: "#8080ff",
+          teams: {
+            noTeamColour: "#8080ff",
+            selectedTeamColour: "#00ffff",
+            otherUsersColour: "#ff0000",
+          },
           circlePackBackground: "#f7f7f7",
           ownerColours: {
             noOwnersColour: "#f7f7f7",
@@ -460,7 +497,14 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
     },
     calculated: {
       // this is mostly for state calculated in the postProcessState stage, based on data
+      forceRecalculateAll: true,
       userTeams: new Map(),
+      fileMaxima: {
+        lines: 0,
+        commits: 0,
+        days: 0,
+        files: 0,
+      },
       svgPatterns: {
         svgPatternIds: new Map(),
         svgPatternLookup: new Map(),
@@ -473,8 +517,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
       `Loaded data file: ${data.name} version ${data.version} ID ${data.id}`
     )
   );
-  // could precalculate ownerData here - but it isn't needed until you select the 'owners' visualisation
-  return defaults;
+  return postprocessState(initialDataRef, defaults, defaults);
 }
 
 function themedColours(config: Config) {
@@ -511,12 +554,20 @@ function postprocessState(
   console.time("postprocessing state");
   let resultingState = newState;
   let alreadyCloned = false; // if we modify state, need to clone it - but only once!
+  const force = newState.calculated.forceRecalculateAll;
+  const datesChanged = !_.isEqual(
+    oldState.config.filters.dateRange,
+    resultingState.config.filters.dateRange
+  );
   if (
+    force ||
+    datesChanged ||
     !_.isEqual(
       resultingState.config.teamsAndAliases,
       oldState.config.teamsAndAliases
     )
   ) {
+    console.time("postprocessing - building user teams");
     if (!alreadyCloned) {
       resultingState = _.cloneDeep(resultingState);
       alreadyCloned = true;
@@ -524,10 +575,20 @@ function postprocessState(
     resultingState.calculated.userTeams = buildUserTeams(
       resultingState.config.teamsAndAliases.teams
     );
+    console.timeEnd("postprocessing - building user teams");
   }
-  if (newState.config.visualization == "teamPattern") {
+  if (force || datesChanged) {
+    console.time("postprocessing - file maxima");
+    resultingState.calculated.fileMaxima = calculateFileMaxima(
+      resultingState,
+      dataRef.current.data.tree
+    );
+    console.timeEnd("postprocessing - file maxima");
+  }
+  if (force || newState.config.visualization == "teamPattern") {
     console.time("checking for svg state change");
     if (
+      force ||
       oldState.config.visualization != newState.config.visualization ||
       !_.isEqual(
         oldState.config.teamVisualisation,
@@ -537,14 +598,14 @@ function postprocessState(
         oldState.config.teamsAndAliases,
         newState.config.teamsAndAliases
       ) ||
-      !_.isEqual(oldState.config.filters, newState.config.filters) ||
+      datesChanged ||
       oldState.config.teamVisualisation.showNonTeamChanges !=
         newState.config.teamVisualisation.showNonTeamChanges ||
-      themedColours(oldState.config).noTeamColour !=
-        themedColours(newState.config).noTeamColour
+      themedColours(oldState.config).teams !=
+        themedColours(newState.config).teams
     ) {
       console.timeEnd("checking for svg state change");
-      console.time("precalculating svg patterns");
+      console.time("postprocessing - svg patterns");
       if (!alreadyCloned) {
         resultingState = _.cloneDeep(resultingState);
         alreadyCloned = true;
@@ -553,10 +614,17 @@ function postprocessState(
         resultingState,
         dataRef.current.data
       );
-      console.timeEnd("precalculating svg patterns");
+      console.time("postprocessing - svg patterns");
     } else {
       console.timeEnd("checking for svg state change");
     }
+  }
+  if (force) {
+    if (!alreadyCloned) {
+      resultingState = _.cloneDeep(resultingState);
+      alreadyCloned = true;
+    }
+    resultingState.calculated.forceRecalculateAll = false;
   }
   console.timeEnd("postprocessing state");
   return resultingState;
@@ -655,6 +723,21 @@ interface SetShowNonTeamChanges {
   payload: boolean;
 }
 
+interface SelectTeam {
+  type: "selectTeam";
+  payload: string;
+}
+
+interface SetShowLevelAsLightness {
+  type: "setShowLevelAsLightness";
+  payload: boolean;
+}
+
+interface SetLightnessCap {
+  type: "setLightnessCap";
+  payload: number;
+}
+
 interface SetAllState {
   type: "setAllState";
   payload: State;
@@ -680,6 +763,9 @@ export type Action =
   | SetUserTeamAliasData
   | SetFileChangeMetric
   | SetShowNonTeamChanges
+  | SelectTeam
+  | SetShowLevelAsLightness
+  | SetLightnessCap
   | SetAllState;
 
 function updateStateFromAction(state: State, action: Action): State {
@@ -793,8 +879,9 @@ function updateStateFromAction(state: State, action: Action): State {
       result.config.teamsAndAliases.aliases = action.payload.aliases;
       result.config.teamsAndAliases.ignoredUsers = action.payload.ignoredUsers;
       result.config.teamsAndAliases.aliasData = action.payload.aliasData;
-      result.config.colours[result.config.colours.currentTheme].noTeamColour =
-        action.payload.noTeamColour;
+      result.config.colours[
+        result.config.colours.currentTheme
+      ].teams.noTeamColour = action.payload.noTeamColour;
 
       return result;
     }
@@ -811,8 +898,25 @@ function updateStateFromAction(state: State, action: Action): State {
       return result;
     }
 
-    case "setAllState":
+    case "selectTeam": {
+      const newTeam = action.payload == "" ? undefined : action.payload;
+      const result = _.cloneDeep(state);
+      result.config.teamVisualisation.selectedTeam = newTeam;
+      return result;
+    }
+    case "setShowLevelAsLightness": {
+      const result = _.cloneDeep(state);
+      result.config.teamVisualisation.showLevelAsLightness = action.payload;
+      return result;
+    }
+    case "setLightnessCap": {
+      const result = _.cloneDeep(state);
+      result.config.teamVisualisation.lightnessCap = action.payload;
+      return result;
+    }
+    case "setAllState": {
       return action.payload;
+    }
 
     default: {
       const impossible: never = action; // this will cause an error if an Action type isn't handled above

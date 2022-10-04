@@ -62,7 +62,7 @@ export function teamOrNoTeamWidget(
   hoverText?: string
 ) {
   if (teamName == NO_TEAM_SYMBOL) {
-    const colour = themedColours(state.config).noTeamColour;
+    const colour = themedColours(state.config).teams.noTeamColour;
     return (
       <NoTeamWidget
         key={key}

@@ -82,9 +82,37 @@ export function teamScale(state: State) {
     */
   return (teamName: string) => {
     if (teamName == NO_TEAM_SYMBOL) {
-      return themedColours(state.config).noTeamColour;
+      return themedColours(state.config).teams.noTeamColour;
     }
     const teamData = state.config.teamsAndAliases.teams.get(teamName);
     return teamData?.colour;
+  };
+}
+
+export function singleTeamScale(state: State) {
+  const { fileMaxima } = state.calculated;
+  const { showLevelAsLightness, lightnessCap } = state.config.teamVisualisation;
+  const { selectedTeamColour, otherUsersColour } = themedColours(
+    state.config
+  ).teams;
+  const { neutralColour } = themedColours(state.config);
+
+  const interpolator = d3.interpolateLab(selectedTeamColour, otherUsersColour);
+  const max = fileMaxima[state.config.fileChangeMetric];
+  return ([ownTotal, otherTotal]: [number, number]) => {
+    const total = ownTotal + otherTotal;
+    if (total <= 0) {
+      return neutralColour;
+    }
+    const ownProportion = ownTotal / (ownTotal + otherTotal);
+
+    const colour = interpolator(ownProportion);
+    if (showLevelAsLightness) {
+      const limit = lightnessCap < 1 ? max * lightnessCap : max;
+      const hsl = d3.hsl(colour);
+      hsl.l = Math.min((total / limit) * 0.5, 0.5);
+      return hsl.formatHex();
+    }
+    return colour;
   };
 }
