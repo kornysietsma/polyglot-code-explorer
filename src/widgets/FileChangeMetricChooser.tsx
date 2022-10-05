@@ -1,7 +1,7 @@
 import React from "react";
 
+import { Action, FileChangeMetric, State } from "../state";
 import HelpPanel from "./HelpPanel";
-import { Action, FileChangeMetric, State } from "./state";
 
 export const FileChangeMetricChooser = ({
   state,

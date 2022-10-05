@@ -2,9 +2,7 @@ import "./NodeInspector.css";
 
 import React from "react";
 
-import CouplingInspector from "./CouplingInspector";
-import { humanizeDate, humanizeDays } from "./datetimes";
-import NodeChangeInspector from "./NodeChangeInspector";
+import { humanizeDate, humanizeDays } from "../datetimes";
 import {
   ChurnData,
   nodeAge,
@@ -15,18 +13,20 @@ import {
   nodeLocData,
   nodeRemoteHead,
   nodeRemoteUrl,
-} from "./nodeData";
-import PathInspector from "./PathInspector";
+} from "../nodeData";
 import {
   FeatureFlags,
   FileNode,
   isDirectory,
   TreeNode,
-} from "./polyglot_data.types";
+} from "../polyglot_data.types";
+import { Action, State } from "../state";
+import { VizMetadata } from "../viz.types";
+import ToggleablePanel from "../widgets/ToggleablePanel";
+import CouplingInspector from "./CouplingInspector";
+import NodeChangeInspector from "./NodeChangeInspector";
+import PathInspector from "./PathInspector";
 import SourceCodeInspector from "./SourceCodeInspector";
-import { Action, State } from "./state";
-import ToggleablePanel from "./ToggleablePanel";
-import { VizMetadata } from "./viz.types";
 
 function findGitUrl(node: TreeNode, remoteUrlTemplate: string) {
   let suffix = node.name;

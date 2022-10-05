@@ -4,10 +4,7 @@ import { useId, useMemo } from "react";
 import { DefaultProps } from "./components.types";
 import CouplingController from "./CouplingController";
 import { humanizeDate } from "./datetimes";
-import { FileChangeMetricChooser } from "./FileChangeMetricChooser";
-import HelpPanel from "./HelpPanel";
 import SaveLoadControls from "./SaveLoadControls";
-import ToggleablePanel from "./ToggleablePanel";
 import UsersAndTeams from "./UsersAndTeams";
 import VisControlPanel from "./VisControlPanel";
 import {
@@ -15,6 +12,9 @@ import {
   VisualizationData,
   Visualizations,
 } from "./VisualizationData";
+import { FileChangeMetricChooser } from "./widgets/FileChangeMetricChooser";
+import HelpPanel from "./widgets/HelpPanel";
+import ToggleablePanel from "./widgets/ToggleablePanel";
 
 const Controller = (props: DefaultProps) => {
   const { dataRef, state, dispatch } = props;

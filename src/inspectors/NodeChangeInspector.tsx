@@ -5,7 +5,7 @@ import {
   nodeChangers,
   nodeChangersByTeam,
   sortedUserStatsAccumulators,
-} from "./nodeData";
+} from "../nodeData";
 import {
   assertFlag,
   DirectoryNode,
@@ -13,12 +13,12 @@ import {
   FeatureFlags,
   FileNode,
   isDirectory,
-} from "./polyglot_data.types";
-import { getUserData, State } from "./state";
-import { teamOrNoTeamWidget } from "./TeamWidget";
-import ToggleablePanel from "./ToggleablePanel";
-import { userTeamListForUser } from "./UserTeamList";
-import { VizMetadata } from "./viz.types";
+} from "../polyglot_data.types";
+import { getUserData, State } from "../state";
+import { userTeamListForUser } from "../UserTeamList";
+import { VizMetadata } from "../viz.types";
+import { teamOrNoTeamWidget } from "../widgets/TeamWidget";
+import ToggleablePanel from "../widgets/ToggleablePanel";
 
 const NodeChangeInspector = ({
   node,

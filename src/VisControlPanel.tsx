@@ -1,11 +1,11 @@
 import ColourKey from "./ColourKey";
 import { humanizeDate } from "./datetimes";
-import HelpPanel from "./HelpPanel";
 import { FeatureFlags } from "./polyglot_data.types";
 import { Action, State } from "./state";
-import ToggleablePanel from "./ToggleablePanel";
 import { VisualizationData } from "./VisualizationData";
 import { VizMetadata } from "./viz.types";
+import HelpPanel from "./widgets/HelpPanel";
+import ToggleablePanel from "./widgets/ToggleablePanel";
 
 const VisControlPanel = ({
   vis,

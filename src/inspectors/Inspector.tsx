@@ -1,8 +1,8 @@
-import { DefaultProps } from "./components.types";
+import { DefaultProps } from "../components.types";
+import { isDirectory } from "../polyglot_data.types";
+import { errorMessage } from "../state";
 import DirectoryNodeInspector from "./DirectoryNodeInspector";
 import NodeInspector from "./NodeInspector";
-import { isDirectory } from "./polyglot_data.types";
-import { errorMessage } from "./state";
 
 const Inspector = (props: DefaultProps) => {
   const { state, dispatch, dataRef } = props;

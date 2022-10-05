@@ -2,10 +2,10 @@ import "./SourceCodeInspector.css";
 
 import { useEffect, useState } from "react";
 
-import { nodePath } from "./nodeData";
-import { FileNode } from "./polyglot_data.types";
-import { State } from "./state";
-import ToggleablePanel from "./ToggleablePanel";
+import { nodePath } from "../nodeData";
+import { FileNode } from "../polyglot_data.types";
+import { State } from "../state";
+import ToggleablePanel from "../widgets/ToggleablePanel";
 
 const SourceCodePanel = ({ node, state }: { node: FileNode; state: State }) => {
   const {

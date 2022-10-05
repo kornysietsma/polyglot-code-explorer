@@ -4,7 +4,6 @@ import React, { useId } from "react";
 import ReactModal from "react-modal";
 
 import { DefaultProps } from "./components.types";
-import DelayedInput from "./DelayedInput";
 import EditAlias from "./EditAlias";
 import {
   exportableTeamsAndAliasesToJson,
@@ -16,7 +15,6 @@ import {
   StandaloneExportTeamsAndAliases,
   teamsAndAliasesFromImport,
 } from "./exportImport";
-import HelpPanel from "./HelpPanel";
 import {
   aggregateTeamStats,
   aggregateUserStats,
@@ -37,8 +35,10 @@ import {
   UserAliasData,
   UserAliases,
 } from "./state";
-import ToggleablePanel from "./ToggleablePanel";
 import { UserTeamList } from "./UserTeamList";
+import DelayedInput from "./widgets/DelayedInput";
+import HelpPanel from "./widgets/HelpPanel";
+import ToggleablePanel from "./widgets/ToggleablePanel";
 
 export type UserAndStatsAndAliases = UserData &
   UserStats & { isAlias: boolean };

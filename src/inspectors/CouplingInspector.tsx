@@ -1,12 +1,10 @@
-import React from "react";
-
-import { couplingDateRange } from "./couplingBuckets";
-import { humanizeDate } from "./datetimes";
-import { nodeCouplingFilesFiltered } from "./nodeData";
-import { TreeNode } from "./polyglot_data.types";
-import { State } from "./state";
-import ToggleablePanel from "./ToggleablePanel";
-import { CouplingStats } from "./viz.types";
+import { couplingDateRange } from "../couplingBuckets";
+import { humanizeDate } from "../datetimes";
+import { nodeCouplingFilesFiltered } from "../nodeData";
+import { TreeNode } from "../polyglot_data.types";
+import { State } from "../state";
+import { CouplingStats } from "../viz.types";
+import ToggleablePanel from "../widgets/ToggleablePanel";
 
 const CouplingInspector = ({
   node,

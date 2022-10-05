@@ -1,12 +1,12 @@
 import React from "react";
 
+import { nodeCumulativeLinesOfCode } from "../nodeData";
+import { DirectoryNode, FeatureFlags } from "../polyglot_data.types";
+import { Action, State } from "../state";
+import { VizMetadata } from "../viz.types";
 import NodeChangeInspector from "./NodeChangeInspector";
-import { nodeCumulativeLinesOfCode } from "./nodeData";
 import PathInspector from "./PathInspector";
-import { DirectoryNode, FeatureFlags } from "./polyglot_data.types";
-import { Action, State } from "./state";
 import SubdirInspector from "./SubdirInspector";
-import { VizMetadata } from "./viz.types";
 
 const DirectoryNodeInspector = ({
   node,

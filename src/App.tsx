@@ -1,7 +1,7 @@
 import { useReducer, useRef } from "react";
 
 import Controller from "./Controller";
-import Inspector from "./Inspector";
+import Inspector from "./inspectors/Inspector";
 import Messages from "./Messages";
 import { globalDispatchReducer, initialiseGlobalState } from "./state";
 import Viz from "./Viz";
