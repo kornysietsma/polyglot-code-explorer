@@ -112,36 +112,44 @@ export function nodeIndentation(
   return node.data.indentation[metric];
 }
 
-function filterDetailsIgnoringUsers(
-  details: GitDetails[],
+function detailsWithinDates(
+  earliest: number,
+  latest: number
+): (detail: GitDetails) => boolean {
+  return (detail: GitDetails) =>
+    detail.commit_day >= earliest && detail.commit_day <= latest;
+}
+
+function removeIgnoredUsers(
   ignoredUsers: Set<number>
-): GitDetails[] {
+): (details: GitDetails) => GitDetails {
   if (ignoredUsers.size == 0) {
-    return details;
-  }
-  return details
-    .map((detail) => {
+    return (details) => details;
+  } else {
+    return (detail) => {
       const notIgnoredUsers = detail.users.filter((u) => !ignoredUsers.has(u));
       return { ...detail, users: notIgnoredUsers };
-    })
-    .filter((detail) => detail.users.length > 0);
+    };
+  }
+}
+
+function detailHasUsers(detail: GitDetails): boolean {
+  return detail.users.length > 0;
 }
 
 // Date range based git details
 function nodeChangeDetails(
   node: FileNode,
   ignoredUsers: Set<number>,
-  earliest?: number,
-  latest?: number
+  earliest: number,
+  latest: number
 ): GitDetails[] | undefined {
   const details = node.data.git?.details;
   if (!details) return undefined;
-  if (earliest === undefined || latest === undefined)
-    return filterDetailsIgnoringUsers(details, ignoredUsers);
-  const detailsWithinDates = details.filter(
-    (d) => d.commit_day >= earliest && d.commit_day <= latest
-  );
-  return filterDetailsIgnoringUsers(detailsWithinDates, ignoredUsers);
+  return details
+    .filter(detailsWithinDates(earliest, latest))
+    .map(removeIgnoredUsers(ignoredUsers))
+    .filter(detailHasUsers);
 }
 
 export function nodeLastChangeDay(
