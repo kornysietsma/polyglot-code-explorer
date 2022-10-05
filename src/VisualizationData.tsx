@@ -1,8 +1,8 @@
 import { HierarchyNode } from "d3";
-import { ReactElement, useId } from "react";
+import { ReactElement } from "react";
 
 import { FeatureFlags, TreeNode } from "./polyglot_data.types";
-import { Action, Config, State, themedColours } from "./state";
+import { Action, Config, State } from "./state";
 import { AgeVisualization } from "./visualizations/AgeVisualization";
 import { ChurnVisualization } from "./visualizations/ChurnVisualization";
 import { CreationDateVisualization } from "./visualizations/CreationDateVisualization";
@@ -15,9 +15,6 @@ import { SingleTeamVisualization } from "./visualizations/SingleTeamVisualizatio
 import { TeamPatternVisualization } from "./visualizations/TeamPatternVisualization";
 import { TeamVisualization } from "./visualizations/TeamVisualization";
 import { VizMetadata } from "./viz.types";
-import { ColourPicker } from "./widgets/ColourPicker";
-import DelayedInputRange from "./widgets/DelayedInputRange";
-import { FileChangeMetricChooser } from "./widgets/FileChangeMetricChooser";
 
 /**
  * The public view of a Visualization
@@ -61,155 +58,6 @@ export function isParentVisualization(
 ): d is ParentVisualizationData {
   return (d as ParentVisualizationData).children !== undefined;
 }
-
-export const TeamExtraControls = ({
-  state,
-  dispatch,
-}: {
-  state: State;
-  dispatch: React.Dispatch<Action>;
-}) => {
-  const showNonTeamId = useId();
-  return (
-    <div>
-      <div>
-        <label htmlFor={showNonTeamId}>
-          Show changes by users without a team:&nbsp;
-          <input
-            type="checkbox"
-            id={showNonTeamId}
-            checked={state.config.teamVisualisation.showNonTeamChanges}
-            onChange={(evt) => {
-              dispatch({
-                type: "setShowNonTeamChanges",
-                payload: evt.target.checked,
-              });
-            }}
-          />
-        </label>
-      </div>
-      {state.config.teamVisualisation.showNonTeamChanges ? (
-        <div>
-          <label>
-            No team colour:
-            <ColourPicker
-              colour={themedColours(state.config).teams.noTeamColour}
-              onChange={(newColour: string) => {
-                dispatch({
-                  type: "setColour",
-                  payload: { name: "teams.noTeamColour", value: newColour },
-                });
-              }}
-            ></ColourPicker>
-          </label>
-        </div>
-      ) : (
-        <></>
-      )}
-      <FileChangeMetricChooser state={state} dispatch={dispatch} />
-    </div>
-  );
-};
-
-export const SingleTeamExtraControls = ({
-  state,
-  dispatch,
-}: {
-  state: State;
-  dispatch: React.Dispatch<Action>;
-}) => {
-  const teamSelectionId = useId();
-  const showLevelAsLightnessId = useId();
-  return (
-    <div>
-      <label htmlFor={teamSelectionId}>
-        Select team:
-        <select
-          id={teamSelectionId}
-          value={state.config.teamVisualisation.selectedTeam ?? ""}
-          onChange={(evt) => {
-            dispatch({
-              type: "selectTeam",
-              payload: evt.target.value,
-            });
-          }}
-        >
-          <option key="" value="">
-            Please choose a team
-          </option>
-          {[...state.config.teamsAndAliases.teams.keys()]
-            .sort()
-            .map((teamName) => (
-              <option key={teamName} value={teamName}>
-                {teamName}
-              </option>
-            ))}
-        </select>
-      </label>
-      <div>
-        <label>
-          This team:
-          <ColourPicker
-            colour={themedColours(state.config).teams.selectedTeamColour}
-            onChange={(newColour: string) => {
-              dispatch({
-                type: "setColour",
-                payload: { name: "teams.selectedTeamColour", value: newColour },
-              });
-            }}
-          ></ColourPicker>
-        </label>
-        <label>
-          {" "}
-          Other users:
-          <ColourPicker
-            colour={themedColours(state.config).teams.otherUsersColour}
-            onChange={(newColour: string) => {
-              dispatch({
-                type: "setColour",
-                payload: { name: "teams.otherUsersColour", value: newColour },
-              });
-            }}
-          ></ColourPicker>
-        </label>
-      </div>
-      <div>
-        Use lightness to show amount of change?&nbsp;
-        <label htmlFor={showLevelAsLightnessId}>
-          <input
-            type="checkbox"
-            id={showLevelAsLightnessId}
-            checked={state.config.teamVisualisation.showLevelAsLightness}
-            onChange={(evt) => {
-              dispatch({
-                type: "setShowLevelAsLightness",
-                payload: evt.target.checked,
-              });
-            }}
-          />
-        </label>
-      </div>
-      {state.config.teamVisualisation.showLevelAsLightness ? (
-        <DelayedInputRange
-          value={state.config.teamVisualisation.lightnessCap * 100}
-          minValue={1}
-          maxValue={100}
-          label={"Lightness Cap:"}
-          onChange={(oldValue: number, newValue: number) => {
-            dispatch({
-              type: "setLightnessCap",
-              payload: newValue / 100,
-            });
-          }}
-          postLabel={(value: number) => `${Math.trunc(value)}%`}
-        ></DelayedInputRange>
-      ) : (
-        <></>
-      )}
-      <FileChangeMetricChooser state={state} dispatch={dispatch} />
-    </div>
-  );
-};
 
 export const Visualizations: {
   [visName: string]: VisualizationData | ParentVisualizationData;

@@ -1,6 +1,7 @@
 import {
   NO_TEAM_SYMBOL,
   nodeChangersByTeam,
+  nodeSingleTeam,
   topTeamsPartitioned,
   UserStats,
 } from "./nodeData";
@@ -382,5 +383,138 @@ describe("finding top teams as partitions", () => {
       true
     );
     expect(partitioned!).toEqual([NO_TEAM_SYMBOL, "foo", "foo"]);
+  });
+});
+
+describe("aggregating for a single team", () => {
+  test("minimal change info returns undefined", () => {
+    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
+      minimalNodeChangersParams();
+    const singleTeamData = nodeSingleTeam(
+      fileNode,
+      "team",
+      "commits",
+      aliases,
+      ignoredUsers,
+      userTeams,
+      earliest,
+      latest
+    );
+    expect(singleTeamData).toBeUndefined();
+  });
+  test("separate changes are divided into this team and other users, for all metrics", () => {
+    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
+      minimalNodeChangersParams();
+    userTeams.set(0, new Set(["teamA"]));
+    fileNode.data.git!.details!.push({
+      commit_day: 1,
+      users: [0],
+      commits: 1,
+      lines_added: 2,
+      lines_deleted: 3,
+    });
+    fileNode.data.git!.details!.push({
+      commit_day: 1,
+      users: [1],
+      commits: 1,
+      lines_added: 1,
+      lines_deleted: 1,
+    });
+    const singleTeamData = nodeSingleTeam(
+      fileNode,
+      "teamA",
+      "commits",
+      aliases,
+      ignoredUsers,
+      userTeams,
+      earliest,
+      latest
+    );
+    expect(singleTeamData).toEqual([1, 1]);
+    const singleTeamLines = nodeSingleTeam(
+      fileNode,
+      "teamA",
+      "lines",
+      aliases,
+      ignoredUsers,
+      userTeams,
+      earliest,
+      latest
+    );
+    expect(singleTeamLines).toEqual([5, 2]);
+  });
+  test("commits shared with a team count towards that team", () => {
+    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
+      minimalNodeChangersParams();
+    userTeams.set(0, new Set(["teamA"]));
+    fileNode.data.git!.details!.push({
+      commit_day: 1,
+      users: [0, 1],
+      commits: 2,
+      lines_added: 1,
+      lines_deleted: 1,
+    });
+    fileNode.data.git!.details!.push({
+      commit_day: 2,
+      users: [1],
+      commits: 3,
+      lines_added: 1,
+      lines_deleted: 1,
+    });
+    const singleTeamData = nodeSingleTeam(
+      fileNode,
+      "teamA",
+      "commits",
+      aliases,
+      ignoredUsers,
+      userTeams,
+      earliest,
+      latest
+    );
+    expect(singleTeamData).toEqual([2, 3]);
+  });
+  test("days are counted as unique days, not added", () => {
+    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
+      minimalNodeChangersParams();
+    userTeams.set(0, new Set(["teamA"]));
+    fileNode.data.git!.details!.push({
+      commit_day: 1,
+      users: [0],
+      commits: 1,
+      lines_added: 1,
+      lines_deleted: 1,
+    });
+    fileNode.data.git!.details!.push({
+      commit_day: 1,
+      users: [0, 1],
+      commits: 2,
+      lines_added: 1,
+      lines_deleted: 1,
+    });
+    fileNode.data.git!.details!.push({
+      commit_day: 2,
+      users: [1],
+      commits: 1,
+      lines_added: 1,
+      lines_deleted: 1,
+    });
+    fileNode.data.git!.details!.push({
+      commit_day: 3,
+      users: [1],
+      commits: 1,
+      lines_added: 1,
+      lines_deleted: 1,
+    });
+    const singleTeamData = nodeSingleTeam(
+      fileNode,
+      "teamA",
+      "days",
+      aliases,
+      ignoredUsers,
+      userTeams,
+      earliest,
+      latest
+    );
+    expect(singleTeamData).toEqual([1, 2]);
   });
 });

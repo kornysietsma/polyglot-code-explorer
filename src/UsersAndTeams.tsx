@@ -36,6 +36,7 @@ import {
   UserAliases,
 } from "./state";
 import { UserTeamList } from "./UserTeamList";
+import { ColourPicker } from "./widgets/ColourPicker";
 import DelayedInput from "./widgets/DelayedInput";
 import HelpPanel from "./widgets/HelpPanel";
 import ToggleablePanel from "./widgets/ToggleablePanel";
@@ -1018,12 +1019,11 @@ const UsersAndTeams = (props: DefaultProps) => {
           <div className="buttonList">
             <label htmlFor={noTeamId}>
               Colour for non-team users:
-              <input
-                type="color"
-                id={noTeamId}
-                name="No-team colour"
-                value={pageState.noTeamColour}
-                onChange={(evt) => setNoTeamColour(evt.target.value)}
+              <ColourPicker
+                colour={pageState.noTeamColour}
+                onChange={(newColour: string) => {
+                  setNoTeamColour(newColour);
+                }}
               />
             </label>
             <button onClick={reColourTeams}>auto-colour teams</button>
@@ -1075,13 +1075,11 @@ const UsersAndTeams = (props: DefaultProps) => {
                         ></input>
                       </td>
                       <td>
-                        <input
-                          type="color"
-                          name="dot colour"
-                          value={teamData.colour}
-                          onChange={(evt) =>
-                            changeTeamColour(name, evt.target.value)
-                          }
+                        <ColourPicker
+                          colour={teamData.colour}
+                          onChange={(newColour: string) => {
+                            changeTeamColour(name, newColour);
+                          }}
                         />
                       </td>
                       <td>

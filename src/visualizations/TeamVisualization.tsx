@@ -4,9 +4,9 @@ import { teamScale } from "../ColourScales";
 import { nodeTopTeam } from "../nodeData";
 import { FeatureFlags, FileNode } from "../polyglot_data.types";
 import { Action, sortTeamsByName, State, themedColours } from "../state";
-import { TeamExtraControls } from "../VisualizationData";
 import { VizMetadata } from "../viz.types";
 import { BaseVisualization } from "./BaseVisualization";
+import { TeamExtraControls } from "./TeamExtraControls";
 
 export class TeamVisualization extends BaseVisualization<string> {
   scale: (v: string) => string | undefined;

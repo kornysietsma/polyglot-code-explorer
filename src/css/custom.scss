@@ -29,6 +29,11 @@ table {
   word-break: break-word;
 }
 
+/* by default, table headers shouldn't wrap! */
+th {
+  white-space: nowrap;
+}
+
 .ModalOverlay {
   position: fixed;
   top: 0;

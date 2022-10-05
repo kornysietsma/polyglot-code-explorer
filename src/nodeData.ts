@@ -594,6 +594,10 @@ export function topTeamsPartitioned(
   return results.sort();
 }
 
+// Note this is slightly messsy, but after profiling
+// I found it is better to only accumulate the stat
+// we care about, not all 4. Especially to avoid masses
+// of pointless set manipulation.
 export function nodeSingleTeam(
   node: FileNode,
   thisTeamName: string,
@@ -607,18 +611,15 @@ export function nodeSingleTeam(
   const details = nodeChangeDetails(node, ignoredUsers, earliest, latest);
   if (!details || details.length == 0) return undefined;
 
-  const myStats: UserStats = {
-    commits: 0,
-    lines: 0,
-    days: new Set(),
-    files: 0,
-  };
-  const otherStats: UserStats = {
-    commits: 0,
-    lines: 0,
-    days: new Set(),
-    files: 0,
-  };
+  // these are redundant, but it seemed simpler
+  // to use pairs of stats rather than a generic
+  // `myStat: number | Set<number>` and a lot of
+  // ugly type casting.
+  // if the metric is days, uses `myDays` otherwise `myStat`
+  let myStat = 0;
+  const myDays: Set<number> = new Set();
+  let otherStat = 0;
+  const otherDays: Set<number> = new Set();
 
   details.forEach(
     ({ users, commits, lines_added, lines_deleted, commit_day }) => {
@@ -631,28 +632,42 @@ export function nodeSingleTeam(
           return teams.has(thisTeamName);
         }) != undefined;
       if (isThisTeam) {
-        myStats.commits += commits;
-        myStats.lines += lines_added + lines_deleted;
-        myStats.days.add(commit_day);
-        myStats.files = 1;
+        switch (metric) {
+          case "commits":
+            myStat += commits;
+            break;
+          case "lines":
+            myStat += lines_added + lines_deleted;
+            break;
+          case "files":
+            myStat = 1;
+            break;
+          case "days":
+            myDays.add(commit_day);
+            break;
+        }
       } else {
-        otherStats.commits += commits;
-        otherStats.lines += lines_added + lines_deleted;
-        otherStats.days.add(commit_day);
-        otherStats.files = 1;
+        switch (metric) {
+          case "commits":
+            otherStat += commits;
+            break;
+          case "lines":
+            otherStat += lines_added + lines_deleted;
+            break;
+          case "files":
+            otherStat = 1;
+            break;
+          case "days":
+            otherDays.add(commit_day);
+            break;
+        }
       }
     }
   );
-  switch (metric) {
-    case "commits":
-      return [myStats.commits, otherStats.commits];
-    case "lines":
-      return [myStats.lines, otherStats.lines];
-    case "days":
-      return [myStats.days.size, otherStats.days.size];
-    case "files":
-      // kind of pointless?
-      return [myStats.files, otherStats.files];
+  if (metric == "days") {
+    return [myDays.size, otherDays.size];
+  } else {
+    return [myStat, otherStat];
   }
 }
 

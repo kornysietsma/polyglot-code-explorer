@@ -8,9 +8,9 @@ import {
   State,
   themedColours,
 } from "../state";
-import { TeamExtraControls } from "../VisualizationData";
 import { VizMetadata } from "../viz.types";
 import { BaseVisualization } from "./BaseVisualization";
+import { TeamExtraControls } from "./TeamExtraControls";
 
 export class TeamPatternVisualization extends BaseVisualization<PatternId> {
   scale: (v: PatternId) => string | undefined = (v) => `url(#pattern${v})`;
