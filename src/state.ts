@@ -614,7 +614,7 @@ function postprocessState(
         resultingState,
         dataRef.current.data
       );
-      console.time("postprocessing - svg patterns");
+      console.timeEnd("postprocessing - svg patterns");
     } else {
       console.timeEnd("checking for svg state change");
     }

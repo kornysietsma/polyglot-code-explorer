@@ -3,7 +3,7 @@ import { HierarchyNode } from "d3";
 import { goodBadUglyColourKeyData } from "../colourKeys";
 import { goodBadUglyScale } from "../ColourScales";
 import { nodeCumulativeLinesOfCode } from "../nodeData";
-import { FeatureFlags, FileNode } from "../polyglot_data.types";
+import { DirectoryNode, FeatureFlags, FileNode } from "../polyglot_data.types";
 import { Action, State } from "../state";
 import { VizMetadata } from "../viz.types";
 import { BaseVisualization } from "./BaseVisualization";
@@ -22,8 +22,8 @@ export class LinesOfCodeVisualization extends BaseVisualization<number> {
   dataFn(d: HierarchyNode<FileNode>): number {
     return nodeCumulativeLinesOfCode(d.data);
   }
-  parentFn(): number | undefined {
-    return undefined;
+  parentFn(d: HierarchyNode<DirectoryNode>): number {
+    return nodeCumulativeLinesOfCode(d.data);
   }
 
   colourKey(): [string, string][] {

@@ -644,17 +644,17 @@ const UsersAndTeams = (props: DefaultProps) => {
     "#76480d",
   ];
   const colourSchemes: [string, readonly string[]][] = [
-    ["Korny custom scheme", bigColourRange],
     ["d3 schemeCategory10", d3.schemeCategory10],
+    ["d3 schemeTableau10", d3.schemeTableau10],
+    ["d3 schemeSet1", d3.schemeSet1],
+    ["d3 schemeSet2", d3.schemeSet2],
+    ["d3 schemeSet3", d3.schemeSet3],
     ["d3 schemeAccent", d3.schemeAccent],
     ["d3 schemeDark2", d3.schemeDark2],
     ["d3 schemePaired", d3.schemePaired],
     ["d3 schemePastel1", d3.schemePastel1],
     ["d3 schemePastel2", d3.schemePastel2],
-    ["d3 schemeSet1", d3.schemeSet1],
-    ["d3 schemeSet2", d3.schemeSet2],
-    ["d3 schemeSet3", d3.schemeSet3],
-    ["d3 schemeTableau10", d3.schemeTableau10],
+    ["Korny custom scheme", bigColourRange],
   ];
 
   function selectColourScheme(scheme: number) {
@@ -1285,7 +1285,6 @@ const UsersAndTeams = (props: DefaultProps) => {
                 >
                   Lines changed total
                 </th>
-                <th>ignored?</th>
                 <th>Actions</th>
                 <th>Teams</th>
               </tr>
@@ -1316,7 +1315,6 @@ const UsersAndTeams = (props: DefaultProps) => {
                       <td>{user.commits}</td>
                       <td>{user.days.size}</td>
                       <td>{user.lines}</td>
-                      <td>{pageState.ignoredUsers.has(user.id) ? "Y" : ""}</td>
                       <td>
                         {user.isAlias ? (
                           <button onClick={editAlias(user.id)}>

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.6.2] - 2022-10-12
+
+### Added
+
+- You can now add an initial state file "default_state.json" to load state on startup - this is mostly for my demos!
+- Quite a few extra controls on visualisations
+- Refactorings and minor bug fixes
+
 ## [0.6.1] - 2022-09-29
 
 ### Added

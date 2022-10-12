@@ -21,6 +21,10 @@ export const SingleTeamExtraControls = ({
 }) => {
   const teamSelectionId = useId();
   const showLevelAsLightnessId = useId();
+  const teamNames = [...state.config.teamsAndAliases.teams]
+    .filter(([, teamData]) => !teamData.hidden)
+    .map(([name]) => name)
+    .sort();
   return (
     <div>
       <label htmlFor={teamSelectionId}>
@@ -38,13 +42,11 @@ export const SingleTeamExtraControls = ({
           <option key="" value="">
             Please choose a team
           </option>
-          {[...state.config.teamsAndAliases.teams.keys()]
-            .sort()
-            .map((teamName) => (
-              <option key={teamName} value={teamName}>
-                {teamName}
-              </option>
-            ))}
+          {teamNames.map((teamName) => (
+            <option key={teamName} value={teamName}>
+              {teamName}
+            </option>
+          ))}
         </select>
       </label>
       <div>

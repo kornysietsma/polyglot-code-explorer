@@ -78,6 +78,7 @@ const redrawSelection = (
 
   const strokeWidthFn = (d: HierarchyNode<TreeNode>) => {
     if (d.data.layout.algorithm === "circlePack") return 0;
+    if (d.depth == 0) return 0;
     return d.depth < 4 ? 4 - d.depth : 1;
   };
 

@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { MutableRefObject, useEffect, useRef, useState } from "react";
 import semver from "semver";
 
 import App from "./App";
+import { ExportableState } from "./exportImport";
 import { PolyglotData, SUPPORTED_FILE_VERSION } from "./polyglot_data.types";
 import {
   countLanguagesIn,
@@ -84,17 +85,61 @@ const useFetch = (
   return data;
 };
 
+const useFetchStateFile = (url: string) => {
+  const [data, setData] = useState<ExportableState>();
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const response = await fetch(url);
+        const ok = await response.ok;
+        if (!ok) {
+          if (response.status >= 400 && response.status < 500) {
+            console.log(
+              `No initial state file: response ${response.status}:${response.statusText}`
+            );
+          } else {
+            console.error(
+              `Ignoring invalid response fetching state file: ${response.status}:${response.statusText}`
+            );
+          }
+          return;
+        }
+        const json = await response.json();
+        setData(json as ExportableState);
+      } catch (e) {
+        console.error("Ignoring error loading initial state:", e);
+      }
+    }
+    fetchData();
+  }, [url]);
+
+  return data;
+};
+
+// While we are loading the data, it's value might be undefined
+export type ExportableStateMaybe = MutableRefObject<
+  ExportableState | undefined
+>;
+
 const Loader = () => {
   const dataFile = process.env.REACT_APP_EXPLORER_DATA || "default";
   const url = `${process.env.PUBLIC_URL}/data/${dataFile}.json`;
+  const stateUrl = `${process.env.PUBLIC_URL}/data/${dataFile}_state.json`;
 
   const dataRefEventually: VizDataRefMaybe = useRef<VizData>();
   const [errors, setErrors] = useState<string[]>([]);
+  const stateRefEventually: ExportableStateMaybe = useRef<ExportableState>();
 
   const data = useFetch(url, setErrors);
   dataRefEventually.current = data;
 
+  const initialState = useFetchStateFile(stateUrl);
+  stateRefEventually.current = initialState;
+
   console.log("in loader, errors:", errors);
+
+  console.log("state ref now", stateRefEventually);
 
   return errors.length > 0 ? (
     <div>
@@ -108,7 +153,10 @@ const Loader = () => {
   ) : dataRefEventually.current === undefined ? (
     <div>Loading...</div>
   ) : (
-    <App dataRefMaybe={dataRefEventually} />
+    <App
+      dataRefMaybe={dataRefEventually}
+      initialStateMaybe={stateRefEventually}
+    />
   );
 };
 

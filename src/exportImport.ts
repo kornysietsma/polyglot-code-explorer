@@ -69,7 +69,7 @@ export type StandaloneExportTeamsAndAliases = {
 
 type ExportableConfig = Omit<Config, "teamsAndAliases">;
 
-type ExportableState = {
+export type ExportableState = {
   dataVersion: string;
   formatVersion: string;
   name: string;
@@ -193,7 +193,7 @@ export function stateFromExportable(
     ) {
       messages.push(
         errorMessage(
-          `Invalid data version ${exportableState.dataVersion} - this release of Explorer supports  ${SUPPORTED_FILE_VERSION}`
+          `Invalid state file data version ${exportableState.dataVersion} - this release of Explorer supports  ${SUPPORTED_FILE_VERSION}`
         )
       );
       if (!tolerant) failed = true;
