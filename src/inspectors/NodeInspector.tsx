@@ -29,12 +29,12 @@ import PathInspector from "./PathInspector";
 import SourceCodeInspector from "./SourceCodeInspector";
 
 function findGitUrl(node: TreeNode, remoteUrlTemplate: string) {
-  let suffix = node.name;
+  let suffix = encodeURIComponent(node.name);
   let current = node;
   while ((!isDirectory(current) || !nodeRemoteUrl(current)) && current.parent) {
     current = current.parent;
     if (!nodeRemoteUrl(current)) {
-      suffix = `${current.name}/${suffix}`;
+      suffix = `${encodeURIComponent(current.name)}/${suffix}`;
     }
   }
   if (!isDirectory(current)) return undefined;
@@ -77,7 +77,7 @@ function findGitUrl(node: TreeNode, remoteUrlTemplate: string) {
   return remoteUrlTemplate
     .replace("{host}", host)
     .replace("{path}", path)
-    .replace("{project}", project)
+    .replace("{project}", encodeURIComponent(project))
     .replace("{ref}", headRef)
     .replace("{file}", suffix);
 }

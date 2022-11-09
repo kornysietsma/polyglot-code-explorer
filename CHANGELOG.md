@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.6.3] - 2022-11-09
+
+### Changed
+
+- Minor bugfix so URLs to external git repositories escape special characters
+
 ## [0.6.2] - 2022-10-12
 
 ### Added
