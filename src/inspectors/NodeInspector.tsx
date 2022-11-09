@@ -202,7 +202,7 @@ const NodeInspector = ({
       {indentationData ? (
         <ToggleablePanel title="Indentation" showInitially={false}>
           <ul>
-            <li>stddev: {indentationData.stddev}</li>
+            <li>stddev: {indentationData.stddev.toFixed(2)}</li>
             <li>p90: {indentationData.p90}</li>
             <li>worst: {indentationData.p99}</li>
             <li>area: {indentationData.sum}</li>
