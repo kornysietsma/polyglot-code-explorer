@@ -33,7 +33,7 @@ const SaveLoadControls = (props: DefaultProps) => {
     });
     const tempElement = document.createElement("a");
     tempElement.href = URL.createObjectURL(file);
-    tempElement.download = "userData.json";
+    tempElement.download = `${data.name}_settings.json`;
     document.body.appendChild(tempElement);
     tempElement.click();
     tempElement.parentNode?.removeChild(tempElement);

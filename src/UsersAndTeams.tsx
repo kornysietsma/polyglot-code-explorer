@@ -386,7 +386,7 @@ const UsersAndTeams = (props: DefaultProps) => {
       }
     );
     tempElement.href = URL.createObjectURL(file);
-    tempElement.download = "userData.json";
+    tempElement.download = `${dataRef.current.data.name}_users.json`;
     document.body.appendChild(tempElement);
     tempElement.click();
     tempElement.parentNode?.removeChild(tempElement);
@@ -865,6 +865,15 @@ const UsersAndTeams = (props: DefaultProps) => {
     return <UserTeamList teams={teams} showNames={true}></UserTeamList>;
   }
 
+  function selectAllUsers() {
+    const all = pageState.usersAndAliases.filter(filterUsers).map((u) => u.id);
+    setPageState({ ...pageState, checkedUsers: new Set(all) });
+  }
+
+  function selectNoUsers() {
+    setPageState({ ...pageState, checkedUsers: new Set() });
+  }
+
   return (
     <div>
       <button onClick={openModal} type="button">
@@ -1224,6 +1233,8 @@ const UsersAndTeams = (props: DefaultProps) => {
               onChange={(evt) => setUserFilter(evt.target.value)}
             />
             <button onClick={() => setUserFilter("")}>&#x1f5d1;</button>
+            <button onClick={selectAllUsers}>Select all</button>
+            <button onClick={selectNoUsers}>None</button>
             <label htmlFor={showCheckedUsersId}>
               only show selected users:
               <input
