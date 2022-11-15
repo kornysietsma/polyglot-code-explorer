@@ -9,7 +9,6 @@ import { CreationDateVisualization } from "./visualizations/CreationDateVisualiz
 import { IndentationVisualization } from "./visualizations/IndentationVisualization";
 import { LanguageVisualization } from "./visualizations/LanguageVisualization";
 import { LinesOfCodeVisualization } from "./visualizations/LinesOfCodeVisualization";
-import { NestingDepthVisualization } from "./visualizations/NestingDepthVisualization";
 import { NumberOfChangersVisualization } from "./visualizations/NumberOfChangersVisualization";
 import { SingleTeamVisualization } from "./visualizations/SingleTeamVisualization";
 import { TeamPatternVisualization } from "./visualizations/TeamPatternVisualization";
@@ -91,16 +90,8 @@ export const Visualizations: {
       return new LinesOfCodeVisualization(state, metadata, features, dispatch);
     },
   },
-  depth: {
-    displayOrder: 2,
-    title: "Nesting depth",
-    help: <p>Shows nesting depth in the directory structure</p>,
-    buildVisualization(state, metadata, features, dispatch) {
-      return new NestingDepthVisualization(state, metadata, features, dispatch);
-    },
-  },
   indentation: {
-    displayOrder: 3,
+    displayOrder: 2,
     title: "Indentation",
     defaultChild: "stddev",
     children: {
@@ -187,7 +178,7 @@ export const Visualizations: {
     },
   },
   age: {
-    displayOrder: 4,
+    displayOrder: 3,
     title: "Age of last change",
     featureCheck: (features: FeatureFlags) =>
       features.git || features.file_stats,
@@ -210,7 +201,7 @@ export const Visualizations: {
     },
   },
   creation: {
-    displayOrder: 5,
+    displayOrder: 4,
     title: "Creation date",
     featureCheck: (features: FeatureFlags) =>
       features.git || features.file_stats,
@@ -235,7 +226,7 @@ export const Visualizations: {
     },
   },
   numberOfChangers: {
-    displayOrder: 6,
+    displayOrder: 5,
     title: "Number of unique changers",
     featureCheck: (features: FeatureFlags) => features.git,
     help: (
@@ -263,7 +254,7 @@ export const Visualizations: {
   },
 
   churn: {
-    displayOrder: 7,
+    displayOrder: 6,
     title: "Churn",
     featureCheck: (features: FeatureFlags) => features.git,
 
@@ -355,7 +346,7 @@ export const Visualizations: {
     },
   },
   team: {
-    displayOrder: 8,
+    displayOrder: 7,
     title: "Top Team",
     featureCheck: (features: FeatureFlags) => features.git,
 
@@ -372,7 +363,7 @@ export const Visualizations: {
     },
   },
   teamPattern: {
-    displayOrder: 9,
+    displayOrder: 8,
     title: "Top Teams (patterned)",
     featureCheck: (features: FeatureFlags) => features.git,
     help: (
@@ -392,7 +383,7 @@ export const Visualizations: {
     },
   },
   singleTeam: {
-    displayOrder: 10,
+    displayOrder: 9,
     title: "Single Team Impact",
     featureCheck: (features: FeatureFlags) => features.git,
     help: (
