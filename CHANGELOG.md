@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.6.4] - 2022-22-15
+
+### Changed
+
+- mostly minor fixes in prep for ThoughtWorks office day talk
+
 ## [0.6.3] - 2022-11-09
 
 ### Changed

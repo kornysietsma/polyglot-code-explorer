@@ -7,7 +7,7 @@ To release a new version:
 * run tests! `yarn test --watchAll` - I know there aren't many, but there's no reason not to run them!
 * Check the changelog is up to date
 * Update the version in package.json
-* commit
+* commit and push
 
 Then
 
