@@ -112,10 +112,15 @@ export type Config = {
     showLevelAsLightness: boolean; // do we scale lightness by amount of change?
     lightnessCap: number; // scale for lightness in dark places
   };
+  nesting: {
+    nestedWidths: [number, number, number];
+    defaultWidth: number;
+  };
   teamsAndAliases: TeamsAndAliases;
   colours: {
     currentTheme: "dark" | "light"; // also sets css on the body!
     dark: {
+      nestedStrokes: [string, string, string];
       defaultStroke: string;
       selectedStroke: string;
       couplingStroke: string; // need to change the arrow colour as well if you change this!
@@ -141,6 +146,7 @@ export type Config = {
       };
     };
     light: {
+      nestedStrokes: [string, string, string];
       defaultStroke: string;
       selectedStroke: string;
       couplingStroke: string; // need to change the arrow colour as well if you change this!
@@ -326,7 +332,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
     latest = moment().add(2, "day").unix();
   }
 
-  const defaults: State = {
+  const defaultState: State = {
     config: {
       visualization: "language",
       subVis: undefined,
@@ -417,9 +423,14 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
         aliasData: new Map(),
         ignoredUsers: new Set(),
       },
+      nesting: {
+        defaultWidth: 1,
+        nestedWidths: [4, 3, 2],
+      },
       colours: {
         currentTheme: "dark", // also sets css on the body!
         dark: {
+          nestedStrokes: ["#aaaaaa", "#777777", "#444444"],
           defaultStroke: "#111111",
           selectedStroke: "#fffa00",
           couplingStroke: "#ff6300", // need to change the arrow colour as well if you change this!
@@ -445,6 +456,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
           },
         },
         light: {
+          nestedStrokes: ["#777777", "#aaaaaa", "#dddddd"],
           defaultStroke: "#f7f7f7",
           selectedStroke: "#fffa00",
           couplingStroke: "#ff6300", // need to change the arrow colour as well if you change this!
@@ -512,12 +524,12 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
     },
     messages: [],
   };
-  defaults.messages.push(
+  defaultState.messages.push(
     infoMessage(
       `Loaded data file: ${data.name} version ${data.version} ID ${data.id}`
     )
   );
-  return postprocessState(initialDataRef, defaults, defaults);
+  return postprocessState(initialDataRef, defaultState, defaultState);
 }
 
 function themedColours(config: Config) {

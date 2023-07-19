@@ -50,17 +50,59 @@ const redrawPolygons = (
     undefined
   );
 
-  const strokeWidthFn = (d: HierarchyNode<TreeNode>) => {
-    if (d.data.layout.algorithm === "circlePack") return 0;
-    return d.depth < 4 ? 4 - d.depth : 1;
-  };
-
   return svgSelection
     .attr("d", (d) => {
       return `${d3.line()(d.data.layout.polygon)}z`;
     })
     .style("fill", (d) => visualization.fillFn(d))
     .style("stroke", themedColours(config).defaultStroke)
+    .style("stroke-width", config.nesting.defaultWidth)
+    .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
+};
+
+const redrawNesting = (
+  svgSelection: Selection<
+    SVGPathElement,
+    HierarchyNode<TreeNode>,
+    SVGGElement,
+    unknown
+  >,
+  metadata: VizMetadata,
+  features: FeatureFlags,
+  state: State
+) => {
+  const { config } = state;
+
+  // const visualization = getCurrentVis(config).buildVisualization(
+  //   state,
+  //   metadata,
+  //   features,
+  //   undefined
+  // );
+
+  const strokeWidthFn = (d: HierarchyNode<TreeNode>) => {
+    const nesting = d.depth - (metadata.topLevelCirclePacked ? 2 : 1);
+    if (nesting < 0) return 0;
+    if (nesting >= config.nesting.nestedWidths.length)
+      return config.nesting.defaultWidth;
+    return config.nesting.nestedWidths[nesting] || config.nesting.defaultWidth;
+  };
+
+  const strokeColourFn = (d: HierarchyNode<TreeNode>) => {
+    const nesting = d.depth - (metadata.topLevelCirclePacked ? 2 : 1);
+    const theme = themedColours(config);
+
+    if (nesting < 0) return 0;
+    if (nesting >= theme.nestedStrokes.length) return theme.defaultStroke;
+    return theme.nestedStrokes[nesting] || theme.defaultStroke;
+  };
+
+  return svgSelection
+    .attr("d", (d) => {
+      return `${d3.line()(d.data.layout.polygon)}z`;
+    })
+    .style("fill", "none")
+    .style("stroke", strokeColourFn)
     .style("stroke-width", strokeWidthFn)
     .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
 };
@@ -72,14 +114,17 @@ const redrawSelection = (
     SVGGElement,
     unknown
   >,
+  metadata: VizMetadata,
   state: State
 ) => {
   const { config } = state;
 
   const strokeWidthFn = (d: HierarchyNode<TreeNode>) => {
-    if (d.data.layout.algorithm === "circlePack") return 0;
-    if (d.depth == 0) return 0;
-    return d.depth < 4 ? 4 - d.depth : 1;
+    const nesting = d.depth - (metadata.topLevelCirclePacked ? 2 : 1);
+    if (nesting < 0) return 0;
+    if (nesting >= config.nesting.nestedWidths.length)
+      return config.nesting.defaultWidth;
+    return config.nesting.nestedWidths[nesting] || config.nesting.defaultWidth;
   };
 
   return svgSelection
@@ -136,6 +181,7 @@ const update = (
   //   throw new Error("Invalid root SVG element");
   // }
   redrawPolygons(svg.selectAll(".cell"), metadata, features, state);
+  redrawNesting(svg.selectAll(".nesting"), metadata, features, state);
 
   // TODO: DRY this up - or should selecting just be expensive config?
   if (!metadata.hierarchyNodesByPath) {
@@ -159,7 +205,7 @@ const update = (
     .append("path")
     .classed("selected", true);
 
-  redrawSelection(selectionNodes.merge(newSelectionNodes), state);
+  redrawSelection(selectionNodes.merge(newSelectionNodes), metadata, state);
   selectionNodes.exit().remove();
 };
 
@@ -377,6 +423,43 @@ const draw = (
 
   nodes.exit().remove();
 
+  const depthAdjust = metadata.topLevelCirclePacked ? 1 : 0;
+
+  const nestingNodes = rootNode
+    .descendants()
+    .filter((d) => d.depth == 3 + depthAdjust)
+    .concat(rootNode.descendants().filter((d) => d.depth == 2 + depthAdjust))
+    .concat(rootNode.descendants().filter((d) => d.depth == 1 + depthAdjust));
+
+  const nestingNodesSelection = group
+    .selectAll<SVGPathElement, HierarchyNode<TreeNode>>(".nesting")
+    .data(nestingNodes, function (node) {
+      return node.data.path;
+    });
+  const newNestingNodes = nestingNodesSelection
+    .enter()
+    .append("path")
+    .classed("nesting", true);
+  redrawNesting(
+    nestingNodesSelection.merge(newNestingNodes),
+    metadata,
+    features,
+    state
+  ).on(
+    "click",
+    function (
+      this: SVGPathElement,
+      event: PointerEvent,
+      node: HierarchyNode<TreeNode>
+    ) {
+      dispatch({ type: "selectNode", payload: node.data.path });
+    }
+  );
+
+  nestingNodesSelection.exit().remove();
+
+  // TODO
+
   const selectionPath = findSelectionPath(state, metadata.hierarchyNodesByPath);
   const selectionNodes = group
     .selectAll<SVGPathElement, HierarchyNode<TreeNode>>(".selected")
@@ -387,7 +470,7 @@ const draw = (
     .append("path")
     .classed("selected", true);
 
-  redrawSelection(selectionNodes.merge(newSelectionNodes), state);
+  redrawSelection(selectionNodes.merge(newSelectionNodes), metadata, state);
 
   selectionNodes.exit().remove();
 

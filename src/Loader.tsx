@@ -62,12 +62,14 @@ const useFetch = (
             firstBucketStart: bucketConfig.first_bucket_start,
           };
         }
+        const topLevelCirclePacked = data.tree.layout.algorithm == "circlePack";
         const metadata = {
           languages,
           stats,
           users,
           nodesByPath,
           timescaleData,
+          topLevelCirclePacked,
         };
         setData({ data: data, metadata });
       } catch (e) {

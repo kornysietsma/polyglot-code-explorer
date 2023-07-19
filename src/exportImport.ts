@@ -28,7 +28,7 @@ import {
 import { VizMetadata } from "./viz.types";
 
 /** the version of the format file - changes whenever state format changes */
-export const FORMAT_FILE_VERSION = "1.4.1";
+export const FORMAT_FILE_VERSION = "1.4.2";
 
 /** User data can be saved on it's own, in which case it has it's own format version */
 export const FORMAT_FILE_USER_VERSION = "1.3.4";
@@ -238,6 +238,24 @@ export function stateFromExportable(
       },
       messages,
     };
+    if (newState.config.nesting == undefined) {
+      // hacky addition so nesting colours doesn't break when loading old state file
+      messages.push(errorMessage("fixing missing state"));
+      newState.config.nesting = {
+        defaultWidth: 1,
+        nestedWidths: [4, 3, 2],
+      };
+      newState.config.colours.dark.nestedStrokes = [
+        "#aaaaaa",
+        "#777777",
+        "#444444",
+      ];
+      newState.config.colours.light.nestedStrokes = [
+        "#777777",
+        "#aaaaaa",
+        "#dddddd",
+      ];
+    }
     return { state: failed ? undefined : newState, messages };
   } catch (e) {
     messages.push(errorMessage(`${e}`));

@@ -35,6 +35,7 @@ export type VizMetadata = {
   nodesByPath: Map<string, TreeNode>;
   hierarchyNodesByPath?: Map<string, d3.HierarchyNode<TreeNode>>;
   timescaleData: TimescaleIntervalData[];
+  topLevelCirclePacked: boolean;
 };
 
 export type VizData = {
