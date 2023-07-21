@@ -750,6 +750,16 @@ interface SetColour {
   payload: { name: string; value: string };
 }
 
+interface SetLines {
+  type: "setLines";
+  payload: {
+    nestedWidths: [number, number, number];
+    defaultWidth: number;
+    nestedStrokes: [string, string, string];
+    defaultStroke: string;
+  };
+}
+
 interface SetLightnessCap {
   type: "setLightnessCap";
   payload: number;
@@ -784,6 +794,7 @@ export type Action =
   | SetShowLevelAsLightness
   | SetLightnessCap
   | SetColour
+  | SetLines
   | SetAllState;
 
 function updateStateFromAction(state: State, action: Action): State {
@@ -943,6 +954,18 @@ function updateStateFromAction(state: State, action: Action): State {
         action.payload.name,
         action.payload.value
       );
+      return result;
+    }
+
+    case "setLines": {
+      const result = _.cloneDeep(state);
+      result.config.nesting.nestedWidths = [...action.payload.nestedWidths];
+      result.config.nesting.defaultWidth = action.payload.defaultWidth;
+      themedColours(result.config).defaultStroke = action.payload.defaultStroke;
+      themedColours(result.config).nestedStrokes = [
+        ...action.payload.nestedStrokes,
+      ];
+
       return result;
     }
 

@@ -1,6 +1,7 @@
 import _ from "lodash";
 import { useId, useMemo } from "react";
 
+import ColoursAndLinesControls from "./ColoursAndLinesControls";
 import { DefaultProps } from "./components.types";
 import CouplingController from "./CouplingController";
 import { humanizeDate } from "./datetimes";
@@ -114,6 +115,12 @@ const Controller = (props: DefaultProps) => {
           ) : (
             <p>(no users as git disabled)</p>
           )}
+
+          <ColoursAndLinesControls
+            dataRef={dataRef}
+            state={state}
+            dispatch={dispatch}
+          />
 
           <label htmlFor={depthId}>
             Display maximum depth:

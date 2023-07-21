@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.6.5] - 2022-22-15
+
+### Added
+
+- You can now set line colour and width for main display
+- You can now set specific line colour and width for top 3 nesting levels
+- The ui for setthign them (advanced settings / colours and lines) is pretty ugly for now
+- This required a settings file version bump, but I tried to make it handle old files adequately
+
 ## [0.6.4] - 2022-22-15
 
 ### Changed
