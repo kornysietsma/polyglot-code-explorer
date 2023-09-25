@@ -425,7 +425,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
       },
       nesting: {
         defaultWidth: 1,
-        nestedWidths: [4, 3, 2],
+        nestedWidths: [2, 2, 1],
       },
       colours: {
         currentTheme: "dark", // also sets css on the body!

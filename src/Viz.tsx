@@ -120,7 +120,7 @@ const redrawSelection = (
   const { config } = state;
 
   const strokeWidthFn = (d: HierarchyNode<TreeNode>) => {
-    const nesting = d.depth - (metadata.topLevelCirclePacked ? 2 : 1);
+    const nesting = d.depth - (metadata.topLevelCirclePacked ? 1 : 0);
     if (nesting < 0) return 0;
     if (nesting >= config.nesting.nestedWidths.length)
       return config.nesting.defaultWidth;
