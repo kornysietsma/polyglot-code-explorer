@@ -46,7 +46,7 @@ function findGitUrl(node: TreeNode, remoteUrlTemplate: string) {
   // sorry, gentle reader, for this ugly regex.
   // TODO: split this, clean it up, make it nicer, add some tests!
   const remoteRe =
-    /^(\w+:\/\/(?<host>[^/]+)\/(?<path>.+)\/(?<project>[^/.]+)(\.git)?)|(\w+@(?<host2>[^:]+):(?<path2>.+)\/(?<project2>[^/.]+)(\.git)?)$/;
+    /^(\w+:\/\/(?<host>[^/]+)\/(?<path>.+)\/(?<project>[^/]+?)(?:\.git)?)|(\w+@(?<host2>[^:]+):(?<path2>.+)\/(?<project2>[^/]+?)(?:\.git)?)$/;
 
   if (!remoteRe.test(remote)) {
     console.error(`Can't match remote URL '${remote}'`);
