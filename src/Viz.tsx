@@ -427,9 +427,11 @@ const draw = (
 
   const nestingNodes = rootNode
     .descendants()
-    .filter((d) => d.depth == 3 + depthAdjust)
-    .concat(rootNode.descendants().filter((d) => d.depth == 2 + depthAdjust))
-    .concat(rootNode.descendants().filter((d) => d.depth == 1 + depthAdjust));
+    .filter(
+      (d) =>
+        d.depth >= 1 + depthAdjust && d.depth <= state.expensiveConfig.depth
+    )
+    .sort((left, right) => right.depth - left.depth);
 
   const nestingNodesSelection = group
     .selectAll<SVGPathElement, HierarchyNode<TreeNode>>(".nesting")
