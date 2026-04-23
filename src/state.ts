@@ -113,14 +113,14 @@ export type Config = {
     lightnessCap: number; // scale for lightness in dark places
   };
   nesting: {
-    nestedWidths: [number, number, number];
+    nestedWidths: [number, number, number, number];
     defaultWidth: number;
   };
   teamsAndAliases: TeamsAndAliases;
   colours: {
     currentTheme: "dark" | "light"; // also sets css on the body!
     dark: {
-      nestedStrokes: [string, string, string];
+      nestedStrokes: [string, string, string, string];
       defaultStroke: string;
       selectedStroke: string;
       couplingStroke: string; // need to change the arrow colour as well if you change this!
@@ -146,7 +146,7 @@ export type Config = {
       };
     };
     light: {
-      nestedStrokes: [string, string, string];
+      nestedStrokes: [string, string, string, string];
       defaultStroke: string;
       selectedStroke: string;
       couplingStroke: string; // need to change the arrow colour as well if you change this!
@@ -425,12 +425,12 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
       },
       nesting: {
         defaultWidth: 1,
-        nestedWidths: [2, 2, 1],
+        nestedWidths: [2, 2, 1, 1],
       },
       colours: {
         currentTheme: "dark", // also sets css on the body!
         dark: {
-          nestedStrokes: ["#aaaaaa", "#777777", "#444444"],
+          nestedStrokes: ["#aaaaaa", "#777777", "#444444", "#222222"],
           defaultStroke: "#111111",
           selectedStroke: "#fffa00",
           couplingStroke: "#ff6300", // need to change the arrow colour as well if you change this!
@@ -456,7 +456,7 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
           },
         },
         light: {
-          nestedStrokes: ["#777777", "#aaaaaa", "#dddddd"],
+          nestedStrokes: ["#777777", "#aaaaaa", "#dddddd", "#eeeeee"],
           defaultStroke: "#f7f7f7",
           selectedStroke: "#fffa00",
           couplingStroke: "#ff6300", // need to change the arrow colour as well if you change this!
@@ -753,9 +753,9 @@ interface SetColour {
 interface SetLines {
   type: "setLines";
   payload: {
-    nestedWidths: [number, number, number];
+    nestedWidths: [number, number, number, number];
     defaultWidth: number;
-    nestedStrokes: [string, string, string];
+    nestedStrokes: [string, string, string, string];
     defaultStroke: string;
   };
 }

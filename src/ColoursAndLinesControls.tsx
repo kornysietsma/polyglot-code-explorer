@@ -15,10 +15,12 @@ const ColoursAndLinesControls = (props: DefaultProps) => {
       nestedWidths: [...state.config.nesting.nestedWidths] as [
         number,
         number,
+        number,
         number
       ],
       defaultWidth: state.config.nesting.defaultWidth,
       nestedStrokes: [...themedColours(state.config).nestedStrokes] as [
+        string,
         string,
         string,
         string
@@ -153,6 +155,40 @@ const ColoursAndLinesControls = (props: DefaultProps) => {
             onChange={(newColour: string) => {
               const payload = basePayload();
               payload.nestedStrokes[2] = newColour;
+              dispatch({
+                type: "setLines",
+                payload,
+              });
+            }}
+          ></ColourPicker>
+        </label>
+      </div>
+      <div>
+        <label>
+          4th level width
+          <NumberPicker
+            name="default width"
+            defaultValue={state.config.nesting.nestedWidths[3]}
+            step={1}
+            min={0}
+            max={20}
+            onChange={(newWidth) => {
+              const payload = basePayload();
+              payload.nestedWidths[3] = newWidth || 1;
+              dispatch({
+                type: "setLines",
+                payload,
+              });
+            }}
+          ></NumberPicker>
+        </label>
+        <label>
+          Colour:
+          <ColourPicker
+            colour={themedColours(state.config).nestedStrokes[3]}
+            onChange={(newColour: string) => {
+              const payload = basePayload();
+              payload.nestedStrokes[3] = newColour;
               dispatch({
                 type: "setLines",
                 payload,

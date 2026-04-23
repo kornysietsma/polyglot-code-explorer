@@ -80,6 +80,22 @@ export type ExportableState = {
   teamsAndAliases: ExportTeamsAndAliases;
 };
 
+function padNestedStrokes(strokes: string[] | undefined, fallback: string) {
+  const nextStrokes = [...(strokes ?? [])];
+  while (nextStrokes.length < 4) {
+    nextStrokes.push(nextStrokes[nextStrokes.length - 1] ?? fallback);
+  }
+  return nextStrokes.slice(0, 4) as [string, string, string, string];
+}
+
+function padNestedWidths(widths: number[] | undefined, fallback: number) {
+  const nextWidths = [...(widths ?? [])];
+  while (nextWidths.length < 4) {
+    nextWidths.push(nextWidths[nextWidths.length - 1] ?? fallback);
+  }
+  return nextWidths.slice(0, 4) as [number, number, number, number];
+}
+
 function toExportUser(
   users: UserData[],
   state: State,
@@ -243,18 +259,33 @@ export function stateFromExportable(
       messages.push(errorMessage("fixing missing state"));
       newState.config.nesting = {
         defaultWidth: 1,
-        nestedWidths: [4, 3, 2],
+        nestedWidths: [4, 3, 2, 1],
       };
       newState.config.colours.dark.nestedStrokes = [
         "#aaaaaa",
         "#777777",
         "#444444",
+        "#222222",
       ];
       newState.config.colours.light.nestedStrokes = [
         "#777777",
         "#aaaaaa",
         "#dddddd",
+        "#eeeeee",
       ];
+    } else {
+      newState.config.nesting.nestedWidths = padNestedWidths(
+        newState.config.nesting.nestedWidths,
+        newState.config.nesting.defaultWidth
+      );
+      newState.config.colours.dark.nestedStrokes = padNestedStrokes(
+        newState.config.colours.dark.nestedStrokes,
+        newState.config.colours.dark.defaultStroke
+      );
+      newState.config.colours.light.nestedStrokes = padNestedStrokes(
+        newState.config.colours.light.nestedStrokes,
+        newState.config.colours.light.defaultStroke
+      );
     }
     return { state: failed ? undefined : newState, messages };
   } catch (e) {
