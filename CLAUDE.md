@@ -12,22 +12,24 @@ Project context belongs in exactly three files, all in git so they can be read a
 
 Do not rely on Claude's private memory for project context — put it in one of these three files instead.
 
-**Currently in flight:** a full tooling and dependency refresh on branch `big-cleanup` (CRA → Vite, React 19, TS 6, yarn → npm). Read `spec.md` then `plan.md` before starting work. The commands and architecture below describe the pre-refresh state and are updated at plan step 7.2.
+**Recently completed:** a full tooling and dependency refresh on branch `big-cleanup` (CRA → Vite, React 19, TS 6, yarn → npm) — see `spec.md` for what changed and why, `plan.md` for the step-by-step record. The commands and architecture below describe the resulting (current) state.
 
 ## What this is
 
-The front-end (Create React App + TypeScript + D3) for visualising a codebase as a Voronoi/circle-pack treemap, coloured by metrics like lines of code, age, churn, indentation, or git team ownership. It only _renders_ data — the JSON data files it consumes are produced by a separate scanner tool (not in this repo); see <https://polyglot.korny.info>. The JSON data format is versioned (`SUPPORTED_FILE_VERSION` in `src/polyglot_data.types.ts`) and changes with the app, so old data files can stop working - changes to the scanner need to be in sync with changes to this front-end.
+The front-end (Vite + TypeScript + D3) for visualising a codebase as a Voronoi/circle-pack treemap, coloured by metrics like lines of code, age, churn, indentation, or git team ownership. It only _renders_ data — the JSON data files it consumes are produced by a separate scanner tool (not in this repo); see <https://polyglot.korny.info>. The JSON data format is versioned (`SUPPORTED_FILE_VERSION` in `src/polyglot_data.types.ts`) and changes with the app, so old data files can stop working - changes to the scanner need to be in sync with changes to this front-end.
 
-The version check at `Loader.tsx` is `semver.satisfies(data.version, SUPPORTED_FILE_VERSION)` with a bare version as the range, which means **exact equality**, not "compatible with". A data file one patch version behind will not load. Only `public/data/default.json` is tracked in git; the other local files there are untracked, mostly stale, and will not load without a version bump.
+The version check at `Loader.tsx` is `semver.satisfies(data.version, SUPPORTED_FILE_VERSION)` with a bare version as the range, which means **exact equality**, not "compatible with". A data file one patch version behind will not load. Only `data/default.json` is tracked in git; the other local files there are untracked, mostly stale, and will not load without a version bump.
 
 ## Commands
 
-- `yarn install` — install dependencies (uses yarn, not npm)
-- `yarn start` — run dev server at localhost:3000, loads `public/data/default.json`
-- `REACT_APP_EXPLORER_DATA=foo yarn start` — load `public/data/foo.json` instead (and optionally `public/data/foo_state.json` for saved UI state)
-- `yarn build` — production build
-- `yarn test` / `yarn test --watchAll` — run the (sparse) Jest test suite; there is no lint or typecheck npm script, run `npx eslint src` / `npx tsc --noEmit` directly
-- Release process is documented in `Releasing.md`: bump `package.json` version, tag `vX.Y.Z`, push tags — GitHub Actions (`.github/workflows/main.yml`) builds a zip and publishes a GitHub release on tag push.
+- `npm install` — install dependencies
+- `npm start` (alias `npm run dev`) — run dev server at localhost:5173, loads `data/default.json`
+- `EXPLORER_DATA=foo npm start` — load `data/foo.json` instead (and optionally `data/foo_state.json` for saved UI state)
+- `npm run build` — production build to `dist/`, containing the app plus exactly the one data file named by `EXPLORER_DATA` (or `default.json` if unset)
+- `npm test` / `npm run test:watch` — Vitest unit tests
+- `npm run e2e` / `npm run e2e:update` — Playwright screenshot suite (10 baseline shots under `tests/screenshots.spec.ts-snapshots/`); a reported diff is a review aid, not a pass/fail gate — see `spec.md` §6.8
+- `npm run typecheck` / `npm run lint` / `npm run format:check` — individual checks; `npm run check` runs all of them plus the unit tests
+- Release process: bump `package.json` version, update `CHANGELOG.md`, tag `vX.Y.Z`, push tags. No CI and no build artifacts — users build from source (see `README.md`).
 
 ## Manual visual verification
 

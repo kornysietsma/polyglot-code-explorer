@@ -976,7 +976,6 @@ function updateStateFromAction(state: State, action: Action): State {
 }
 
 // Note - this takes a binding of the data ref, so App.js can pass in the data and the reducer can update state based on data.
-// TODO: use immer? Needs a change from my base sample as `produce()` doesn't quite fit with `postprocessState`
 function globalDispatchReducer(dataRef: VizDataRef) {
   return (state: State, action: Action) => {
     const newState = updateStateFromAction(state, action);
