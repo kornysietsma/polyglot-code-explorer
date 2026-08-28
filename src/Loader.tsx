@@ -123,9 +123,9 @@ export type ExportableStateMaybe = MutableRefObject<
 >;
 
 const Loader = () => {
-  const dataFile = process.env.REACT_APP_EXPLORER_DATA || "default";
-  const url = `${process.env.PUBLIC_URL}/data/${dataFile}.json`;
-  const stateUrl = `${process.env.PUBLIC_URL}/data/${dataFile}_state.json`;
+  const dataFile = __EXPLORER_DATA__;
+  const url = `${import.meta.env.BASE_URL}data/${dataFile}.json`;
+  const stateUrl = `${import.meta.env.BASE_URL}data/${dataFile}_state.json`;
 
   const dataRefEventually: VizDataRefMaybe = useRef<VizData>();
   const [errors, setErrors] = useState<string[]>([]);
