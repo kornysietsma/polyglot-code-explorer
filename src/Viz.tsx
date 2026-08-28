@@ -166,7 +166,7 @@ function findSelectionPath(
 }
 
 const update = (
-  d3Container: React.RefObject<SVGSVGElement>,
+  d3Container: React.RefObject<SVGSVGElement | null>,
   files: TreeNode,
   metadata: VizMetadata,
   features: FeatureFlags,
@@ -328,7 +328,7 @@ function drawCoupling(
 }
 
 const updateCoupling = (
-  d3Container: React.RefObject<SVGSVGElement>,
+  d3Container: React.RefObject<SVGSVGElement | null>,
   files: TreeNode,
   metadata: VizMetadata,
   state: State,
@@ -345,7 +345,7 @@ const updateCoupling = (
 };
 
 const draw = (
-  d3Container: React.RefObject<SVGSVGElement>,
+  d3Container: React.RefObject<SVGSVGElement | null>,
   files: TreeNode,
   metadata: VizMetadata,
   features: FeatureFlags,
@@ -507,7 +507,7 @@ function addDays(date: Date, days: number) {
 }
 
 function drawTimescale(
-  d3TimescaleContainer: React.RefObject<SVGSVGElement>,
+  d3TimescaleContainer: React.RefObject<SVGSVGElement | null>,
   timescaleData: TimescaleIntervalData[],
   features: FeatureFlags,
   state: State,
@@ -632,7 +632,7 @@ function drawTimescale(
 
 // see https://stackoverflow.com/questions/53446020/how-to-compare-oldvalues-and-newvalues-on-react-hooks-useeffect
 function usePrevious<T>(value: T) {
-  const ref = useRef<T>();
+  const ref = useRef<T | undefined>(undefined);
   useEffect(() => {
     ref.current = value;
   });
@@ -644,8 +644,10 @@ const updateBodyTheme = (newTheme: string) => {
 };
 
 const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
-  const d3Container: RefObject<SVGSVGElement> = useRef(null);
-  const d3TimescaleContainer: RefObject<SVGSVGElement> = useRef(null);
+  const d3Container: RefObject<SVGSVGElement | null> =
+    useRef<SVGSVGElement | null>(null);
+  const d3TimescaleContainer: RefObject<SVGSVGElement | null> =
+    useRef<SVGSVGElement | null>(null);
 
   const debouncedDispatch = useMemo(
     () => _.debounce((nextValue) => dispatch(nextValue), 250),

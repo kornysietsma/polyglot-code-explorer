@@ -1,15 +1,15 @@
-import moment from "moment";
+import { format, fromUnixTime, getUnixTime } from "date-fns";
 
 export function humanizeDate(unixdate: number) {
-  return moment.unix(unixdate).format("DD-MMM-YYYY");
+  return format(fromUnixTime(unixdate), "dd-MMM-yyyy");
 }
 
 export function dateToUnix(jsDate: Date): number {
-  return moment(jsDate).unix();
+  return getUnixTime(jsDate);
 }
 
 export function unixToDate(date: number): Date {
-  return moment.unix(date).toDate();
+  return fromUnixTime(date);
 }
 
 export function humanizeDays(days: number): string {

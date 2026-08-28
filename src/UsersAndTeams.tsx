@@ -592,7 +592,7 @@ const UsersAndTeams = (props: DefaultProps) => {
     let teamName =
       pageState.checkedUsers.size == 1
         ? pageState.usersAndAliases[
-            pageState.checkedUsers.values().next().value
+            pageState.checkedUsers.values().next().value!
           ]?.name
         : undefined;
     if (!teamName) {

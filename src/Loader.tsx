@@ -127,9 +127,13 @@ const Loader = () => {
   const url = `${import.meta.env.BASE_URL}data/${dataFile}.json`;
   const stateUrl = `${import.meta.env.BASE_URL}data/${dataFile}_state.json`;
 
-  const dataRefEventually: VizDataRefMaybe = useRef<VizData>();
+  const dataRefEventually: VizDataRefMaybe = useRef<VizData | undefined>(
+    undefined
+  );
   const [errors, setErrors] = useState<string[]>([]);
-  const stateRefEventually: ExportableStateMaybe = useRef<ExportableState>();
+  const stateRefEventually: ExportableStateMaybe = useRef<
+    ExportableState | undefined
+  >(undefined);
 
   const data = useFetch(url, setErrors);
   dataRefEventually.current = data;
