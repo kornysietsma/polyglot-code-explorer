@@ -9,7 +9,7 @@ import { FileNode, GitData, LocData, NodeLayout } from "./polyglot_data.types";
 import { UserAliases, UserTeams } from "./state";
 
 const EMPTY_LAYOUT: NodeLayout = {
-  algorithm: "test",
+  algorithm: "voronoi",
   center: [0, 0],
   polygon: [],
 };

@@ -6,6 +6,7 @@ import {
   DirectoryNode,
   FeatureFlags,
   FileNode,
+  isCirclePacked,
   isFile,
   isHierarchyDirectory,
   TreeNode,
@@ -107,7 +108,7 @@ function overrideColourFunction(
   const { nonexistentColour, circlePackBackground } = themedColours(config);
   const { latest } = config.filters.dateRange;
 
-  if (node.data.layout.algorithm === "circlePack") return circlePackBackground;
+  if (isCirclePacked(node.data.layout.algorithm)) return circlePackBackground;
   const creationDate =
     isFile(node.data) && nodeCreationDate(node.data, features);
   if (creationDate && creationDate > latest) return nonexistentColour;

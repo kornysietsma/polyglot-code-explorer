@@ -58,6 +58,11 @@ export function nodeCumulativeLinesOfCode(node: TreeNode): number {
   return node.value;
 }
 
+// count of strict ancestors whose layout.algorithm is a circle type - see NodeLayoutAlgorithm
+export function nodeCircleAncestors(node: TreeNode): number {
+  return node.circleAncestors ?? 0;
+}
+
 export function nodeDepth(
   d: HierarchyNode<FileNode> | HierarchyNode<DirectoryNode>
 ): number {

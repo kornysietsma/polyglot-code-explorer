@@ -2,9 +2,23 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Where context lives
+
+Project context belongs in exactly three files, all in git so they can be read and reviewed:
+
+- **`CLAUDE.md`** (this file) — durable project context. Keep it thin.
+- **`spec.md`** — the current spec for the in-flight tooling refresh, as it stands *now*. Not a history; edit it in place, git has the old versions.
+- **`plan.md`** — the ordered implementation plan and its checklist. Trimmed as steps complete.
+
+Do not rely on Claude's private memory for project context — put it in one of these three files instead.
+
+**Currently in flight:** a full tooling and dependency refresh on branch `big-cleanup` (CRA → Vite, React 19, TS 6, yarn → npm). Read `spec.md` then `plan.md` before starting work. The commands and architecture below describe the pre-refresh state and are updated at plan step 7.2.
+
 ## What this is
 
 The front-end (Create React App + TypeScript + D3) for visualising a codebase as a Voronoi/circle-pack treemap, coloured by metrics like lines of code, age, churn, indentation, or git team ownership. It only *renders* data — the JSON data files it consumes are produced by a separate scanner tool (not in this repo); see <https://polyglot.korny.info>. The JSON data format is versioned (`SUPPORTED_FILE_VERSION` in `src/polyglot_data.types.ts`) and changes with the app, so old data files can stop working - changes to the scanner need to be in sync with changes to this front-end.
+
+The version check at `Loader.tsx` is `semver.satisfies(data.version, SUPPORTED_FILE_VERSION)` with a bare version as the range, which means **exact equality**, not "compatible with". A data file one patch version behind will not load. Only `public/data/default.json` is tracked in git; the other local files there are untracked, mostly stale, and will not load without a version bump.
 
 ## Commands
 
@@ -14,6 +28,12 @@ The front-end (Create React App + TypeScript + D3) for visualising a codebase as
 - `yarn build` — production build
 - `yarn test` / `yarn test --watchAll` — run the (sparse) Jest test suite; there is no lint or typecheck npm script, run `npx eslint src` / `npx tsc --noEmit` directly
 - Release process is documented in `Releasing.md`: bump `package.json` version, tag `vX.Y.Z`, push tags — GitHub Actions (`.github/workflows/main.yml`) builds a zip and publishes a GitHub release on tag push.
+
+## Manual visual verification
+
+For manual checks that need eyes on the rendered app (comparing a before/after, checking a plan.md
+manual gate), use the `playwright-cli` skill to drive a real browser and take screenshots. Don't use
+a browser extension/plugin (e.g. claude-in-chrome) for this — Korny prefers playwright-cli.
 
 ## Architecture
 
