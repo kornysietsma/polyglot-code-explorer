@@ -1,6 +1,6 @@
 import * as d3 from "d3";
+import { fromUnixTime, getUnixTime, startOfWeek } from "date-fns";
 import _ from "lodash";
-import moment, { unitOfTime } from "moment";
 
 import { nodeLinesOfCode, nodeLocData } from "./nodeData";
 import {
@@ -166,19 +166,32 @@ export type TimescaleIntervalData = {
   lines_deleted: number;
 };
 
+// gatherTimescaleData is only ever called with "week" - narrow union rather than
+// reproducing moment's whole StartOf type for a single supported value.
+export type TimescaleUnit = "week";
+
+function startOfUnit(date: Date, timeUnit: TimescaleUnit): Date {
+  switch (timeUnit) {
+    case "week":
+      // moment's default start-of-week is locale-dependent; pin explicitly to Sunday
+      return startOfWeek(date, { weekStartsOn: 0 });
+  }
+}
+
 // yes, I'm modifying a parameter, it's hard to avoid in JavaScript with big data structures
-// timeUnit is 'week' or similar, passed to https://momentjs.com/docs/#/manipulating/start-of/
 function addTimescaleData(
   timescaleData: Map<number, TimescaleData>,
   node: TreeNode,
   features: FeatureFlags,
-  timeUnit: unitOfTime.StartOf
+  timeUnit: TimescaleUnit
 ) {
   if (features.git) {
     const gitData = isFile(node) && node.data.git;
     if (gitData && gitData.details && gitData.details.length > 0) {
       gitData.details.forEach((data) => {
-        const startDate = moment.unix(data.commit_day).startOf(timeUnit).unix();
+        const startDate = getUnixTime(
+          startOfUnit(fromUnixTime(data.commit_day), timeUnit)
+        );
         let dateData = timescaleData.get(startDate);
         if (!dateData) {
           dateData = {
@@ -220,7 +233,7 @@ function addTimescaleData(
 
 export function gatherTimescaleData(
   data: PolyglotData,
-  timeUnit: unitOfTime.StartOf
+  timeUnit: TimescaleUnit
 ): TimescaleIntervalData[] {
   const timescaleData: Map<number, TimescaleData> = new Map();
   addTimescaleData(timescaleData, data.tree, data.features, timeUnit);
@@ -228,7 +241,7 @@ export function gatherTimescaleData(
   return [...timescaleData]
     .map(([day, dayData]) => {
       // convert to Javascript dates as d3 likes them - sigh.  I could do this on display?
-      return { day: moment.unix(day).toDate(), ...dayData };
+      return { day: fromUnixTime(day), ...dayData };
     })
     .sort((a, b) => a.day.getTime() - b.day.getTime());
 }

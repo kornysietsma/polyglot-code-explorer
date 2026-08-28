@@ -89,7 +89,7 @@ export abstract class BaseVisualization<ScaleUnit> implements Visualization {
     const override = overrideColourFunction(d, config, this.features);
     if (override !== undefined) return override;
     const value = isHierarchyDirectory(d)
-      ? this.parentFn(d)
+      ? this.parentFn(d as HierarchyNode<DirectoryNode>)
       : this.dataFn(d as HierarchyNode<FileNode>);
 
     return value === undefined

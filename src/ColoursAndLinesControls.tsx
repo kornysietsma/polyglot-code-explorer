@@ -1,10 +1,37 @@
 import React from "react";
-import { NumberPicker } from "react-widgets/cjs";
+import {
+  Button,
+  Group,
+  Input,
+  Label,
+  NumberField,
+} from "react-aria-components";
 
 import { DefaultProps } from "./components.types";
 import { themedColours } from "./state";
 import { ColourPicker } from "./widgets/ColourPicker";
 import ToggleablePanel from "./widgets/ToggleablePanel";
+
+const LineWidthField = (props: {
+  label: string;
+  defaultValue: number;
+  onChange: (newWidth: number) => void;
+}) => (
+  <NumberField
+    defaultValue={props.defaultValue}
+    step={1}
+    minValue={0}
+    maxValue={20}
+    onChange={(newWidth) => props.onChange(newWidth || 1)}
+  >
+    <Label>{props.label}</Label>
+    <Group>
+      <Button slot="decrement">−</Button>
+      <Input />
+      <Button slot="increment">+</Button>
+    </Group>
+  </NumberField>
+);
 
 const ColoursAndLinesControls = (props: DefaultProps) => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -32,22 +59,16 @@ const ColoursAndLinesControls = (props: DefaultProps) => {
   return (
     <ToggleablePanel title="Colours and Lines" showInitially={false}>
       <div>
-        <label>
-          Default line width
-          <NumberPicker
-            name="default width"
-            defaultValue={state.config.nesting.defaultWidth}
-            step={1}
-            min={0}
-            max={20}
-            onChange={(newWidth) =>
-              dispatch({
-                type: "setLines",
-                payload: { ...basePayload(), defaultWidth: newWidth || 1 },
-              })
-            }
-          ></NumberPicker>
-        </label>
+        <LineWidthField
+          label="Default line width"
+          defaultValue={state.config.nesting.defaultWidth}
+          onChange={(newWidth) =>
+            dispatch({
+              type: "setLines",
+              payload: { ...basePayload(), defaultWidth: newWidth },
+            })
+          }
+        />
         <label>
           Default line colour:
           <ColourPicker
@@ -62,24 +83,18 @@ const ColoursAndLinesControls = (props: DefaultProps) => {
         </label>
       </div>
       <div>
-        <label>
-          Top level width
-          <NumberPicker
-            name="default width"
-            defaultValue={state.config.nesting.nestedWidths[0]}
-            step={1}
-            min={0}
-            max={20}
-            onChange={(newWidth) => {
-              const payload = basePayload();
-              payload.nestedWidths[0] = newWidth || 1;
-              dispatch({
-                type: "setLines",
-                payload,
-              });
-            }}
-          ></NumberPicker>
-        </label>
+        <LineWidthField
+          label="Top level width"
+          defaultValue={state.config.nesting.nestedWidths[0]}
+          onChange={(newWidth) => {
+            const payload = basePayload();
+            payload.nestedWidths[0] = newWidth;
+            dispatch({
+              type: "setLines",
+              payload,
+            });
+          }}
+        />
         <label>
           Colour:
           <ColourPicker
@@ -96,24 +111,18 @@ const ColoursAndLinesControls = (props: DefaultProps) => {
         </label>
       </div>
       <div>
-        <label>
-          2nd level width
-          <NumberPicker
-            name="default width"
-            defaultValue={state.config.nesting.nestedWidths[1]}
-            step={1}
-            min={0}
-            max={20}
-            onChange={(newWidth) => {
-              const payload = basePayload();
-              payload.nestedWidths[1] = newWidth || 1;
-              dispatch({
-                type: "setLines",
-                payload,
-              });
-            }}
-          ></NumberPicker>
-        </label>
+        <LineWidthField
+          label="2nd level width"
+          defaultValue={state.config.nesting.nestedWidths[1]}
+          onChange={(newWidth) => {
+            const payload = basePayload();
+            payload.nestedWidths[1] = newWidth;
+            dispatch({
+              type: "setLines",
+              payload,
+            });
+          }}
+        />
         <label>
           Colour:
           <ColourPicker
@@ -130,24 +139,18 @@ const ColoursAndLinesControls = (props: DefaultProps) => {
         </label>
       </div>
       <div>
-        <label>
-          3rd level width
-          <NumberPicker
-            name="default width"
-            defaultValue={state.config.nesting.nestedWidths[2]}
-            step={1}
-            min={0}
-            max={20}
-            onChange={(newWidth) => {
-              const payload = basePayload();
-              payload.nestedWidths[2] = newWidth || 1;
-              dispatch({
-                type: "setLines",
-                payload,
-              });
-            }}
-          ></NumberPicker>
-        </label>
+        <LineWidthField
+          label="3rd level width"
+          defaultValue={state.config.nesting.nestedWidths[2]}
+          onChange={(newWidth) => {
+            const payload = basePayload();
+            payload.nestedWidths[2] = newWidth;
+            dispatch({
+              type: "setLines",
+              payload,
+            });
+          }}
+        />
         <label>
           Colour:
           <ColourPicker
@@ -164,24 +167,18 @@ const ColoursAndLinesControls = (props: DefaultProps) => {
         </label>
       </div>
       <div>
-        <label>
-          4th level width
-          <NumberPicker
-            name="default width"
-            defaultValue={state.config.nesting.nestedWidths[3]}
-            step={1}
-            min={0}
-            max={20}
-            onChange={(newWidth) => {
-              const payload = basePayload();
-              payload.nestedWidths[3] = newWidth || 1;
-              dispatch({
-                type: "setLines",
-                payload,
-              });
-            }}
-          ></NumberPicker>
-        </label>
+        <LineWidthField
+          label="4th level width"
+          defaultValue={state.config.nesting.nestedWidths[3]}
+          onChange={(newWidth) => {
+            const payload = basePayload();
+            payload.nestedWidths[3] = newWidth;
+            dispatch({
+              type: "setLines",
+              payload,
+            });
+          }}
+        />
         <label>
           Colour:
           <ColourPicker

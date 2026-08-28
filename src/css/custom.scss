@@ -121,3 +121,38 @@ span.delayedInput {
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
   z-index: 100;
 }
+
+.react-aria-NumberField {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+
+  .react-aria-Label {
+    margin-right: 4px;
+  }
+
+  .react-aria-Group {
+    display: inline-flex;
+    align-items: stretch;
+    border: 1px solid var(--color-borders);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .react-aria-Input {
+    width: 3em;
+    border: none;
+    text-align: right;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+  }
+
+  .react-aria-Button {
+    border: none;
+    border-left: 1px solid var(--color-borders);
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    cursor: pointer;
+    padding: 0 6px;
+  }
+}

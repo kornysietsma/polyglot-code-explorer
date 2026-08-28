@@ -1,6 +1,6 @@
 import * as d3 from "d3";
+import { addDays, fromUnixTime, getUnixTime, subYears } from "date-fns";
 import _ from "lodash";
-import moment from "moment";
 
 import { calculateFileMaxima } from "./nodeData";
 import { UserData } from "./polyglot_data.types";
@@ -323,13 +323,13 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
   let earliest: number;
   let latest: number;
   if (hasDates) {
-    const twoYearsAgo = moment.unix(latestData).subtract(2, "year").unix();
+    const twoYearsAgo = getUnixTime(subYears(fromUnixTime(latestData), 2));
 
     earliest = twoYearsAgo < earliestData ? earliestData : twoYearsAgo;
-    latest = moment.unix(latestData).add(2, "day").unix(); // a bit of leeway for selecting all dates easily
+    latest = getUnixTime(addDays(fromUnixTime(latestData), 2)); // a bit of leeway for selecting all dates easily
   } else {
-    earliest = moment().subtract(2, "year").unix();
-    latest = moment().add(2, "day").unix();
+    earliest = getUnixTime(subYears(new Date(), 2));
+    latest = getUnixTime(addDays(new Date(), 2));
   }
 
   const defaultState: State = {

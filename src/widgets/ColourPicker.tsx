@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
+import { useInteractOutside } from "react-aria";
 import { HexColorPicker } from "react-colorful";
-import useDebouncy from "use-debouncy/lib/fn";
-import useOnClickOutside from "use-onclickoutside";
+import { useDebouncyFn } from "use-debouncy";
 
 export const ColourPicker = ({
   colour,
@@ -14,9 +14,9 @@ export const ColourPicker = ({
   const [isOpen, toggle] = useState(false);
 
   const close = useCallback(() => toggle(false), []);
-  useOnClickOutside(popover, close);
+  useInteractOutside({ ref: popover, onInteractOutside: close });
 
-  const handleChange = useDebouncy(
+  const handleChange = useDebouncyFn(
     (newColour: string) => onChange(newColour),
     200
   );

@@ -64,15 +64,17 @@ export function isFile(node: TreeNode): node is FileNode {
   return (node as DirectoryNode).children == undefined;
 }
 
-export function isHierarchyDirectory(
-  node: HierarchyNode<TreeNode>
-): node is HierarchyNode<DirectoryNode> {
+// Not type predicates: @types/d3-hierarchy's `HierarchyNode<Datum>` declares a
+// `new(data: Datum): this` construct signature, which puts Datum in contravariant
+// position and makes `HierarchyNode<DirectoryNode>` structurally incompatible with
+// `HierarchyNode<TreeNode>` for predicate-narrowing purposes, even though the
+// underlying data is provably safe to narrow. Callers cast explicitly instead, same
+// as the existing `d as HierarchyNode<FileNode>` convention at the one call site.
+export function isHierarchyDirectory(node: HierarchyNode<TreeNode>): boolean {
   return isDirectory(node.data);
 }
 
-export function isHierarchyFile(
-  node: HierarchyNode<TreeNode>
-): node is HierarchyNode<FileNode> {
+export function isHierarchyFile(node: HierarchyNode<TreeNode>): boolean {
   return isFile(node.data);
 }
 
