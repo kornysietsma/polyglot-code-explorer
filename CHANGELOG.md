@@ -11,7 +11,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Full tooling and dependency refresh: Create React App → Vite, yarn → npm, React 19, TypeScript 6,
   Jest → Vitest, ESLint flat config, Prettier 3. No change to how the app looks or behaves, other
-  than a fix to circle-packed layout handling for `nestedCircles` data files (see `spec.md` §3.2).
+  than the layout fix below.
+
+### Fixed
+
+- Circle-packed layout depth handling for `nestedCircles` data files. The explorer only understood
+  the `circlePack` layout mode, and tracked it with a single global flag that could not express
+  circle depth varying per branch — so nesting line widths and colours were wrong below a
+  `nestedCircles` root. Depth is now a per-node count of circle-packed ancestors.
 - Data files moved from `public/data/` to a top-level `data/` directory; the unprefixed
   `EXPLORER_DATA` env var replaces `REACT_APP_EXPLORER_DATA`; `npm run build` now ships exactly one
   data file instead of the whole `data/` directory.
