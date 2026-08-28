@@ -407,7 +407,6 @@ const draw = (
   const newNodes = nodes.enter().append("path").classed("cell", true);
 
   redrawPolygons(nodes.merge(newNodes), metadata, features, state)
-    // eslint-disable-next-line no-unused-vars
     .on(
       "click",
       function (

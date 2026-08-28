@@ -19,7 +19,7 @@
     "noImplicitAny": true,
     "noImplicitReturns": true,
     "noUncheckedIndexedAccess": true,
-    "types": ["jest"]
+    "types": ["vitest/globals"]
   },
   "include": ["src"]
 }
