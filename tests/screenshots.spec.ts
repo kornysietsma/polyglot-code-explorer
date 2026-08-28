@@ -1,6 +1,6 @@
 import { expect, Page, test } from "@playwright/test";
 
-// The 10-shot core screenshot set - see spec.md §6.8. These are a review aid, not a
+// The 10-shot core screenshot set - see CLAUDE.md. These are a review aid, not a
 // pass/fail gate (re-baseline with `npm run e2e:update` after a deliberate change).
 
 async function gotoLoaded(page: Page) {
@@ -28,9 +28,9 @@ async function expandPanel(page: Page, title: string) {
 }
 
 // Selecting a specific node means clicking the pre-computed D3 canvas at a pixel
-// position - there's no text-based way to pick a single file (see spec.md §3.3, the
-// layout is deterministic). Try successively larger cells (by rendered area) until one
-// resolves to a file rather than a directory.
+// position - there's no text-based way to pick a single file, and the layout is
+// deterministic because the polygons come from the data file. Try successively larger
+// cells (by rendered area) until one resolves to a file rather than a directory.
 async function selectAFileNode(page: Page) {
   const cells = page.locator("svg.chart path.cell");
   const count = await cells.count();

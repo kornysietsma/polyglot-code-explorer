@@ -4,15 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Where context lives
 
-Project context belongs in exactly three files, all in git so they can be read and reviewed:
+Project context belongs in git so it can be read and reviewed — never in Claude's private memory.
 
-- **`CLAUDE.md`** (this file) — durable project context. Keep it thin.
-- **`spec.md`** — the spec for the tooling refresh, describing the state it left behind. Not a history; if it goes stale, edit it in place — git has the old versions.
-- **`plan.md`** — that refresh's implementation plan and checklist, now a completion record.
-
-Do not rely on Claude's private memory for project context — put it in one of these three files instead.
-
-**Recently completed:** a full tooling and dependency refresh on branch `big-cleanup` (CRA → Vite, React 19, TS 6, yarn → npm) — see `spec.md` for what changed and why, `plan.md` for the step-by-step record. The commands and architecture below describe the resulting (current) state.
+- **`CLAUDE.md`** (this file) — durable project context. Keep it thin: design decisions and
+  constraints that aren't obvious from the code, plus where to find things that don't follow
+  common conventions. Not a substitute for reading the code.
+- For a substantial piece of work, add a **`spec.md`** (what and why, edited in place as it
+  stands _now_) and **`plan.md`** (ordered steps and checklist). Fold anything durable back into
+  this file when the work lands, then delete them — git keeps the history.
 
 ## What this is
 
@@ -27,15 +26,23 @@ The version check at `Loader.tsx` is `semver.satisfies(data.version, SUPPORTED_F
 - `EXPLORER_DATA=foo npm start` — load `data/foo.json` instead (and optionally `data/foo_state.json` for saved UI state)
 - `npm run build` — production build to `dist/`, containing the app plus exactly the one data file named by `EXPLORER_DATA` (or `default.json` if unset)
 - `npm test` / `npm run test:watch` — Vitest unit tests
-- `npm run e2e` / `npm run e2e:update` — Playwright screenshot suite (10 baseline shots under `tests/screenshots.spec.ts-snapshots/`); a reported diff is a review aid, not a pass/fail gate — see `spec.md` §6.8
+- `npm run e2e` / `npm run e2e:update` — Playwright screenshot suite (10 baseline shots under `tests/screenshots.spec.ts-snapshots/`)
 - `npm run typecheck` / `npm run lint` / `npm run format:check` — individual checks; `npm run check` runs all of them plus the unit tests
 - Release process: bump `package.json` version, update `CHANGELOG.md`, tag `vX.Y.Z`, push tags. No CI and no build artifacts — users build from source (see `README.md`).
 
+The screenshot suite is a **review aid, not a pass/fail gate**: its job is to make visual change
+_visible_ so it's a deliberate choice. Open any reported diff and decide, then re-baseline with
+`npm run e2e:update`. Don't wire it into a blocking check. Strictness is asymmetric though — a
+change that touches no UI code should produce **zero** diffs, and any diff on the visualisation
+canvas is a real bug, because those polygons are pre-computed in the data file rather than laid
+out at render time.
+
 ## Manual visual verification
 
-For manual checks that need eyes on the rendered app (comparing a before/after, checking a plan.md
-manual gate), use the `playwright-cli` skill to drive a real browser and take screenshots. Don't use
-a browser extension/plugin (e.g. claude-in-chrome) for this — Korny prefers playwright-cli.
+For manual checks that need eyes on the rendered app (comparing a before/after, confirming a
+change in the real app), use the `playwright-cli` skill to drive a real browser and take
+screenshots. Don't use a browser extension/plugin (e.g. claude-in-chrome) for this — Korny prefers
+playwright-cli.
 
 ## Architecture
 
@@ -53,15 +60,77 @@ a browser extension/plugin (e.g. claude-in-chrome) for this — Korny prefers pl
 
 `polyglot_data.types.ts` defines the JSON shape: a `TreeNode` is either a `DirectoryNode` or `FileNode` (discriminated via `isDirectory`/`isFile` by presence of `children`), each carrying optional `git`, `file_stats`, `coupling`, `indentation`, `loc` data depending on which `FeatureFlags` were enabled when the data was scanned. `parent` links are absent from the raw JSON and populated by `preprocess.linkParents` after load. Always check the relevant `FeatureFlags` (or use `assertFlag`) before assuming git/coupling/file_stats data is present — it may be legitimately absent for a given data file.
 
+### Circle-packed layouts and `circleAncestors`
+
+Node layout is baked into the data file by the separate layout tool
+(`polyglot-code-offline-layout`), never chosen in the UI. `NodeLayout.algorithm` has three values,
+and **`circlePack` and `nestedCircles` are two different modes, not a rename**:
+
+- `voronoi` — the default.
+- `circlePack` — circles at the top level only, voronoi below.
+- `nestedCircles` — circle-packing recurses through nested repos until it hits a git repo root,
+  then that subtree switches to voronoi. **Circle depth therefore varies per branch** within one
+  tree, because repos sit at different depths.
+
+That last point is why depth handling is a per-node count rather than a global flag.
+`preprocess.linkParents` computes `circleAncestors` on every node — the number of _strict_
+ancestors whose algorithm is a circle type (`isCirclePacked`) — and `Viz.tsx` reads it via
+`nodeCircleAncestors` at four sites to offset `d.depth`. Nesting strokes sit one level deeper than
+selection strokes; that 1-level difference is deliberate, so keep the relationship if you touch
+those offsets. Compute this in preprocess, not per-node-per-redraw — `Viz` redraws are
+performance-sensitive.
+
+`nodeCircleAncestors` throws rather than defaulting when the field is missing, because 0 is
+exactly the old buggy value and would show up as subtly-wrong nesting instead of a failure.
+
 ### State import/export
 
 `exportImport.ts` + `SaveLoadControls.tsx` let users save/load the `State` (config, teams/aliases, colours, etc., but not `calculated`) as JSON, independent of the underlying data file — this is how `*_state.json` sidecar files work.
 
+### Serving the data files
+
+Data lives in top-level `data/`, which is deliberately **not** `publicDir` — scanner files run to
+hundreds of MB and must never enter Vite's transform pipeline. Two small plugins in
+`vite.config.ts` handle it instead: `serveDataDir` streams the directory off disk in dev,
+`copyDataFile` emits exactly the one selected file at build time. Both carry comments on their
+sharp edges; read them before changing either.
+
+## Things that will bite you
+
+- **`index.tsx` deliberately omits `React.StrictMode`**, and `react-hooks/refs` is off in
+  `eslint.config.ts`. Both for the same reason: this app reads refs during render and does
+  imperative D3 rendering in `Viz.tsx`, which StrictMode's double-invoked effects would break.
+- **TypeScript is pinned to 6.x, not 7**, because `typescript-eslint` peer-caps at
+  `typescript <6.1.0`. Check that cap before bumping.
+- **`publish_*.sh` and `statefiles/` are gitignored on purpose** — they reference internal bucket
+  names and have never been tracked. Don't "helpfully" commit them.
+- **The Playwright fixture is generated, not committed.** `tests/global-setup.ts` copies
+  `data/default.json` → `data/explorertest.json` at run start and drops the committed state
+  sidecar beside it, so the fixture tracks the shipped default instead of duplicating 746 KB.
+
 ## TypeScript conventions specific to this repo
 
-`tsconfig.json` enables `noUncheckedIndexedAccess`, which TypeScript doesn't fully reconcile with manual bounds-checks. The established convention (see `README.md`) is:
+`tsconfig.app.json` enables `noUncheckedIndexedAccess`, which TypeScript doesn't fully reconcile with manual bounds-checks. The established convention (see `README.md`) is:
 
 - Use non-null assertion (`!`) when an index is provably in range from a preceding check — `@typescript-eslint/no-non-null-assertion` is deliberately disabled for this reason.
 - Where the index _isn't_ provably safe, throw an explicit `Error` on `undefined` rather than silently coercing, e.g. `if (colour == undefined) throw new Error("Logic error: invalid colour index")`.
 
 Import ordering is enforced by `simple-import-sort` via eslint (not manually maintained).
+
+## Known follow-ups
+
+Deliberately not done; all still open:
+
+- **Regenerate `data/default.json` with the current scanner** — a `nestedCircles` root with
+  coupling enabled and real git history. The tracked file is a hand-bumped 1.0.4-shaped one, and
+  `nestedCircles` is the awkward layout, so the shipped default should eventually exercise it.
+- **Re-verify against real scanner-generated multi-repo output** once
+  `polyglot-code-offline-layout`'s `nested-circles` branch lands. The nested groups in the local
+  `omf.json` smoke-test file were hand-built to match what `packChildren` produces; a real scan is
+  the final word.
+- **Consolidate the four `publish_*.sh` scripts.**
+- **TypeScript 7** once `typescript-eslint` lifts its peer cap.
+- **Better test coverage.** `datetimes.ts` and the week-bucketing in `preprocess.ts` are pure and
+  currently covered only by the screenshot suite; `state.ts`'s no-git-dates branch calls
+  `new Date()` directly, so it isn't testable as written. Korny is aware and content with this for
+  now — don't add tests unasked.

@@ -49,7 +49,14 @@ For a discussion of how I use React and D3 together, take a look at [my blog pos
 
 ## Testing
 
-To run the unit tests, `npm test`. To run the Playwright screenshot suite, `npm run e2e`.
+`npm test` runs the unit tests, `npm run e2e` the Playwright screenshot suite, and `npm run check`
+runs typecheck, lint, format-check and unit tests together — that last one is what I run before a
+release.
+
+The screenshot suite exists to make visual changes _visible_, not to gate anything. When it
+reports a diff, look at the image and decide: if the change was intended, re-baseline it with
+`npm run e2e:update`. A diff on the visualisation canvas itself is almost always a real bug,
+because those polygons are computed by the scanner and just rendered here.
 
 I have hardly any tests - mostly as this started as all UI code with little logic, and frankly the effort for UI testing on a rapidly changing pet project just didn't seem worth the benefits.
 
