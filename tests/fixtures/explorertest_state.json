@@ -1,0 +1,225 @@
+{
+  "dataVersion": "1.0.5",
+  "formatVersion": "1.4.2",
+  "name": "sample",
+  "id": "f4f49ac9-3325-4118-ac97-e11392acec9e",
+  "config": {
+    "visualization": "language",
+    "layout": {
+      "timescaleHeight": 130
+    },
+    "remoteUrlTemplate": "https://{host}/{path}/{project}/blob/{ref}/{file}",
+    "fileChangeMetric": "lines",
+    "codeInspector": {
+      "enabled": false,
+      "prefix": "http://localhost:8675/"
+    },
+    "loc": {
+      "bad": 1000,
+      "good": 0,
+      "ugly": 10000,
+      "precision": 0
+    },
+    "indentation": {
+      "sum": {
+        "bad": 10000,
+        "good": 0,
+        "ugly": 100000,
+        "precision": 0
+      },
+      "p99": {
+        "bad": 30,
+        "good": 0,
+        "ugly": 80,
+        "precision": 0
+      },
+      "stddev": {
+        "bad": 10,
+        "good": 3,
+        "ugly": 20,
+        "precision": 2
+      }
+    },
+    "age": {
+      "bad": 365,
+      "good": 0,
+      "ugly": 1460,
+      "precision": 0
+    },
+    "churn": {
+      "lines": {
+        "bad": 10,
+        "good": 0,
+        "ugly": 100,
+        "precision": 2
+      },
+      "days": {
+        "bad": 0.1,
+        "good": 0,
+        "ugly": 0.5,
+        "precision": 4
+      },
+      "commits": {
+        "bad": 0.1,
+        "good": 0,
+        "ugly": 1,
+        "precision": 4
+      }
+    },
+    "numberOfChangers": {
+      "noChangersColour": "#00ffff",
+      "oneChangerColour": "#a52a2a",
+      "fewChangersMinColour": "#00ff00",
+      "fewChangersMaxColour": "#0000ff",
+      "fewChangersMin": 2,
+      "fewChangersMax": 8,
+      "manyChangersColour": "#ffff00",
+      "manyChangersMax": 30,
+      "precision": 0,
+      "topChangersCount": 10
+    },
+    "teamVisualisation": {
+      "showNonTeamChanges": true,
+      "showLevelAsLightness": true,
+      "lightnessCap": 1
+    },
+    "nesting": {
+      "defaultWidth": 1,
+      "nestedWidths": [
+        2,
+        2,
+        1,
+        1
+      ]
+    },
+    "colours": {
+      "currentTheme": "dark",
+      "dark": {
+        "nestedStrokes": [
+          "#aaaaaa",
+          "#777777",
+          "#444444",
+          "#222222"
+        ],
+        "defaultStroke": "#111111",
+        "selectedStroke": "#fffa00",
+        "couplingStroke": "#ff6300",
+        "goodColour": "#0000ff",
+        "badColour": "#ff0000",
+        "uglyColour": "#ffff00",
+        "earlyColour": "#0000ff",
+        "lateColour": "#00ff00",
+        "neutralColour": "#808080",
+        "nonexistentColour": "#111111",
+        "errorColour": "#ff0000",
+        "teams": {
+          "noTeamColour": "#8080ff",
+          "selectedTeamColour": "#00ff00",
+          "otherUsersColour": "#ff0000"
+        },
+        "circlePackBackground": "#111111",
+        "ownerColours": {
+          "noOwnersColour": "#222222",
+          "oneOwnerColours": [
+            "#e41a1c",
+            "#377eb8",
+            "#4daf4a",
+            "#984ea3",
+            "#ff7f00",
+            "#ffff33",
+            "#a65628",
+            "#f781bf",
+            "#999999"
+          ],
+          "moreOwnerColours": [
+            "#66c2a5",
+            "#fc8d62",
+            "#8da0cb",
+            "#e78ac3",
+            "#a6d854",
+            "#ffd92f",
+            "#e5c494",
+            "#b3b3b3"
+          ],
+          "otherColour": "#808080"
+        }
+      },
+      "light": {
+        "nestedStrokes": [
+          "#777777",
+          "#aaaaaa",
+          "#dddddd",
+          "#eeeeee"
+        ],
+        "defaultStroke": "#f7f7f7",
+        "selectedStroke": "#fffa00",
+        "couplingStroke": "#ff6300",
+        "goodColour": "#0000ff",
+        "badColour": "#ff0000",
+        "uglyColour": "#ffff00",
+        "earlyColour": "#0000ff",
+        "lateColour": "#00ff00",
+        "neutralColour": "#808080",
+        "nonexistentColour": "#f7f7f7",
+        "errorColour": "#ff0000",
+        "teams": {
+          "noTeamColour": "#8080ff",
+          "selectedTeamColour": "#00ffff",
+          "otherUsersColour": "#ff0000"
+        },
+        "circlePackBackground": "#f7f7f7",
+        "ownerColours": {
+          "noOwnersColour": "#f7f7f7",
+          "oneOwnerColours": [
+            "#66c2a5",
+            "#fc8d62",
+            "#8da0cb",
+            "#e78ac3",
+            "#a6d854",
+            "#ffd92f",
+            "#e5c494",
+            "#b3b3b3"
+          ],
+          "moreOwnerColours": [
+            "#e41a1c",
+            "#377eb8",
+            "#4daf4a",
+            "#984ea3",
+            "#ff7f00",
+            "#ffff33",
+            "#a65628",
+            "#f781bf",
+            "#999999"
+          ],
+          "otherColour": "#808080"
+        }
+      }
+    },
+    "filters": {
+      "dateRange": {
+        "earliest": 1601289129,
+        "latest": 1664533929
+      }
+    },
+    "selectedNode": ""
+  },
+  "expensiveConfig": {
+    "depth": 6
+  },
+  "couplingConfig": {
+    "shown": false,
+    "minBursts": 10,
+    "minRatio": 0.9,
+    "maxCommonRoots": -1,
+    "dateRange": {
+      "earliest": 1601289129,
+      "latest": 1664361129
+    }
+  },
+  "teamsAndAliases": {
+    "aliasData": [],
+    "aliases": [],
+    "teams": [],
+    "ignoredUsers": []
+  }
+}
