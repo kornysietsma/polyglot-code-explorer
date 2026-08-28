@@ -33,10 +33,15 @@ const LineWidthField = (props: {
   </NumberField>
 );
 
-const ColoursAndLinesControls = (props: DefaultProps) => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { dataRef, state, dispatch } = props;
+// nestedWidths / nestedStrokes are fixed-length 4-tuples, one entry per nesting level
+const NESTING_LEVELS = [
+  { index: 0, label: "Top level width" },
+  { index: 1, label: "2nd level width" },
+  { index: 2, label: "3rd level width" },
+  { index: 3, label: "4th level width" },
+] as const;
 
+const ColoursAndLinesControls = ({ state, dispatch }: DefaultProps) => {
   const basePayload = () => {
     return {
       nestedWidths: [...state.config.nesting.nestedWidths] as [
@@ -82,118 +87,36 @@ const ColoursAndLinesControls = (props: DefaultProps) => {
           ></ColourPicker>
         </label>
       </div>
-      <div>
-        <LineWidthField
-          label="Top level width"
-          defaultValue={state.config.nesting.nestedWidths[0]}
-          onChange={(newWidth) => {
-            const payload = basePayload();
-            payload.nestedWidths[0] = newWidth;
-            dispatch({
-              type: "setLines",
-              payload,
-            });
-          }}
-        />
-        <label>
-          Colour:
-          <ColourPicker
-            colour={themedColours(state.config).nestedStrokes[0]}
-            onChange={(newColour: string) => {
+      {NESTING_LEVELS.map(({ index, label }) => (
+        <div key={index}>
+          <LineWidthField
+            label={label}
+            defaultValue={state.config.nesting.nestedWidths[index]}
+            onChange={(newWidth) => {
               const payload = basePayload();
-              payload.nestedStrokes[0] = newColour;
+              payload.nestedWidths[index] = newWidth;
               dispatch({
                 type: "setLines",
                 payload,
               });
             }}
-          ></ColourPicker>
-        </label>
-      </div>
-      <div>
-        <LineWidthField
-          label="2nd level width"
-          defaultValue={state.config.nesting.nestedWidths[1]}
-          onChange={(newWidth) => {
-            const payload = basePayload();
-            payload.nestedWidths[1] = newWidth;
-            dispatch({
-              type: "setLines",
-              payload,
-            });
-          }}
-        />
-        <label>
-          Colour:
-          <ColourPicker
-            colour={themedColours(state.config).nestedStrokes[1]}
-            onChange={(newColour: string) => {
-              const payload = basePayload();
-              payload.nestedStrokes[1] = newColour;
-              dispatch({
-                type: "setLines",
-                payload,
-              });
-            }}
-          ></ColourPicker>
-        </label>
-      </div>
-      <div>
-        <LineWidthField
-          label="3rd level width"
-          defaultValue={state.config.nesting.nestedWidths[2]}
-          onChange={(newWidth) => {
-            const payload = basePayload();
-            payload.nestedWidths[2] = newWidth;
-            dispatch({
-              type: "setLines",
-              payload,
-            });
-          }}
-        />
-        <label>
-          Colour:
-          <ColourPicker
-            colour={themedColours(state.config).nestedStrokes[2]}
-            onChange={(newColour: string) => {
-              const payload = basePayload();
-              payload.nestedStrokes[2] = newColour;
-              dispatch({
-                type: "setLines",
-                payload,
-              });
-            }}
-          ></ColourPicker>
-        </label>
-      </div>
-      <div>
-        <LineWidthField
-          label="4th level width"
-          defaultValue={state.config.nesting.nestedWidths[3]}
-          onChange={(newWidth) => {
-            const payload = basePayload();
-            payload.nestedWidths[3] = newWidth;
-            dispatch({
-              type: "setLines",
-              payload,
-            });
-          }}
-        />
-        <label>
-          Colour:
-          <ColourPicker
-            colour={themedColours(state.config).nestedStrokes[3]}
-            onChange={(newColour: string) => {
-              const payload = basePayload();
-              payload.nestedStrokes[3] = newColour;
-              dispatch({
-                type: "setLines",
-                payload,
-              });
-            }}
-          ></ColourPicker>
-        </label>
-      </div>
+          />
+          <label>
+            Colour:
+            <ColourPicker
+              colour={themedColours(state.config).nestedStrokes[index]}
+              onChange={(newColour: string) => {
+                const payload = basePayload();
+                payload.nestedStrokes[index] = newColour;
+                dispatch({
+                  type: "setLines",
+                  payload,
+                });
+              }}
+            ></ColourPicker>
+          </label>
+        </div>
+      ))}
     </ToggleablePanel>
   );
 };

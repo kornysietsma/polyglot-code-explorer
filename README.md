@@ -72,7 +72,7 @@ last([]); // undefined!
 
 There's a lot of discussion [here](https://stackoverflow.com/questions/50647399/typescript-accessing-an-array-element-does-not-account-for-the-possibility-of-u)
 
-I have enabled the new-ish flag `noUncheckedIndexedAccess` (see tsconfig.json) so that this is checked. But, sadly, typescript doesn't then like code like:
+I have enabled the new-ish flag `noUncheckedIndexedAccess` (see `tsconfig.app.json`) so that this is checked. But, sadly, typescript doesn't then like code like:
 
 ```js
  if (index < bigColourRange.length) {

@@ -13,5 +13,10 @@
     "isolatedModules": true,
     "noEmit": true
   },
-  "include": ["vite.config.ts"]
+  "include": [
+    "vite.config.ts",
+    "playwright.config.ts",
+    "eslint.config.ts",
+    "tests/**/*.ts"
+  ]
 }

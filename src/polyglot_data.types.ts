@@ -1,5 +1,3 @@
-import { HierarchyNode } from "d3";
-
 /** these types should match this file version, semver style */
 export const SUPPORTED_FILE_VERSION = "1.0.5";
 
@@ -62,20 +60,6 @@ export function isDirectory(node: TreeNode): node is DirectoryNode {
 
 export function isFile(node: TreeNode): node is FileNode {
   return (node as DirectoryNode).children == undefined;
-}
-
-// Not type predicates: @types/d3-hierarchy's `HierarchyNode<Datum>` declares a
-// `new(data: Datum): this` construct signature, which puts Datum in contravariant
-// position and makes `HierarchyNode<DirectoryNode>` structurally incompatible with
-// `HierarchyNode<TreeNode>` for predicate-narrowing purposes, even though the
-// underlying data is provably safe to narrow. Callers cast explicitly instead, same
-// as the existing `d as HierarchyNode<FileNode>` convention at the one call site.
-export function isHierarchyDirectory(node: HierarchyNode<TreeNode>): boolean {
-  return isDirectory(node.data);
-}
-
-export function isHierarchyFile(node: HierarchyNode<TreeNode>): boolean {
-  return isFile(node.data);
 }
 
 // Tree types

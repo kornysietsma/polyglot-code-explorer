@@ -68,18 +68,9 @@ const redrawNesting = (
     SVGGElement,
     unknown
   >,
-  metadata: VizMetadata,
-  features: FeatureFlags,
   state: State
 ) => {
   const { config } = state;
-
-  // const visualization = getCurrentVis(config).buildVisualization(
-  //   state,
-  //   metadata,
-  //   features,
-  //   undefined
-  // );
 
   const strokeWidthFn = (d: HierarchyNode<TreeNode>) => {
     const nesting = d.depth - (nodeCircleAncestors(d.data) + 1);
@@ -181,7 +172,7 @@ const update = (
   //   throw new Error("Invalid root SVG element");
   // }
   redrawPolygons(svg.selectAll(".cell"), metadata, features, state);
-  redrawNesting(svg.selectAll(".nesting"), metadata, features, state);
+  redrawNesting(svg.selectAll(".nesting"), state);
 
   // TODO: DRY this up - or should selecting just be expensive config?
   if (!metadata.hierarchyNodesByPath) {
@@ -440,12 +431,7 @@ const draw = (
     .enter()
     .append("path")
     .classed("nesting", true);
-  redrawNesting(
-    nestingNodesSelection.merge(newNestingNodes),
-    metadata,
-    features,
-    state
-  ).on(
+  redrawNesting(nestingNodesSelection.merge(newNestingNodes), state).on(
     "click",
     function (
       this: SVGPathElement,
@@ -499,7 +485,10 @@ const draw = (
   );
 };
 
-function addDays(date: Date, days: number) {
+// Deliberately not date-fns' `addDays`: this adds absolute elapsed time, which is what the
+// UTC timescale below wants. date-fns' version is local-calendar-based, so it would shift by
+// an hour across a DST boundary.
+function addUtcDays(date: Date, days: number) {
   const result = new Date(date);
   result.setTime(result.getTime() + days * 24 * 60 * 60 * 1000);
   return result;
@@ -559,8 +548,8 @@ function drawTimescale(
   if (dateRange[0] === undefined || dateRange[1] === undefined) {
     throw new Error("No date range in timescale data");
   }
-  dateRange[0] = addDays(dateRange[0], -7);
-  dateRange[1] = addDays(dateRange[1], 7);
+  dateRange[0] = addUtcDays(dateRange[0], -7);
+  dateRange[1] = addUtcDays(dateRange[1], 7);
 
   const xScale: ScaleTime<number, number, never> = scaleUtc()
     .domain(dateRange)
