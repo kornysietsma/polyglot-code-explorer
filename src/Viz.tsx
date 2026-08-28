@@ -601,7 +601,10 @@ function drawTimescale(
       }
     });
 
-  const selection = [xScale(unixToDate(earliest)), xScale(unixToDate(latest))];
+  const selection: [number, number] = [
+    xScale(unixToDate(earliest)),
+    xScale(unixToDate(latest)),
+  ];
 
   // update or draw x axis - using join as an experiment so we don't keep appending new axes on redraw
   svg
