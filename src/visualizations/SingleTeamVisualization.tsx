@@ -115,6 +115,7 @@ export const SingleTeamExtraControls = ({
 };
 
 // The key of SingleTeamVisualisation is [own count, other count]
+// eslint-disable-next-line react-refresh/only-export-components -- visualisation strategy class, deliberately co-located with its controls component
 export class SingleTeamVisualization extends BaseVisualization<
   [number, number]
 > {

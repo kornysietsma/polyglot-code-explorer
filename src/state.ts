@@ -634,7 +634,6 @@ function postprocessState(
   if (force) {
     if (!alreadyCloned) {
       resultingState = _.cloneDeep(resultingState);
-      alreadyCloned = true;
     }
     resultingState.calculated.forceRecalculateAll = false;
   }

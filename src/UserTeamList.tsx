@@ -21,6 +21,7 @@ export const UserTeamList = (props: {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- helper deliberately co-located with UserTeamList
 export function userTeamListForUser(
   state: State,
   userId: number,

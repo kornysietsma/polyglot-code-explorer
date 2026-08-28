@@ -53,6 +53,7 @@ const NoTeamWidget = (props: {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- helper deliberately co-located with TeamWidget/NoTeamWidget
 export function teamOrNoTeamWidget(
   key: string,
   teamName: string,

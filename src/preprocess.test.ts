@@ -1,4 +1,3 @@
-import { linkParents } from "./preprocess";
 import {
   DirectoryNode,
   FileNode,
@@ -6,6 +5,7 @@ import {
   NodeLayoutAlgorithm,
   PolyglotData,
 } from "./polyglot_data.types";
+import { linkParents } from "./preprocess";
 
 function layout(algorithm: NodeLayoutAlgorithm): NodeLayout {
   return { algorithm, center: [0, 0], polygon: [] };
