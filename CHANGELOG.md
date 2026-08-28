@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- Full tooling and dependency refresh: Create React App → Vite, yarn → npm, React 19, TypeScript 6,
+  Jest → Vitest, ESLint flat config, Prettier 3. No change to how the app looks or behaves, other
+  than a fix to circle-packed layout handling for `nestedCircles` data files (see `spec.md` §3.2).
+- Data files moved from `public/data/` to a top-level `data/` directory; the unprefixed
+  `EXPLORER_DATA` env var replaces `REACT_APP_EXPLORER_DATA`; `npm run build` now ships exactly one
+  data file instead of the whole `data/` directory.
+- Added a Playwright screenshot suite as a regression aid.
+- Dropped GitHub Actions and published release zips - see `README.md` for building from source.
+
 ## [0.6.5] - 2022-22-15
 
 ### Added

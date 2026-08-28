@@ -14,79 +14,42 @@ Especially note, I'm changed the data file formats created by the explorer and u
 
 ## Installing and running
 
-You can run with node.js (see below) - or you can grab a compiled static site and run it yourself.
+You need [Node.js](https://nodejs.org/) 24+ installed (see `.nvmrc`).
 
-### Running from a static release
-
-See also <https://polyglot.korny.info/tools/explorer/howto> for more detailed instructions
-
-Static releases are published to <https://github.com/kornysietsma/polyglot-code-explorer/releases>
-
-These are published as a static site - you can run them by:
-
-- Download the zip file from the latest release
-- Unzip it somewhere
-- Optionally copy your own JSON data file over `data/default.json`
-- Load the static site in your favourite static web server
-
-There are quite a ways to run a static web server locally - many people have python pre-installed, in which case you can run a simple web server very easily:
-
-```sh
-# Check python version
-python -V
-# If Python version returned above is 3.X
-python3 -m http.server
-# On windows try "python" instead of "python3", or "py -3"
-# If Python version returned above is 2.X
-python -m SimpleHTTPServer
-```
-
-### Running using node.js
-
-You need node.js installed, currently tested on node 14.5.0 though it may well work on older or newer versions.
-
-You need `yarn` installed - see <https://classic.yarnpkg.com/en/docs/install>
-
-run `yarn install` in the project directory to fetch all dependencies.
+Run `npm install` in the project directory to fetch all dependencies.
 
 ## Running the explorer
 
-You can run with the default data file by running `yarn run` - a browser window will open on <http://localhost:3000>
+Run `npm start` - a browser window will open on <http://localhost:5173>, loading `data/default.json`.
 
 ## Running with a particular data file
 
-Initially I had data files in `src/data/flare.json` loaded with
-
-```js
-import rawData from "./data/flare.json";
-```
-
-This works, but it doesn't work well if you want to change data files at run-time.
-
-Now, instead it looks for a file in `public/data/default.json` and loads it via an `xmlhttprequest` in `index.js`
-
-If you want a different file, set `REACT_APP_EXPLORER_DATA` with the file prefix (ignoring the `.json` part) - create-react-app
-will pass variables starting `REACT_APP_` to the app, so `index.js` can read it and load the right file.
-
-For example:
+Data files live in the top-level `data/` directory (only `data/default.json` is tracked in git -
+everything else there is gitignored). To use a different one, set `EXPLORER_DATA` to its name,
+without the `.json` extension:
 
 ```sh
-REACT_APP_EXPLORER_DATA=big yarn start
+EXPLORER_DATA=big npm start
 ```
 
-or if you don't want to re-open the browser:
+## Building a static site
+
+`npm run build` produces a self-contained static build in `dist/`, containing the app plus exactly
+the one data file named by `EXPLORER_DATA` (or `default.json` if unset). The result works unchanged
+whether pushed to a bucket root, served from a GitHub Pages project sub-path, or just unzipped and
+served locally - there are lots of ways to run a static web server, but if you have Python
+installed it's simple:
 
 ```sh
-REACT_APP_EXPLORER_DATA=big BROWSER=none yarn start
+npm run build
+cd dist && python3 -m http.server
 ```
 
 For a discussion of how I use React and D3 together, take a look at [my blog post](https://blog.korny.info/2020/07/19/better-d3-with-react.html) and [demo code](https://github.com/kornysietsma/d3-react-demo)
 
-This was created using Create-React-App and hasn't been "ejected" yet so you can upgrade react versions and the like. You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
 ## Testing
 
-To run tests, `yarn test`
+To run the unit tests, `npm test`. To run the Playwright screenshot suite, `npm run e2e`.
 
 I have hardly any tests - mostly as this started as all UI code with little logic, and frankly the effort for UI testing on a rapidly changing pet project just didn't seem worth the benefits.
 

@@ -32,3 +32,7 @@ yarn-error.log*
 # scanner data files — only the shipped default is tracked
 /data/*
 !/data/default.json
+
+# personal deploy scripts — reference internal bucket names/targets, stay local only
+/publish_*.sh
+/statefiles/

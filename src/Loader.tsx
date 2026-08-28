@@ -141,10 +141,6 @@ const Loader = () => {
   const initialState = useFetchStateFile(stateUrl);
   stateRefEventually.current = initialState;
 
-  console.log("in loader, errors:", errors);
-
-  console.log("state ref now", stateRefEventually);
-
   return errors.length > 0 ? (
     <div>
       <h1>Errors loading data:</h1>
