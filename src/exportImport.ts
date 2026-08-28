@@ -367,7 +367,7 @@ export function teamsAndAliasesFromImport(
         })
         .filter(([a, b]) => a != undefined && b != undefined) as [
         number,
-        number
+        number,
       ][]
     );
     const newIgnoredUsers: Set<number> = new Set(

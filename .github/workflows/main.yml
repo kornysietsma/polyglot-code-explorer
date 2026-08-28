@@ -3,7 +3,7 @@ name: Package
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   build:
@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2-beta
         with:
-          node-version: '14'
+          node-version: "14"
 
       - name: Fetch dependencies
         run: yarn install --frozen-lockfile
@@ -30,12 +30,12 @@ jobs:
         uses: docker://antonyurchenko/git-release:v3.4.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DRAFT_RELEASE: 'false'
-          PRE_RELEASE: 'false'
-          CHANGELOG_FILE: 'CHANGELOG.md'
-          ALLOW_EMPTY_CHANGELOG: 'false'
-          ALLOW_TAG_PREFIX: 'true'
-          RELEASE_NAME_PREFIX: 'Release: '
+          DRAFT_RELEASE: "false"
+          PRE_RELEASE: "false"
+          CHANGELOG_FILE: "CHANGELOG.md"
+          ALLOW_EMPTY_CHANGELOG: "false"
+          ALLOW_TAG_PREFIX: "true"
+          RELEASE_NAME_PREFIX: "Release: "
         with:
           args: |
             dist/*.zip

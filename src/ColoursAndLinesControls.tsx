@@ -43,14 +43,14 @@ const ColoursAndLinesControls = (props: DefaultProps) => {
         number,
         number,
         number,
-        number
+        number,
       ],
       defaultWidth: state.config.nesting.defaultWidth,
       nestedStrokes: [...themedColours(state.config).nestedStrokes] as [
         string,
         string,
         string,
-        string
+        string,
       ],
       defaultStroke: themedColours(state.config).defaultStroke,
     };

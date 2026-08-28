@@ -132,9 +132,8 @@ const UsersAndTeams = (props: DefaultProps) => {
   const { users } = dataRef.current.metadata;
   const { earliest, latest } = state.config.filters.dateRange;
 
-  const [pageState, setPageState] = React.useState<UsersAndTeamsPageState>(
-    initialPageState()
-  );
+  const [pageState, setPageState] =
+    React.useState<UsersAndTeamsPageState>(initialPageState());
 
   const tree = dataRef.current.data.tree;
 

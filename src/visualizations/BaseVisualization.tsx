@@ -94,7 +94,7 @@ export abstract class BaseVisualization<ScaleUnit> implements Visualization {
 
     return value === undefined
       ? neutralColour
-      : this.scale(value) ?? neutralColour;
+      : (this.scale(value) ?? neutralColour);
   }
 }
 

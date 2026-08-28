@@ -1,8 +1,7 @@
 {
   "short_name": "Polyglot Code Explorer",
   "name": "Polyglot Code Explorer",
-  "icons": [
-  ],
+  "icons": [],
   "start_url": ".",
   "display": "standalone",
   "theme_color": "#000000",

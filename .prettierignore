@@ -1,0 +1,20 @@
+# build output
+/dist
+
+# scanner data files — not source, and some are hundreds of MB
+/public/data
+
+# untracked local working files
+/statefiles
+
+# playwright / test artifacts
+/coverage
+/test-results
+/playwright-report
+/.playwright-cli
+
+# npm-managed formatting, not ours to reflow
+package-lock.json
+
+# local Claude Code settings, not part of the repo
+/.claude
