@@ -33,7 +33,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "e2e": "playwright test",
+    "e2e:update": "playwright test --update-snapshots"
   },
   "browserslist": {
     "production": [
@@ -48,6 +50,7 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/react-modal": "^3.13.1",
     "@types/semver": "^7.3.12",
     "@typescript-eslint/eslint-plugin": "^5.14.0",
