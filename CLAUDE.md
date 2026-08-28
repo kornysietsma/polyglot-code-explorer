@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Project context belongs in exactly three files, all in git so they can be read and reviewed:
 
 - **`CLAUDE.md`** (this file) — durable project context. Keep it thin.
-- **`spec.md`** — the current spec for the in-flight tooling refresh, as it stands *now*. Not a history; edit it in place, git has the old versions.
+- **`spec.md`** — the current spec for the in-flight tooling refresh, as it stands _now_. Not a history; edit it in place, git has the old versions.
 - **`plan.md`** — the ordered implementation plan and its checklist. Trimmed as steps complete.
 
 Do not rely on Claude's private memory for project context — put it in one of these three files instead.
@@ -16,7 +16,7 @@ Do not rely on Claude's private memory for project context — put it in one of 
 
 ## What this is
 
-The front-end (Create React App + TypeScript + D3) for visualising a codebase as a Voronoi/circle-pack treemap, coloured by metrics like lines of code, age, churn, indentation, or git team ownership. It only *renders* data — the JSON data files it consumes are produced by a separate scanner tool (not in this repo); see <https://polyglot.korny.info>. The JSON data format is versioned (`SUPPORTED_FILE_VERSION` in `src/polyglot_data.types.ts`) and changes with the app, so old data files can stop working - changes to the scanner need to be in sync with changes to this front-end.
+The front-end (Create React App + TypeScript + D3) for visualising a codebase as a Voronoi/circle-pack treemap, coloured by metrics like lines of code, age, churn, indentation, or git team ownership. It only _renders_ data — the JSON data files it consumes are produced by a separate scanner tool (not in this repo); see <https://polyglot.korny.info>. The JSON data format is versioned (`SUPPORTED_FILE_VERSION` in `src/polyglot_data.types.ts`) and changes with the app, so old data files can stop working - changes to the scanner need to be in sync with changes to this front-end.
 
 The version check at `Loader.tsx` is `semver.satisfies(data.version, SUPPORTED_FILE_VERSION)` with a bare version as the range, which means **exact equality**, not "compatible with". A data file one patch version behind will not load. Only `public/data/default.json` is tracked in git; the other local files there are untracked, mostly stale, and will not load without a version bump.
 
@@ -58,7 +58,8 @@ a browser extension/plugin (e.g. claude-in-chrome) for this — Korny prefers pl
 ## TypeScript conventions specific to this repo
 
 `tsconfig.json` enables `noUncheckedIndexedAccess`, which TypeScript doesn't fully reconcile with manual bounds-checks. The established convention (see `README.md`) is:
+
 - Use non-null assertion (`!`) when an index is provably in range from a preceding check — `@typescript-eslint/no-non-null-assertion` is deliberately disabled for this reason.
-- Where the index *isn't* provably safe, throw an explicit `Error` on `undefined` rather than silently coercing, e.g. `if (colour == undefined) throw new Error("Logic error: invalid colour index")`.
+- Where the index _isn't_ provably safe, throw an explicit `Error` on `undefined` rather than silently coercing, e.g. `if (colour == undefined) throw new Error("Logic error: invalid colour index")`.
 
 Import ordering is enforced by `simple-import-sort` via eslint (not manually maintained).

@@ -1,20 +1,20 @@
 .ToggleablePanel {
-    border-style: solid;
-    border-width: 1px;
-    border-color: var(--color-borders);
-    padding: 2px;
-    margin: 2px;
+  border-style: solid;
+  border-width: 1px;
+  border-color: var(--color-borders);
+  padding: 2px;
+  margin: 2px;
 }
 .ToggleablePanel.hidden {
-    border-style: dotted;
+  border-style: dotted;
 }
 
 .ToggleablePanel h4 {
-    margin-top: 0px;
-    margin-bottom: 0px;
+  margin-top: 0px;
+  margin-bottom: 0px;
 }
 .ToggleablePanel.borderless {
-    border-style: none;
-    padding: 0;
-    margin: 0;
+  border-style: none;
+  padding: 0;
+  margin: 0;
 }

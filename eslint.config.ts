@@ -31,7 +31,10 @@ export default defineConfig([
     rules: {
       "simple-import-sort/imports": "error",
       "simple-import-sort/exports": "error",
-      "@typescript-eslint/no-unused-vars": ["error", { varsIgnorePattern: "^_.*" }],
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { varsIgnorePattern: "^_.*" },
+      ],
       // Deliberate convention for working with `noUncheckedIndexedAccess` — see README.md.
       "@typescript-eslint/no-non-null-assertion": "off",
       // This app deliberately reads refs during render to bridge imperative D3 rendering with

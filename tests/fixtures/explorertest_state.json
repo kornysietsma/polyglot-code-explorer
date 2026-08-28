@@ -85,22 +85,12 @@
     },
     "nesting": {
       "defaultWidth": 1,
-      "nestedWidths": [
-        2,
-        2,
-        1,
-        1
-      ]
+      "nestedWidths": [2, 2, 1, 1]
     },
     "colours": {
       "currentTheme": "dark",
       "dark": {
-        "nestedStrokes": [
-          "#aaaaaa",
-          "#777777",
-          "#444444",
-          "#222222"
-        ],
+        "nestedStrokes": ["#aaaaaa", "#777777", "#444444", "#222222"],
         "defaultStroke": "#111111",
         "selectedStroke": "#fffa00",
         "couplingStroke": "#ff6300",
@@ -145,12 +135,7 @@
         }
       },
       "light": {
-        "nestedStrokes": [
-          "#777777",
-          "#aaaaaa",
-          "#dddddd",
-          "#eeeeee"
-        ],
+        "nestedStrokes": ["#777777", "#aaaaaa", "#dddddd", "#eeeeee"],
         "defaultStroke": "#f7f7f7",
         "selectedStroke": "#fffa00",
         "couplingStroke": "#ff6300",

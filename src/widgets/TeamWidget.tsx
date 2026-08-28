@@ -34,14 +34,14 @@ const NoTeamWidget = (props: {
     bodyText == undefined
       ? undefined
       : bodyText == NO_TEAM_SYMBOL
-      ? "No Team"
-      : bodyText;
+        ? "No Team"
+        : bodyText;
   const fixedHoverText =
     hoverText == undefined
       ? undefined
       : hoverText == NO_TEAM_SYMBOL
-      ? "No Team"
-      : hoverText;
+        ? "No Team"
+        : hoverText;
   return (
     <span
       className="teamWidget"

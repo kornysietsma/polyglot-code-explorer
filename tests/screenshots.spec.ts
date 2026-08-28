@@ -69,7 +69,9 @@ test.describe("screenshots", () => {
     await gotoLoaded(page);
     await selectVisualization(page, "Indentation");
     await selectSubVisualization(page, "Worst indentation");
-    await expect(page.locator(".Viz")).toHaveScreenshot("03-indentation-p99.png");
+    await expect(page.locator(".Viz")).toHaveScreenshot(
+      "03-indentation-p99.png"
+    );
   });
 
   test("4 - age", async ({ page }) => {

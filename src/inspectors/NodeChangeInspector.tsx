@@ -44,7 +44,8 @@ const NodeChangeInspector = ({
 
   const userStats = isDirectory(node)
     ? aggregateUserStats(node, earliest, latest, aliases, ignoredUsers)
-    : nodeChangers(node, aliases, ignoredUsers, earliest, latest) ?? new Map();
+    : (nodeChangers(node, aliases, ignoredUsers, earliest, latest) ??
+      new Map());
 
   const userChangers = sortedUserStatsAccumulators(userStats, fileChangeMetric);
 
@@ -59,7 +60,7 @@ const NodeChangeInspector = ({
         userTeams,
         showNonTeamChanges
       )
-    : nodeChangersByTeam(
+    : (nodeChangersByTeam(
         node,
         aliases,
         ignoredUsers,
@@ -67,7 +68,7 @@ const NodeChangeInspector = ({
         earliest,
         latest,
         showNonTeamChanges
-      ) ?? new Map();
+      ) ?? new Map());
   const teamChangers = sortedUserStatsAccumulators(teamStats, fileChangeMetric);
   const topTeamChangers = teamChangers.slice(0, topChangersCount);
 
