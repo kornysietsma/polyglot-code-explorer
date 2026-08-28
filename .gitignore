@@ -28,5 +28,7 @@ yarn-error.log*
 /test-results
 /playwright-report
 /.playwright-cli
-/public/data/explorertest.json
-/public/data/explorertest_state.json
+
+# scanner data files — only the shipped default is tracked
+/data/*
+!/data/default.json
