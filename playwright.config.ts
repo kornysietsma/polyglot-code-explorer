@@ -12,7 +12,7 @@ export default defineConfig({
     toHaveScreenshot: { maxDiffPixelRatio: 0.02 },
   },
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: "http://localhost:5173",
     trace: "retain-on-failure",
   },
   projects: [
@@ -22,8 +22,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "REACT_APP_EXPLORER_DATA=explorertest npm start",
-    url: "http://localhost:3000",
+    command: "EXPLORER_DATA=explorertest npm run dev",
+    url: "http://localhost:5173",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

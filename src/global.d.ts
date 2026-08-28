@@ -1,7 +1,4 @@
-// this seems needed to get typescript, react and css modules to play nicely. sigh.
-// see https://stackoverflow.com/questions/58380082/create-react-app-typescript-css-modules-auto-generating-type-definitions-wi
+/// <reference types="vite/client" />
 
-declare module "*.module.css" {
-  const classes: { [key: string]: string };
-  export default classes;
-}
+declare const __APP_VERSION__: string;
+declare const __EXPLORER_DATA__: string;
