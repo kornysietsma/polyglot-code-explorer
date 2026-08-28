@@ -60,7 +60,14 @@ export function nodeCumulativeLinesOfCode(node: TreeNode): number {
 
 // count of strict ancestors whose layout.algorithm is a circle type - see NodeLayoutAlgorithm
 export function nodeCircleAncestors(node: TreeNode): number {
-  return node.circleAncestors ?? 0;
+  if (node.circleAncestors == undefined) {
+    // defaulting to 0 here would silently reproduce the pre-fix behaviour for nestedCircles
+    // files - wrong nesting depths rather than an obvious failure
+    throw new Error(
+      `Logic error: circleAncestors missing on ${node.path} - linkParents did not run`
+    );
+  }
+  return node.circleAncestors;
 }
 
 export function nodeDepth(

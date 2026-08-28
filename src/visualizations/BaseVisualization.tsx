@@ -7,8 +7,8 @@ import {
   FeatureFlags,
   FileNode,
   isCirclePacked,
+  isDirectory,
   isFile,
-  isHierarchyDirectory,
   TreeNode,
 } from "../polyglot_data.types";
 import { Action, Config, State, themedColours } from "../state";
@@ -88,7 +88,10 @@ export abstract class BaseVisualization<ScaleUnit> implements Visualization {
     const { neutralColour } = themedColours(config);
     const override = overrideColourFunction(d, config, this.features);
     if (override !== undefined) return override;
-    const value = isHierarchyDirectory(d)
+    // Casts, not narrowing: `HierarchyNode` is invariant in its Datum, so a type
+    // predicate from `HierarchyNode<TreeNode>` to `HierarchyNode<DirectoryNode>` is
+    // rejected (TS2677) even though `isDirectory` has proven the data safe.
+    const value = isDirectory(d.data)
       ? this.parentFn(d as HierarchyNode<DirectoryNode>)
       : this.dataFn(d as HierarchyNode<FileNode>);
 

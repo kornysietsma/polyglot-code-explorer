@@ -166,14 +166,13 @@ export type TimescaleIntervalData = {
   lines_deleted: number;
 };
 
-// gatherTimescaleData is only ever called with "week" - narrow union rather than
-// reproducing moment's whole StartOf type for a single supported value.
+// gatherTimescaleData is only ever called with "week"; widen this union if that changes.
 export type TimescaleUnit = "week";
 
 function startOfUnit(date: Date, timeUnit: TimescaleUnit): Date {
   switch (timeUnit) {
     case "week":
-      // moment's default start-of-week is locale-dependent; pin explicitly to Sunday
+      // pinned to Sunday so bucket boundaries don't shift with the machine's locale
       return startOfWeek(date, { weekStartsOn: 0 });
   }
 }

@@ -7,8 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Project context belongs in exactly three files, all in git so they can be read and reviewed:
 
 - **`CLAUDE.md`** (this file) — durable project context. Keep it thin.
-- **`spec.md`** — the current spec for the in-flight tooling refresh, as it stands _now_. Not a history; edit it in place, git has the old versions.
-- **`plan.md`** — the ordered implementation plan and its checklist. Trimmed as steps complete.
+- **`spec.md`** — the spec for the tooling refresh, describing the state it left behind. Not a history; if it goes stale, edit it in place — git has the old versions.
+- **`plan.md`** — that refresh's implementation plan and checklist, now a completion record.
 
 Do not rely on Claude's private memory for project context — put it in one of these three files instead.
 

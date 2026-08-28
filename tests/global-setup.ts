@@ -1,5 +1,5 @@
-import fs from "fs";
-import path from "path";
+import fs from "node:fs";
+import path from "node:path";
 
 // The screenshot suite needs a data file plus a pinned `_state.json` sidecar,
 // served from `data/` under a fixed name so `EXPLORER_DATA=explorertest`
@@ -7,8 +7,8 @@ import path from "path";
 // here so the fixture always tracks the shipped default (spec.md §4.1). Both copies are
 // gitignored.
 export default function globalSetup() {
-  const dataDir = path.resolve(__dirname, "../data");
-  const fixturesDir = path.resolve(__dirname, "./fixtures");
+  const dataDir = path.resolve(import.meta.dirname, "../data");
+  const fixturesDir = path.resolve(import.meta.dirname, "./fixtures");
 
   fs.copyFileSync(
     path.join(dataDir, "default.json"),

@@ -22,7 +22,7 @@ const outDir = "dist";
 // `/data` for dev only, streaming files straight off disk; the production build's equivalent is
 // the `writeBundle` copy below.
 function serveDataDir(): Plugin {
-  const dataDir = path.resolve(__dirname, "data");
+  const dataDir = path.resolve(import.meta.dirname, "data");
   return {
     name: "serve-data-dir",
     configureServer(server) {
@@ -65,7 +65,7 @@ function serveDataDir(): Plugin {
 // the one file the app was built with, so `dist/` stays small and doesn't leak every scanner
 // output the developer happens to have on disk.
 function copyDataFile(): Plugin {
-  const dataDir = path.resolve(__dirname, "data");
+  const dataDir = path.resolve(import.meta.dirname, "data");
   return {
     name: "copy-data-file",
     apply: "build",
@@ -77,7 +77,7 @@ function copyDataFile(): Plugin {
           `Data file not found: ${src} — set EXPLORER_DATA to the name of an existing file under data/ (without .json)`
         );
       }
-      const destDir = path.resolve(__dirname, outDir, "data");
+      const destDir = path.resolve(import.meta.dirname, outDir, "data");
       mkdirSync(destDir, { recursive: true });
       copyFileSync(src, path.join(destDir, `${dataName}.json`));
 
@@ -94,6 +94,9 @@ export default defineConfig({
   plugins: [react(), serveDataDir(), copyDataFile()],
   build: {
     outDir,
+    // Single-page tool loaded once - code-splitting the d3/react-aria bundle buys nothing,
+    // so raise the limit rather than see the warning on every build.
+    chunkSizeWarningLimit: 1000,
   },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),

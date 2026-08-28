@@ -2,15 +2,11 @@
   "name": "polyglot-code-explorer",
   "version": "0.6.5",
   "private": true,
+  "type": "module",
   "engines": {
     "node": ">=24"
   },
   "dependencies": {
-    "@types/d3": "^7.4.3",
-    "@types/lodash": "^4.17.25",
-    "@types/node": "^24.13.3",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.5",
     "d3": "^7.9.0",
     "date-fns": "^4.4.0",
     "lodash": "^4.18.1",
@@ -21,7 +17,6 @@
     "react-dom": "^19.2.8",
     "react-modal": "^3.16.3",
     "semver": "^7.8.5",
-    "typescript": "^6.0.3",
     "use-debouncy": "^6.0.0"
   },
   "scripts": {
@@ -34,19 +29,24 @@
     "e2e": "playwright test",
     "e2e:update": "playwright test --update-snapshots",
     "typecheck": "tsc -b --noEmit",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
+    "@types/d3": "^7.4.3",
+    "@types/lodash": "^4.17.25",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
     "@types/react-modal": "^3.16.3",
     "@types/semver": "^7.8.0",
-    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-react": "^6.1.0",
     "eslint": "^10.9.1",
     "eslint-plugin-react-hooks": "^7.1.1",
@@ -57,6 +57,7 @@
     "jsdom": "^30.0.1",
     "prettier": "^3.9.6",
     "sass-embedded": "^1.103.1",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.68.0",
     "vite": "^8.2.2",
     "vitest": "^4.1.11"

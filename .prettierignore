@@ -1,6 +1,9 @@
 # build output
 /dist
 
+# vendored third-party stylesheet - keep it as upstream ships it
+/src/css/normalize.css
+
 # scanner data files — not source, and some are hundreds of MB
 /data
 
