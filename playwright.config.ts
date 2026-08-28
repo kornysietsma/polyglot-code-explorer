@@ -22,7 +22,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "REACT_APP_EXPLORER_DATA=explorertest yarn start",
+    command: "REACT_APP_EXPLORER_DATA=explorertest npm start",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
