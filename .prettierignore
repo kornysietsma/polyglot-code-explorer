@@ -2,7 +2,7 @@
 /dist
 
 # scanner data files — not source, and some are hundreds of MB
-/public/data
+/data
 
 # untracked local working files
 /statefiles
