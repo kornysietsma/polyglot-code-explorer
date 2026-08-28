@@ -7,6 +7,7 @@ import {
   DirectoryNode,
   FeatureFlags,
   GitUser,
+  isCirclePacked,
   isDirectory,
   isFile,
   PolyglotData,
@@ -17,6 +18,9 @@ import { LanguagesMetadata, TreeStats } from "./viz.types";
 
 function linkParentRecursively(node: TreeNode, parent: DirectoryNode) {
   node.parent = parent;
+  node.circleAncestors =
+    (parent.circleAncestors ?? 0) +
+    (isCirclePacked(parent.layout.algorithm) ? 1 : 0);
   if (isDirectory(node)) {
     for (const child of node.children) {
       linkParentRecursively(child, node);
@@ -29,6 +33,7 @@ export function linkParents(data: PolyglotData) {
   if (!isDirectory(rootNode)) {
     throw new Error("Root of tree is not a directory!");
   }
+  rootNode.circleAncestors = 0;
   for (const child of rootNode.children) {
     linkParentRecursively(child, rootNode);
   }

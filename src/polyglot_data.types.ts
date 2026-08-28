@@ -38,6 +38,8 @@ type AbstractTreeNode = {
   layout: NodeLayout;
   value: number; //redundant, but useful until we have new layout code
   parent?: DirectoryNode; // populated after loading
+  // count of strict ancestors whose layout.algorithm is a circle type - populated after loading
+  circleAncestors?: number;
 };
 
 export type TreeNode = DirectoryNode | FileNode;
@@ -120,14 +122,23 @@ export type CouplingMetadata = {
 
 // TreeNode types
 
+// `circlePack` packs circles at the top level only, with voronoi below.
+// `nestedCircles` recurses circle-packing through nested repos until it hits a git repo root,
+// then that subtree switches to voronoi - so circle depth varies per branch.
+export type NodeLayoutAlgorithm = "voronoi" | "circlePack" | "nestedCircles";
+
 export type NodeLayout = {
-  algorithm: string;
+  algorithm: NodeLayoutAlgorithm;
   center: Point;
   polygon: Point[];
   // width and height exist on directories not files! But that is beyond typescript
   width?: number;
   height?: number;
 };
+
+export function isCirclePacked(algorithm: NodeLayoutAlgorithm): boolean {
+  return algorithm === "circlePack" || algorithm === "nestedCircles";
+}
 
 export type Point = [x: number, y: number];
 

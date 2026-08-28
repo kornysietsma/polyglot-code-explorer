@@ -19,6 +19,7 @@ import { dateToUnix, unixToDate } from "./datetimes";
 import {
   CouplingLink,
   nodeCenter,
+  nodeCircleAncestors,
   nodeCouplingFilesFiltered,
   nodeDescendants,
   nodeHasCouplingData,
@@ -81,7 +82,7 @@ const redrawNesting = (
   // );
 
   const strokeWidthFn = (d: HierarchyNode<TreeNode>) => {
-    const nesting = d.depth - (metadata.topLevelCirclePacked ? 2 : 1);
+    const nesting = d.depth - (nodeCircleAncestors(d.data) + 1);
     if (nesting < 0) return 0;
     if (nesting >= config.nesting.nestedWidths.length)
       return config.nesting.defaultWidth;
@@ -89,7 +90,7 @@ const redrawNesting = (
   };
 
   const strokeColourFn = (d: HierarchyNode<TreeNode>) => {
-    const nesting = d.depth - (metadata.topLevelCirclePacked ? 2 : 1);
+    const nesting = d.depth - (nodeCircleAncestors(d.data) + 1);
     const theme = themedColours(config);
 
     if (nesting < 0) return 0;
@@ -114,13 +115,12 @@ const redrawSelection = (
     SVGGElement,
     unknown
   >,
-  metadata: VizMetadata,
   state: State
 ) => {
   const { config } = state;
 
   const strokeWidthFn = (d: HierarchyNode<TreeNode>) => {
-    const nesting = d.depth - (metadata.topLevelCirclePacked ? 1 : 0);
+    const nesting = d.depth - nodeCircleAncestors(d.data);
     if (nesting < 0) return 0;
     if (nesting >= config.nesting.nestedWidths.length)
       return config.nesting.defaultWidth;
@@ -205,7 +205,7 @@ const update = (
     .append("path")
     .classed("selected", true);
 
-  redrawSelection(selectionNodes.merge(newSelectionNodes), metadata, state);
+  redrawSelection(selectionNodes.merge(newSelectionNodes), state);
   selectionNodes.exit().remove();
 };
 
@@ -423,13 +423,12 @@ const draw = (
 
   nodes.exit().remove();
 
-  const depthAdjust = metadata.topLevelCirclePacked ? 1 : 0;
-
   const nestingNodes = rootNode
     .descendants()
     .filter(
       (d) =>
-        d.depth >= 1 + depthAdjust && d.depth <= state.expensiveConfig.depth
+        d.depth >= 1 + nodeCircleAncestors(d.data) &&
+        d.depth <= state.expensiveConfig.depth
     )
     .sort((left, right) => right.depth - left.depth);
 
@@ -472,7 +471,7 @@ const draw = (
     .append("path")
     .classed("selected", true);
 
-  redrawSelection(selectionNodes.merge(newSelectionNodes), metadata, state);
+  redrawSelection(selectionNodes.merge(newSelectionNodes), state);
 
   selectionNodes.exit().remove();
 
