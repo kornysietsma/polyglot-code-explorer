@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-28
+
+A large internal refactor rather than a feature release. Nothing about the data format changed and
+the app behaves as it did, but almost every build tool and dependency was replaced, so this gets a
+minor version bump to mark the break in continuity. Note that release artifacts are no longer
+published - build from source (see `README.md`).
+
 ### Changed
 
 - Full tooling and dependency refresh: Create React App → Vite, yarn → npm, React 19, TypeScript 6,
