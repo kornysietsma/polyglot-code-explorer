@@ -102,6 +102,43 @@ export function worldToDevice(
   return [cssX * camera.dpr, cssY * camera.dpr];
 }
 
+export interface ClipTransform {
+  scaleX: number;
+  scaleY: number;
+  translateX: number;
+  translateY: number;
+}
+
+// World units -> WebGL clip space [-1,1], for a canvas whose backing store is
+// canvasWidthPx x canvasHeightPx device pixels (i.e. after the DPR multiply - see
+// resizeCanvasToDisplaySize in Viz.tsx). Composes worldToDevice with the standard
+// device-pixel -> clip-space mapping: device pixels grow down from the top-left, clip space
+// grows up, so Y flips here - a flip a 2D canvas context never needs, which is why this isn't
+// folded into worldToDevice. Returned as a scale/translate pair rather than a matrix so the
+// vertex shader can compute `a_pos * u_scale + u_translate` directly.
+export function worldToClipTransform(
+  camera: Camera,
+  canvasWidthPx: number,
+  canvasHeightPx: number
+): ClipTransform {
+  if (canvasWidthPx <= 0 || canvasHeightPx <= 0) {
+    throw new Error(
+      `worldToClipTransform: canvas must have positive size, got ${canvasWidthPx}x${canvasHeightPx}`
+    );
+  }
+  const { fit, zoom, dpr } = camera;
+  const deviceScale = fit.scale * zoom.k * dpr;
+
+  return {
+    scaleX: (2 * deviceScale) / canvasWidthPx,
+    scaleY: (-2 * deviceScale) / canvasHeightPx,
+    translateX:
+      (2 * dpr * (fit.translateX * zoom.k + zoom.x)) / canvasWidthPx - 1,
+    translateY:
+      1 - (2 * dpr * (fit.translateY * zoom.k + zoom.y)) / canvasHeightPx,
+  };
+}
+
 // The overlay <svg> keeps its own viewBox, so the browser re-applies an identical fit to
 // whatever transform we set on its <g> automatically. To keep the overlay pixel-locked to the
 // canvas - which applies fit then zoom explicitly - the group's transform has to pre-compensate

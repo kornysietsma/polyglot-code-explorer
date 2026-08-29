@@ -35,38 +35,28 @@ import {
   fitTransform,
   IDENTITY_ZOOM,
   overlayGroupTransform,
-  worldToDevice,
 } from "./webgl/camera";
+import { resolvePatternFallback } from "./webgl/colours";
+import { GlRenderer } from "./webgl/GlRenderer";
 
-const redrawPolygons = (
-  svgSelection: Selection<
-    SVGPathElement,
-    HierarchyNode<TreeNode>,
-    SVGGElement,
-    unknown
-  >,
+// Builds the per-node fill-colour function the WebGL renderer uploads as its colour buffer:
+// the current visualisation's own fillFn, with `url(#patternN)` (TeamPatternVisualization)
+// resolved down to a flat colour via colours.ts's step-3 fallback. Replaces the SVG-era
+// `redrawPolygons`, which set this as a `.cell` path's `fill` style directly.
+function buildFillFn(
   metadata: VizMetadata,
   features: FeatureFlags,
   state: State
-) => {
-  const { config } = state;
-
-  const visualization = getCurrentVis(config).buildVisualization(
+): (d: HierarchyNode<TreeNode>) => string {
+  const visualization = getCurrentVis(state.config).buildVisualization(
     state,
     metadata,
     features,
     undefined
   );
-
-  return svgSelection
-    .attr("d", (d) => {
-      return `${d3.line()(d.data.layout.polygon)}z`;
-    })
-    .style("fill", (d) => visualization.fillFn(d))
-    .style("stroke", themedColours(config).defaultStroke)
-    .style("stroke-width", config.nesting.defaultWidth)
-    .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
-};
+  const { svgPatternIds } = state.calculated.svgPatterns;
+  return (d) => resolvePatternFallback(visualization.fillFn(d), svgPatternIds);
+}
 
 const redrawNesting = (
   svgSelection: Selection<
@@ -165,7 +155,10 @@ function findSelectionPath(
 
 const update = (
   d3Container: React.RefObject<SVGSVGElement | null>,
-  files: TreeNode,
+  glCanvasRef: React.RefObject<HTMLCanvasElement | null>,
+  cameraRef: React.RefObject<Camera | null>,
+  glRendererRef: React.RefObject<GlRenderer | null>,
+  visibleNodesRef: React.RefObject<HierarchyNode<TreeNode>[] | null>,
   metadata: VizMetadata,
   features: FeatureFlags,
   state: State
@@ -178,7 +171,21 @@ const update = (
   // if (!svg instanceof SVGElement) {
   //   throw new Error("Invalid root SVG element");
   // }
-  redrawPolygons(svg.selectAll(".cell"), metadata, features, state);
+  const glCanvas = glCanvasRef.current;
+  const camera = cameraRef.current;
+  const glRenderer = glRendererRef.current;
+  const visibleNodes = visibleNodesRef.current;
+  if (!glCanvas || !camera || !glRenderer || !visibleNodes) {
+    throw new Error(
+      "update called before draw, so the WebGL renderer is not ready"
+    );
+  }
+  // Naive routing (plan.md step 4): any config change rebuilds both buffers, even though only
+  // colours changed here. Fixed in step 8, once GlRenderer exposes setColours() separately.
+  glRenderer.setGeometry(visibleNodes, buildFillFn(metadata, features, state));
+  glRenderer.setTransform(camera, glCanvas.width, glCanvas.height);
+  glRenderer.draw();
+
   redrawNesting(svg.selectAll(".nesting"), state);
 
   // TODO: DRY this up - or should selecting just be expensive config?
@@ -355,37 +362,13 @@ function resizeCanvasToDisplaySize(
   canvas.height = Math.round(cssHeight * dpr);
 }
 
-// TEMPORARY (plan.md step 1): a 2D-context quad tracing the root node's own polygon, purely to
-// de-risk the camera math (fit + zoom + DPR + resize) before any real WebGL geometry exists. It
-// must sit exactly on the root cell's edge and stay welded to it through pan/zoom/resize -
-// deleted in step 4, once real fills take over the canvas.
-function drawDebugQuad(
-  canvas: HTMLCanvasElement,
-  camera: Camera,
-  polygon: Point[]
-) {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("2D context unavailable on debug canvas");
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (polygon.length < 2) return;
-  ctx.strokeStyle = "#ff00ff";
-  ctx.lineWidth = 2 * camera.dpr;
-  ctx.beginPath();
-  polygon.forEach(([x, y], i) => {
-    const [dx, dy] = worldToDevice(camera, x, y);
-    if (i === 0) ctx.moveTo(dx, dy);
-    else ctx.lineTo(dx, dy);
-  });
-  ctx.closePath();
-  ctx.stroke();
-}
-
 const draw = (
   d3Container: React.RefObject<SVGSVGElement | null>,
   glCanvasRef: React.RefObject<HTMLCanvasElement | null>,
   chartStackRef: React.RefObject<HTMLDivElement | null>,
   cameraRef: React.RefObject<Camera | null>,
+  glRendererRef: React.RefObject<GlRenderer | null>,
+  visibleNodesRef: React.RefObject<HierarchyNode<TreeNode>[] | null>,
   files: TreeNode,
   metadata: VizMetadata,
   features: FeatureFlags,
@@ -426,7 +409,10 @@ const draw = (
   const camera: Camera = { fit, zoom: IDENTITY_ZOOM, dpr };
   cameraRef.current = camera;
   resizeCanvasToDisplaySize(glCanvas, w, boxHeight, dpr);
-  drawDebugQuad(glCanvas, camera, layout.polygon);
+  if (!glRendererRef.current) {
+    glRendererRef.current = new GlRenderer(glCanvas);
+  }
+  const glRenderer = glRendererRef.current;
 
   const svg = d3
     .select(vizEl)
@@ -455,30 +441,10 @@ const draw = (
       (d) => d.children === undefined || d.depth === expensiveConfig.depth
     );
 
-  const nodes = group
-    .selectAll<SVGPathElement, HierarchyNode<TreeNode>>(".cell")
-    .data(allNodes, function (node) {
-      return node.data.path;
-    });
-
-  // TODO - consider reworking this with join which seems to be the new hotness?
-  const newNodes = nodes.enter().append("path").classed("cell", true);
-
-  redrawPolygons(nodes.merge(newNodes), metadata, features, state)
-    .on(
-      "click",
-      function (
-        this: SVGPathElement,
-        event: PointerEvent,
-        node: HierarchyNode<TreeNode>
-      ) {
-        dispatch({ type: "selectNode", payload: node.data.path });
-      }
-    )
-    .append("svg:title")
-    .text((n) => n.data.path);
-
-  nodes.exit().remove();
+  visibleNodesRef.current = allNodes;
+  glRenderer.setGeometry(allNodes, buildFillFn(metadata, features, state));
+  glRenderer.setTransform(camera, glCanvas.width, glCanvas.height);
+  glRenderer.draw();
 
   const nestingNodes = rootNode
     .descendants()
@@ -557,7 +523,8 @@ const draw = (
       `translate(${overlay.x},${overlay.y}) scale(${overlay.k})`
     );
 
-    drawDebugQuad(glCanvas, nextCamera, layout.polygon);
+    glRenderer.setTransform(nextCamera, glCanvas.width, glCanvas.height);
+    glRenderer.draw();
   };
 
   d3.select(chartStackEl).call(
@@ -728,6 +695,12 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
   const chartStackRef: RefObject<HTMLDivElement | null> =
     useRef<HTMLDivElement | null>(null);
   const cameraRef: RefObject<Camera | null> = useRef<Camera | null>(null);
+  const glRendererRef: RefObject<GlRenderer | null> = useRef<GlRenderer | null>(
+    null
+  );
+  const visibleNodesRef: RefObject<HierarchyNode<TreeNode>[] | null> = useRef<
+    HierarchyNode<TreeNode>[] | null
+  >(null);
 
   const debouncedDispatch = useMemo(
     () => _.debounce((nextValue) => dispatch(nextValue), 250),
@@ -755,6 +728,8 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
         glCanvasRef,
         chartStackRef,
         cameraRef,
+        glRendererRef,
+        visibleNodesRef,
         data.tree,
         metadata,
         features,
@@ -776,7 +751,16 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
       if (!_.isEqual(prevState.config, config)) {
         console.log("cheap config change - just redraw");
         console.time("update");
-        update(d3Container, data.tree, metadata, features, state);
+        update(
+          d3Container,
+          glCanvasRef,
+          cameraRef,
+          glRendererRef,
+          visibleNodesRef,
+          metadata,
+          features,
+          state
+        );
         console.timeEnd("update");
         if (
           prevState.config.colours.currentTheme !==
@@ -794,15 +778,18 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
     }
   }, [dataRef, state, dispatch, debouncedDispatch, prevState]);
 
-  // Resize handling: re-fit the camera and the canvas's backing-store resolution, without
-  // rebuilding any geometry (there is none yet - just the step-1 debug quad). The overlay
-  // SVG's own viewBox re-fits itself natively; nothing to do there.
+  // Resize handling: re-fit the camera and the canvas's backing-store resolution, then redraw
+  // the existing geometry at the new transform - no rebuild needed, per spec.md's "DPR and
+  // resize". The overlay SVG's own viewBox re-fits itself natively; nothing to do there. Skips
+  // until the first `draw()` has created the renderer.
   useEffect(() => {
     const stackEl = chartStackRef.current;
     const canvas = glCanvasRef.current;
     if (!stackEl || !canvas) return;
 
     const observer = new ResizeObserver(() => {
+      const glRenderer = glRendererRef.current;
+      if (!glRenderer) return;
       const { layout } = dataRef.current.data.tree;
       if (!layout.width || !layout.height) return;
       const dpr = window.devicePixelRatio || 1;
@@ -817,7 +804,8 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
       const camera: Camera = { fit, zoom, dpr };
       cameraRef.current = camera;
       resizeCanvasToDisplaySize(canvas, w, boxHeight, dpr);
-      drawDebugQuad(canvas, camera, layout.polygon);
+      glRenderer.setTransform(camera, canvas.width, canvas.height);
+      glRenderer.draw();
     });
     observer.observe(stackEl);
     return () => observer.disconnect();

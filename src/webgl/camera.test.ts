@@ -6,6 +6,7 @@ import {
   IDENTITY_ZOOM,
   overlayGroupTransform,
   screenToWorld,
+  worldToClipTransform,
   worldToCss,
   worldToDevice,
 } from "./camera";
@@ -120,5 +121,69 @@ describe("overlayGroupTransform", () => {
       expect(renderedX).toBeCloseTo(expectedX);
       expect(renderedY).toBeCloseTo(expectedY);
     }
+  });
+});
+
+describe("worldToClipTransform", () => {
+  function applyClip(
+    clip: ReturnType<typeof worldToClipTransform>,
+    worldX: number,
+    worldY: number
+  ): [number, number] {
+    return [
+      worldX * clip.scaleX + clip.translateX,
+      worldY * clip.scaleY + clip.translateY,
+    ];
+  }
+
+  it("maps the container's top-left and bottom-right CSS corners to clip (-1,1) and (1,-1)", () => {
+    const layout = { width: 100, height: 60 };
+    const [canvasWidth, canvasHeight] = [300, 200]; // dpr 1, so device px == css px
+    const fit = fitTransform(layout, canvasWidth, canvasHeight);
+    const camera: Camera = { fit, zoom: IDENTITY_ZOOM, dpr: 1 };
+    const clip = worldToClipTransform(camera, canvasWidth, canvasHeight);
+
+    const topLeftWorld = screenToWorld(camera, 0, 0);
+    const bottomRightWorld = screenToWorld(camera, canvasWidth, canvasHeight);
+
+    const [tlX, tlY] = applyClip(clip, ...topLeftWorld);
+    expect(tlX).toBeCloseTo(-1);
+    expect(tlY).toBeCloseTo(1);
+
+    const [brX, brY] = applyClip(clip, ...bottomRightWorld);
+    expect(brX).toBeCloseTo(1);
+    expect(brY).toBeCloseTo(-1);
+  });
+
+  it.each([1, 2])(
+    "round-trips an arbitrary CSS pixel to the same clip coordinate the formula predicts, at DPR %i",
+    (dpr) => {
+      const layout = { width: 120, height: 80 };
+      const [cssWidth, cssHeight] = [300, 300];
+      const [canvasWidth, canvasHeight] = [cssWidth * dpr, cssHeight * dpr];
+      const fit = fitTransform(layout, cssWidth, cssHeight);
+      const zoom = { x: 17, y: -9, k: 2.2 };
+      const camera: Camera = { fit, zoom, dpr };
+      const clip = worldToClipTransform(camera, canvasWidth, canvasHeight);
+
+      for (const [cssX, cssY] of [
+        [0, 0],
+        [cssWidth, cssHeight],
+        [150, 40],
+        [12.5, 287.25],
+      ] as const) {
+        const [worldX, worldY] = screenToWorld(camera, cssX, cssY);
+        const [clipX, clipY] = applyClip(clip, worldX, worldY);
+        expect(clipX).toBeCloseTo(((cssX * dpr) / canvasWidth) * 2 - 1);
+        expect(clipY).toBeCloseTo(1 - ((cssY * dpr) / canvasHeight) * 2);
+      }
+    }
+  );
+
+  it("rejects a non-positive canvas size", () => {
+    const fit = fitTransform({ width: 10, height: 10 }, 100, 100);
+    const camera: Camera = { fit, zoom: IDENTITY_ZOOM, dpr: 1 };
+    expect(() => worldToClipTransform(camera, 0, 100)).toThrow();
+    expect(() => worldToClipTransform(camera, 100, -1)).toThrow();
   });
 });

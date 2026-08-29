@@ -237,20 +237,20 @@ the expected first colour and an unknown pattern id throws.
 
 The cutover. This is the big one.
 
-- [ ] `src/webgl/shaders.ts` — vertex/fragment source for flat-filled triangles.
-- [ ] `src/webgl/geometry.ts` — `buildFills(nodes)` → positions `Float32Array` and
+- [x] `src/webgl/shaders.ts` — vertex/fragment source for flat-filled triangles.
+- [x] `src/webgl/geometry.ts` — `buildFills(nodes)` → positions `Float32Array` and
       a per-vertex colour array, using `fanTriangulate` and `assertConvex`. Same
       node filter as today (`Viz.tsx` L391-395): `depth <= expensiveConfig.depth`
       and (`children === undefined` || at the depth limit).
-- [ ] `src/webgl/GlRenderer.ts` — context (`antialias: true`, standard alpha
+- [x] `src/webgl/GlRenderer.ts` — context (`antialias: true`, standard alpha
       blending), program compilation with real error reporting on failure, static
       position buffer, separate dynamic colour buffer, uniforms, `draw()`,
       `destroy()`. Positions and colours in **separate buffers from the start** —
       step 8 depends on it and retrofitting is a rewrite.
-- [ ] Wire into `Viz.tsx`; remove the temporary debug quad.
-- [ ] **Delete** `redrawPolygons`, the `.cell` selection, its `click` handler and
+- [x] Wire into `Viz.tsx`; remove the temporary debug quad.
+- [x] **Delete** `redrawPolygons`, the `.cell` selection, its `click` handler and
       its `svg:title` children. Remove the `redrawPolygons` call from `update()`.
-- [ ] Routing stays naive: _any_ config or expensiveConfig change rebuilds
+- [x] Routing stays naive: _any_ config or expensiveConfig change rebuilds
       geometry and colours. Slow, correct, and fixed in step 8.
 
 **Verify — manual (this is the step that needs eyes):** side by side with the
@@ -599,3 +599,52 @@ open questions, anything that contradicts the spec. Fold the durable parts into
 - `parseCssColour` built on `d3.color()` per spec.md, following the existing
   `import * as d3 from "d3"` convention (`Viz.tsx`, `state.ts` already do
   this) rather than a named import.
+
+### Step 4
+
+- **`camera.ts` gained `worldToClipTransform()`** (world -> WebGL clip space
+  `[-1,1]`, as a scale/translate pair rather than a matrix, for
+  `a_pos * u_scale + u_translate` in the vertex shader). Step 1 had already
+  named this in its checklist ("the world -> clip matrix or scale/translate
+  uniforms") but hadn't actually written it - there was no GL consumer yet,
+  only the 2D-context debug quad, which needs device pixels, not clip space.
+  It composes `worldToDevice` with the standard device-pixel -> clip-space
+  mapping (Y flips: device pixels grow down, clip space grows up) - unit
+  tested the same way as the rest of `camera.ts` (corner-mapping and
+  round-trip-against-the-formula cases), fully gl-free.
+- **`GlRenderer.setGeometry`/`setTransform`/`draw`/`destroy` exist as the
+  three-method split spec.md asks for**, even though step 4's own routing is
+  naive (`update()` and `draw()` both call `setGeometry` for any change, per
+  plan decision - step 8 is what actually stops rebuilding positions on a
+  colour-only change). `destroy()` is implemented but not yet wired to an
+  unmount effect - that wiring is step 8's job, not step 4's.
+- **`visibleNodesRef`** (a new ref on `Viz`) caches the depth-filtered node
+  list `draw()` computes, so `update()` (cheap config-change path) doesn't
+  need to rebuild the tree filter just to re-run `setGeometry` on the same
+  node set - mirrors how the old SVG code reused the DOM's bound `.cell`
+  data across `redrawPolygons` calls without re-walking the hierarchy.
+- **`buildFillFn`** replaces `redrawPolygons` as the shared colour-function
+  builder: current visualisation's `fillFn`, piped through step 3's
+  `resolvePatternFallback` for the `teamPattern` flat fallback. Used by both
+  `draw()` and `update()`.
+- **Manual verification, side-by-side with the `../explorer-svg` worktree**
+  (`playwright-cli`, both on port 5173 new / 5174 old): fills matched the
+  SVG renderer pixel-for-pixel on `explorertest` (default data), `omf.json`
+  (nestedCircles, varying circle depth per branch - no `assertConvex`
+  throws), and visually correct (not diffed against the worktree, but no
+  triangulation artefacts) at full scale on `openmrs.json` (34k nodes,
+  one-time geometry build+draw ~470ms including the still-SVG nesting/
+  selection layers). Checked both themes, several visualisations including
+  `teamPattern` (confirmed flat-fallback colour, not a gradient), and
+  zoom/pan tracking (canvas fills stayed welded to the SVG nesting overlay
+  through wheel-zoom, no drift).
+- **Worktree gotcha:** `../explorer-svg`'s `data/` only had `default.json` -
+  git worktrees don't share untracked files, and per CLAUDE.md only
+  `default.json` is tracked. Symlinked `omf.json`, `openmrs.json`,
+  `explorertest.json`/`_state.json` and `spring-projects.json` from the main
+  tree's `data/` into the worktree's so steps 7/9/10's side-by-sides don't
+  hit this again.
+- **`npm run e2e` behaved exactly as plan.md decision 3 predicted:** only
+  shot 7 fails (`selectAFileNode`'s `path.cell` selector matches nothing -
+  fixed in step 5); all 9 other shots passed with **zero** diffs, not just
+  explicable ones. Baselines untouched, per decision 3.
