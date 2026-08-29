@@ -5,34 +5,10 @@ import {
   topTeamsPartitioned,
   UserStats,
 } from "./nodeData";
-import { FileNode, GitData, LocData, NodeLayout } from "./polyglot_data.types";
+import { GitData } from "./polyglot_data.types";
 import { UserAliases, UserTeams } from "./state";
+import { minimalFileNode } from "./testFixtures";
 
-const EMPTY_LAYOUT: NodeLayout = {
-  algorithm: "voronoi",
-  center: [0, 0],
-  polygon: [],
-};
-const DUMMY_LOC: LocData = {
-  language: "test",
-  binary: false,
-  blanks: 1,
-  code: 2,
-  comments: 3,
-  lines: 4,
-  bytes: 5,
-};
-function minimalFileNode(name: string, path: string): FileNode {
-  return {
-    name,
-    path,
-    layout: EMPTY_LAYOUT,
-    value: 0,
-    data: {
-      loc: DUMMY_LOC,
-    },
-  };
-}
 function minimalGitData(): GitData {
   return {
     last_update: 0,

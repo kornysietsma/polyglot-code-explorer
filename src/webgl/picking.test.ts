@@ -1,38 +1,12 @@
 import { hierarchy, HierarchyNode } from "d3";
 import { describe, expect, it } from "vitest";
 
-import {
-  FileNode,
-  LocData,
-  NodeLayout,
-  Point,
-  TreeNode,
-} from "../polyglot_data.types";
+import { Point, TreeNode } from "../polyglot_data.types";
+import { minimalFileNode } from "../testFixtures";
 import { buildIndex, pick, pointInConvexPolygon } from "./picking";
 
-// Same minimal-fixture convention as geometry.test.ts's fileNode().
-const DUMMY_LOC: LocData = {
-  language: "test",
-  binary: false,
-  blanks: 1,
-  code: 2,
-  comments: 3,
-  lines: 4,
-  bytes: 5,
-};
-
-function layoutFor(center: Point, polygon: Point[]): NodeLayout {
-  return { algorithm: "voronoi", center, polygon };
-}
-
-function fileNode(path: string, center: Point, polygon: Point[]): FileNode {
-  return {
-    name: path,
-    path,
-    layout: layoutFor(center, polygon),
-    value: 0,
-    data: { loc: DUMMY_LOC },
-  };
+function fileNode(path: string, center: Point, polygon: Point[]) {
+  return minimalFileNode(path, path, { layout: { center, polygon } });
 }
 
 const SQUARE_CCW: Point[] = [
@@ -135,7 +109,7 @@ describe("buildIndex / pick", () => {
     // "near" sits right next to the query point and has the closer declared centroid, but its
     // small polygon doesn't actually reach the point. "far" is a large, clipped-looking cell
     // whose declared centroid (near its own left edge, not its true geometric centroid) is much
-    // further from the query point - the case spec.md's widening search exists for.
+    // further from the query point - the case the widening search exists for.
     const near = fileNode(
       "near",
       [17, 0],
