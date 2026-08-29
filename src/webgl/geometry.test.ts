@@ -143,19 +143,25 @@ describe("outlineLevel", () => {
 
   it.each([
     // depth, circleAncestors, expected level
-    [0, 0, DEFAULT], // level -1: above the first circle-ancestor level -> default
+    [0, 0, DEFAULT], // the root: level -1 -> default
     [1, 0, 0],
     [2, 0, 1],
     [3, 0, 2],
     [4, 0, 3],
     [5, 0, DEFAULT], // past the configurable nested colours -> default
     [8, 0, DEFAULT],
-    // omf.json's varying-circle-depth case: the same tree depth maps to a different level
-    // depending on how many circle-packed ancestors this particular branch has.
-    [2, 1, 0],
-    [3, 1, 1],
-    [3, 2, 0],
-    [2, 2, DEFAULT], // level -1 again, just reached via a higher circleAncestors this time
+    // omf.json's varying-circle-depth case: voronoi nesting inside a circle starts at level 1,
+    // and the same tree depth maps to a different level depending on how many circle-packed
+    // ancestors this particular branch has.
+    [2, 1, 1],
+    [3, 1, 2],
+    [3, 2, 1],
+    [5, 1, DEFAULT], // past the configurable nested colours, one level sooner than at depth 0
+    // depth === circleAncestors: the node is itself drawn as a circle, and every circle shares
+    // the top-level slot however deeply the circle packing nests.
+    [1, 1, 0], // a top-level circle below a circle-packed root
+    [2, 2, 0], // a circle nested inside another circle
+    [5, 5, 0],
   ])(
     "depth %d, circleAncestors %d -> level %d",
     (depth, circleAncestors, expected) => {
