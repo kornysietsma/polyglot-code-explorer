@@ -16,9 +16,22 @@
 .Viz {
   background-color: var(--color-viz-bg);
 
-  > svg.chart {
+  // Wraps the canvas + overlay pair so they can be absolutely stacked and exactly
+  // co-located, and so d3.zoom (attached here, not to either layer - see camera.ts)
+  // keeps receiving events regardless of which layer currently has pointer-events.
+  // Same box svg.chart used to occupy alone.
+  > .chart-stack {
+    position: relative;
     width: 100%;
     height: 1024px;
+
+    > canvas.chart-gl,
+    > svg.chart-overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
   }
 
   > svg.timescale {

@@ -30,6 +30,13 @@ import { TimescaleIntervalData } from "./preprocess";
 import { Action, colourKeyToColours, State, themedColours } from "./state";
 import { getCurrentVis } from "./VisualizationData";
 import { VizMetadata } from "./viz.types";
+import {
+  Camera,
+  fitTransform,
+  IDENTITY_ZOOM,
+  overlayGroupTransform,
+  worldToDevice,
+} from "./webgl/camera";
 
 const redrawPolygons = (
   svgSelection: Selection<
@@ -335,8 +342,50 @@ const updateCoupling = (
   drawCoupling(group, files, metadata, state, dispatch);
 };
 
+// Resizes a canvas's backing store to match its CSS box at the current DPR. CSS size itself
+// stays declarative (100%/100% in main_areas.scss) - only the device-pixel resolution is set
+// here, per plan.md's "DPR and resize".
+function resizeCanvasToDisplaySize(
+  canvas: HTMLCanvasElement,
+  cssWidth: number,
+  cssHeight: number,
+  dpr: number
+) {
+  canvas.width = Math.round(cssWidth * dpr);
+  canvas.height = Math.round(cssHeight * dpr);
+}
+
+// TEMPORARY (plan.md step 1): a 2D-context quad tracing the root node's own polygon, purely to
+// de-risk the camera math (fit + zoom + DPR + resize) before any real WebGL geometry exists. It
+// must sit exactly on the root cell's edge and stay welded to it through pan/zoom/resize -
+// deleted in step 4, once real fills take over the canvas.
+function drawDebugQuad(
+  canvas: HTMLCanvasElement,
+  camera: Camera,
+  polygon: Point[]
+) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("2D context unavailable on debug canvas");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (polygon.length < 2) return;
+  ctx.strokeStyle = "#ff00ff";
+  ctx.lineWidth = 2 * camera.dpr;
+  ctx.beginPath();
+  polygon.forEach(([x, y], i) => {
+    const [dx, dy] = worldToDevice(camera, x, y);
+    if (i === 0) ctx.moveTo(dx, dy);
+    else ctx.lineTo(dx, dy);
+  });
+  ctx.closePath();
+  ctx.stroke();
+}
+
 const draw = (
   d3Container: React.RefObject<SVGSVGElement | null>,
+  glCanvasRef: React.RefObject<HTMLCanvasElement | null>,
+  chartStackRef: React.RefObject<HTMLDivElement | null>,
+  cameraRef: React.RefObject<Camera | null>,
   files: TreeNode,
   metadata: VizMetadata,
   features: FeatureFlags,
@@ -352,14 +401,32 @@ const draw = (
     console.warn("in draw but d3container not yet current");
     return;
   }
+  const chartStackEl = chartStackRef.current;
+  const glCanvas = glCanvasRef.current;
+  if (!chartStackEl || !glCanvas) {
+    console.warn("in draw but canvas layer not yet mounted");
+    return;
+  }
   const vizEl = d3Container.current;
-  const w = vizEl.clientWidth;
-  const h = vizEl.clientHeight - timescaleHeight;
+  const w = chartStackEl.clientWidth;
+  const boxHeight = chartStackEl.clientHeight;
+  const h = boxHeight - timescaleHeight;
 
   const { layout } = files;
   if (!layout.width || !layout.height) {
     throw new Error("Root node has no width or height!");
   }
+
+  const dpr = window.devicePixelRatio || 1;
+  const fit = fitTransform(
+    { width: layout.width, height: layout.height },
+    w,
+    boxHeight
+  );
+  const camera: Camera = { fit, zoom: IDENTITY_ZOOM, dpr };
+  cameraRef.current = camera;
+  resizeCanvasToDisplaySize(glCanvas, w, boxHeight, dpr);
+  drawDebugQuad(glCanvas, camera, layout.polygon);
 
   const svg = d3
     .select(vizEl)
@@ -467,15 +534,35 @@ const draw = (
   group.selectAll(".coupling").raise();
 
   // zooming - see https://observablehq.com/@d3/zoomable-map-tiles?collection=@d3/d3-zoom
-  const zoomed = (
-    event: D3ZoomEvent<SVGSVGElement, HierarchyNode<TreeNode>>
-  ) => {
-    group.attr("transform", event.transform.toString());
+  //
+  // Attached to the chart-stack wrapper, not to the SVG or the canvas: it's a plain HTML
+  // element with no viewBox, so d3.pointer() reports coordinates in plain CSS pixels local to
+  // it - which is why the camera composes fit *then* zoom (camera.ts) - and it stays the right
+  // target regardless of which layer currently has pointer-events (canvas.chart-gl gets that
+  // switch in step 5), so d3.zoom never needs to move again.
+  const zoomed = (event: D3ZoomEvent<HTMLDivElement, unknown>) => {
+    const nextCamera: Camera = {
+      ...camera,
+      zoom: {
+        x: event.transform.x,
+        y: event.transform.y,
+        k: event.transform.k,
+      },
+    };
+    cameraRef.current = nextCamera;
+
+    const overlay = overlayGroupTransform(nextCamera);
+    group.attr(
+      "transform",
+      `translate(${overlay.x},${overlay.y}) scale(${overlay.k})`
+    );
+
+    drawDebugQuad(glCanvas, nextCamera, layout.polygon);
   };
 
-  svg.call(
+  d3.select(chartStackEl).call(
     d3
-      .zoom<SVGSVGElement, unknown>()
+      .zoom<HTMLDivElement, unknown>()
       .extent([
         [0, 0],
         [w, h],
@@ -636,6 +723,11 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
     useRef<SVGSVGElement | null>(null);
   const d3TimescaleContainer: RefObject<SVGSVGElement | null> =
     useRef<SVGSVGElement | null>(null);
+  const glCanvasRef: RefObject<HTMLCanvasElement | null> =
+    useRef<HTMLCanvasElement | null>(null);
+  const chartStackRef: RefObject<HTMLDivElement | null> =
+    useRef<HTMLDivElement | null>(null);
+  const cameraRef: RefObject<Camera | null> = useRef<Camera | null>(null);
 
   const debouncedDispatch = useMemo(
     () => _.debounce((nextValue) => dispatch(nextValue), 250),
@@ -658,7 +750,17 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
     ) {
       console.log("expensive config change - rebuild all");
       console.time("redraw");
-      draw(d3Container, data.tree, metadata, features, state, dispatch);
+      draw(
+        d3Container,
+        glCanvasRef,
+        chartStackRef,
+        cameraRef,
+        data.tree,
+        metadata,
+        features,
+        state,
+        dispatch
+      );
       console.timeEnd("redraw");
       console.time("redrawTimescale");
       drawTimescale(
@@ -691,6 +793,35 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
       }
     }
   }, [dataRef, state, dispatch, debouncedDispatch, prevState]);
+
+  // Resize handling: re-fit the camera and the canvas's backing-store resolution, without
+  // rebuilding any geometry (there is none yet - just the step-1 debug quad). The overlay
+  // SVG's own viewBox re-fits itself natively; nothing to do there.
+  useEffect(() => {
+    const stackEl = chartStackRef.current;
+    const canvas = glCanvasRef.current;
+    if (!stackEl || !canvas) return;
+
+    const observer = new ResizeObserver(() => {
+      const { layout } = dataRef.current.data.tree;
+      if (!layout.width || !layout.height) return;
+      const dpr = window.devicePixelRatio || 1;
+      const w = stackEl.clientWidth;
+      const boxHeight = stackEl.clientHeight;
+      const fit = fitTransform(
+        { width: layout.width, height: layout.height },
+        w,
+        boxHeight
+      );
+      const zoom = cameraRef.current?.zoom ?? IDENTITY_ZOOM;
+      const camera: Camera = { fit, zoom, dpr };
+      cameraRef.current = camera;
+      resizeCanvasToDisplaySize(canvas, w, boxHeight, dpr);
+      drawDebugQuad(canvas, camera, layout.polygon);
+    });
+    observer.observe(stackEl);
+    return () => observer.disconnect();
+  }, [dataRef]);
 
   function svgPatternDefs() {
     const { svgPatternIds } = state.calculated.svgPatterns;
@@ -743,31 +874,34 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
 
   return (
     <aside className="Viz">
-      <svg className="chart" ref={d3Container}>
-        <defs>
-          {/* arrowhead marker definition */}
-          <marker
-            id="arrow"
-            viewBox="0 0 4 4"
-            refX="2"
-            refY="2"
-            markerWidth="5"
-            markerHeight="5"
-            markerUnits="strokeWidth"
-            // xoverflow="visible"  TODO: this was here and invalid - check
-            overflow="visible"
-            orient="auto-start-reverse"
-          >
-            <path d="M0,0L4,2L0,4z" fill="#ff6300" />
-          </marker>
-          {state.config.visualization == "teamPattern" ? (
-            svgPatternDefs()
-          ) : (
-            <></>
-          )}
-        </defs>
-        <g className="topGroup" />
-      </svg>
+      <div className="chart-stack" ref={chartStackRef}>
+        <canvas className="chart-gl" ref={glCanvasRef} />
+        <svg className="chart-overlay" ref={d3Container}>
+          <defs>
+            {/* arrowhead marker definition */}
+            <marker
+              id="arrow"
+              viewBox="0 0 4 4"
+              refX="2"
+              refY="2"
+              markerWidth="5"
+              markerHeight="5"
+              markerUnits="strokeWidth"
+              // xoverflow="visible"  TODO: this was here and invalid - check
+              overflow="visible"
+              orient="auto-start-reverse"
+            >
+              <path d="M0,0L4,2L0,4z" fill="#ff6300" />
+            </marker>
+            {state.config.visualization == "teamPattern" ? (
+              svgPatternDefs()
+            ) : (
+              <></>
+            )}
+          </defs>
+          <g className="topGroup" />
+        </svg>
+      </div>
       <svg className="timescale" ref={d3TimescaleContainer} />
     </aside>
   );

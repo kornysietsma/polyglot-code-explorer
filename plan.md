@@ -168,21 +168,21 @@ everything downstream assumes the screenshot suite can still see the rendering.
 The riskiest integration work, done while there is nothing else on screen to
 confuse it.
 
-- [ ] `src/webgl/camera.ts`: pure module. `fitTransform(layout, clientW, clientH)`
+- [x] `src/webgl/camera.ts`: pure module. `fitTransform(layout, clientW, clientH)`
       reproducing the `xMidYMid meet` viewBox fit; composition with the `d3.zoom`
       transform; `screenToWorld(clientX, clientY)`; the world→clip matrix or
       scale/translate uniforms. No `gl` import.
-- [ ] `src/Viz.tsx`: add `<canvas className="chart-gl">` **before** the existing
+- [x] `src/Viz.tsx`: add `<canvas className="chart-gl">` **before** the existing
       svg, rename `svg.chart` → `svg.chart-overlay`. Both absolutely positioned
       and exactly co-located inside `.Viz`.
-- [ ] `src/css/main_areas.scss`: position the two layers. Overlay keeps normal
+- [x] `src/css/main_areas.scss`: position the two layers. Overlay keeps normal
       pointer events **for now** (the `.nesting` click handler is still live until
       step 7; the switch to `pointer-events: none` happens in step 5).
-- [ ] Canvas sizing: `width/height = client × devicePixelRatio`, CSS size in layout
+- [x] Canvas sizing: `width/height = client × devicePixelRatio`, CSS size in layout
       pixels, `ResizeObserver` on the container re-sizing and redrawing without
       rebuilding geometry.
-- [ ] Zoom handler updates the camera uniforms _and_ the overlay `<g>` transform.
-- [ ] **Temporary debug draw:** a single quad (raw 2D canvas context is fine here,
+- [x] Zoom handler updates the camera uniforms _and_ the overlay `<g>` transform.
+- [x] **Temporary debug draw:** a single quad (raw 2D canvas context is fine here,
       or the first scrap of GL) outlining the root node's polygon bounds.
 
 **Verify — unit:** `camera.ts` tests — fit scale and centring for wider-than-tall
@@ -559,3 +559,62 @@ open questions, anything that contradicts the spec. Fold the durable parts into
   `npx vite --port 5174` serves the pre-WebGL renderer, then stopped it - start it
   again whenever a side-by-side is actually needed (step 4 onward), no need to
   leave it running between sessions.
+
+### Step 1
+
+- **d3.zoom is attached to a new `.chart-stack` wrapper div, not to the SVG.**
+  This wasn't explicit in spec.md/plan.md but follows from the chain they
+  document (`world -> viewBox fit -> d3.zoom transform -> CSS pixels`): d3.zoom's
+  `d3.pointer()` resolves coordinates through an SVG element's own viewBox
+  transform, which would put zoom back in _world_ units, not CSS pixels - the
+  opposite of the documented chain, and the opposite of what today's SVG-only
+  code actually does (today's zoom, attached to `svg.chart`, operates in world
+  units; `group.attr("transform", event.transform.toString())` only works
+  because the SVG's own viewBox re-fits it afterwards). A plain wrapper div has
+  no viewBox, so `d3.pointer` reports plain CSS pixels local to it - matching the
+  documented chain - and it's a stable host that never needs to move: it still
+  receives every event once the overlay switches to `pointer-events: none` in
+  step 5 (events bubble up through it regardless of which descendant layer
+  currently has pointer-events), so d3.zoom is attached exactly once, ever.
+  Excludes `svg.timescale` (a sibling, outside the wrapper) so scrolling over the
+  timescale/brush doesn't pan the main viz - it didn't before, and still doesn't.
+- **Consequence: the overlay's `<g>` transform is no longer `event.transform`
+  verbatim.** Since the overlay SVG keeps its own viewBox, the browser re-applies
+  an identical fit to whatever we put on the group, on top of what we set. To
+  keep the overlay pixel-locked to the canvas (fit-then-zoom), the group's
+  transform has to pre-compensate: `overlayGroupTransform()` in camera.ts solves
+  `fit^-1 . (fit-then-zoom)`, which collapses algebraically to a plain
+  translate+scale. Verified against a hand-rolled "simulate the browser's own
+  fit on top" check in camera.test.ts, and confirmed visually - the SVG content
+  and the canvas debug quad move in exact lockstep through pan/zoom/resize with
+  no drift, on both `explorertest` (circlePack root) and `omf.json`
+  (nestedCircles, varying circle depth per branch).
+- **Manual verification was pixel-precise, not just eyeballed.** Read the debug
+  canvas's own pixels back via `getImageData` and compared against hand-computed
+  expectations from the layout data: at identity zoom the root's circle (root
+  width/height 323.32, in a 1024x1024 CSS box) touches all four canvas edges
+  exactly (measured 0-1023 both axes, matching `1024/323.32 * 323.32 = 1024`);
+  after a wheel zoom at the exact canvas centre, `d3.zoom`'s own transform read
+  back as `k=0.5743...` (matching the hand-derived `2^(-0.8)` from d3-zoom's
+  default wheel delta formula for a 400-unit scroll), and the debug circle's
+  measured diameter (589px) and centre (511.5, 511.5 - exactly canvas centre)
+  matched the camera-predicted values to the pixel. Drag-pan was verified the
+  same way (`__zoom.x/y` moved by exactly the mouse-drag delta in CSS pixels).
+- **One real bug found and fixed during verification, but it was in the test
+  methodology, not the app**: an early manual check used a mouse target
+  (640, 758) computed from a bounding rect measured against a taller page state;
+  the actual viewport was only 720px tall, so `elementFromPoint` at that
+  coordinate returned `null`, the wheel event fell through to native page
+  scroll, and I initially misread the resulting `scrollY` change as a working
+  zoom. `document.elementFromPoint` returning `null` (rather than the expected
+  element) was the tell. Resizing the Playwright viewport to comfortably contain
+  the whole 1024px-tall chart-stack fixed it. Worth remembering next time a
+  manual pan/zoom check on this app looks like it's "working" but the numbers
+  don't add up - check the viewport size before the camera math.
+- ResizeObserver verified by resizing the browser viewport width (1024 -> 700
+  CSS px): canvas backing store resized to match, fit correctly switched from
+  height-constrained to width-constrained, and the debug quad + SVG content
+  re-fit together with no drift.
+- No visual regression: SVG cell/nesting/selection rendering is byte-for-byte
+  the same code path as before, just inside a renamed `svg.chart-overlay`
+  sitting over the new (otherwise-empty-but-for-the-debug-quad) canvas.
