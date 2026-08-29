@@ -285,16 +285,53 @@ The SVG got this free via `viewBox`; the canvas does not.
 `TeamPatternVisualization` returns `url(#patternN)`, resolved against the
 `<linearGradient>` defs built in `svgPatternDefs()` (L695-742): a 3-colour diagonal
 stripe, `gradientUnits="userSpaceOnUse"`, `x2="10"`, `spreadMethod="repeat"`,
-`gradientTransform="rotate(-45)"` - so the stripes are in **world space and scale
-with zoom**.
+`gradientTransform="rotate(-45)"`.
 
-Reproduce in the fragment shader:
+Because `userSpaceOnUse` puts the gradient in the shared coordinate system of
+`g.topGroup`, stripes **align across adjacent cells** - the viz reads as one
+continuous striped fabric with cells cut out of it - and they **scale with zoom**.
 
-- Upload the palette as an `N x 1` RGB texture, 3 texels per pattern.
+**Decision: keep the continuous fabric, but make stripe width constant on screen.**
+The zoom-scaling was a design compromise, not a goal. Proportionality stays as it
+is: `topTeamsPartitioned` (`nodeData.ts` L573) allocates 3 equal bands by a
+largest-remainder quota, repeating a team's colour to approximate its share, so a
+70/30 split renders 2:1. `SVG_PARTITIONS`, `topTeamsPartitioned` and
+`coloursToColourKey` are all **unchanged**; only the rendering moves.
+
+### Do not use `gl_FragCoord` directly
+
+The obvious screen-space form, `dot(gl_FragCoord.xy, axis)`, locks the stripe field
+to the **viewport**, so panning slides the content underneath a stationary pattern -
+the classic "shower door" artefact. Anchor the phase to world space instead, and
+take the constant screen width from the scale factor alone:
+
+```glsl
+// v_world is the world position, interpolated from the vertex shader
+const vec2 AXIS = vec2(0.7071, -0.7071);          // -45 degrees
+float d = dot(v_world * u_scale, AXIS) / (10.0 * u_dpr);
+int band = int(floor(fract(d) * 3.0));
+vec3 rgb = texture2D(u_palette, paletteUv(v_patternIndex, band)).rgb;
+```
+
+`u_scale` is world -> device pixels, so multiplying by it fixes the stripe period at
+10 CSS pixels regardless of zoom, while basing `d` on `v_world` (not the translated
+screen position) keeps the phase attached to the content. Stripes stay aligned
+across adjacent cells exactly as they do today, and they travel with the map when
+you pan.
+
+Remaining mechanics:
+
+- Upload the palette as an `N x 1` RGB texture, 3 texels per pattern. The pattern
+  count is bounded by distinct colour triples, so this stays small.
 - Per-vertex `a_patternIndex` (float), used only when `u_patternMode` is set.
-- Fragment: `stripe = floor(fract(dot(worldPos, vec2(cos(-PI/4), sin(-PI/4))) / 10.0) * 3.0)`
-  then sample the palette at `patternIndex * 3 + stripe`.
-- The world position must be interpolated from the vertex shader as a varying.
+- `v_world` must be passed from the vertex shader as a varying.
+
+**Known limitation, carried over from today:** a cell smaller than one stripe period
+can land inside a single band and read as single-owner. Rejected alternative:
+per-polygon proportional bands (each cell divided by true ownership fractions,
+inherently zoom-invariant, immune to that failure) - rejected because it breaks the
+continuous cross-cell fabric that gives this visualisation its character. Revisit
+only if the small-cell case proves misleading in practice.
 
 **Sequence this last.** Ship the first working renderer with `teamPattern` falling
 back to the first colour of its triple (flat fill), and add the stripe shader as a
@@ -308,6 +345,9 @@ Re-baseline these deliberately; anything else is a bug.
   `.cell`'s stroke. With all fills drawn before all outlines, outlines always win.
   Expect hairline differences on shared borders.
 - **Directory-border clicks** now select the leaf, per decision 3.
+- **Team pattern stripe width** is now constant on screen instead of scaling with
+  zoom. Screenshots of the `teamPattern` visualisation will differ at any zoom
+  level other than the one where the two happen to coincide.
 - **Antialiasing.** GPU AA differs from Skia's. This is the one that makes
   screenshot baselines less portable across machines than they are today - worth
   knowing before re-baselining, given CLAUDE.md treats canvas diffs as real bugs.
@@ -332,6 +372,9 @@ Re-baseline these deliberately; anything else is a bug.
    needed? Decide by clicking around the real app.
 3. Should the tooltip show more than the path (LOC, age, churn) now that it is
    cheap? Deliberately deferred to keep screenshot parity in the first pass.
+4. Is 10 CSS pixels still the right stripe period once width no longer scales with
+   zoom? It was chosen against a world-space pattern; a different constant may read
+   better now. Cheap to tune - it is one uniform.
 
 ## Verification
 
