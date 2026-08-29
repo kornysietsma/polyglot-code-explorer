@@ -30,6 +30,7 @@ import { TimescaleIntervalData } from "./preprocess";
 import { Action, colourKeyToColours, State, themedColours } from "./state";
 import { getCurrentVis } from "./VisualizationData";
 import { VizMetadata } from "./viz.types";
+import VizTooltip from "./VizTooltip";
 import {
   Camera,
   fitTransform,
@@ -696,6 +697,10 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
   const visibleNodesRef: RefObject<HierarchyNode<TreeNode>[] | null> = useRef<
     HierarchyNode<TreeNode>[] | null
   >(null);
+  const vizContainerRef: RefObject<HTMLElement | null> =
+    useRef<HTMLElement | null>(null);
+  const vizTooltipRef: RefObject<HTMLDivElement | null> =
+    useRef<HTMLDivElement | null>(null);
 
   const debouncedDispatch = useMemo(
     () => _.debounce((nextValue) => dispatch(nextValue), 250),
@@ -835,6 +840,81 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
     return () => canvas.removeEventListener("click", handleClick);
   }, [dispatch]);
 
+  // Hover tooltip (plan.md step 6): replaces the SVG-era per-node `<title>`. Picking on every
+  // raw `mousemove` would run a quadtree search on every pixel the cursor crosses; instead the
+  // latest event is stashed in a ref and a single `pick()` runs once per animation frame
+  // (`rafId` guards against scheduling more than one), which is what spec.md's "Interaction"
+  // section calls for. The DOM is only touched when the picked node's path actually changes -
+  // sweeping the mouse across one large cell shouldn't touch the DOM every frame - but the
+  // tooltip still tracks the cursor position on every throttled tick, since it must move even
+  // while the picked node stays the same.
+  useEffect(() => {
+    const canvas = glCanvasRef.current;
+    const tooltip = vizTooltipRef.current;
+    const container = vizContainerRef.current;
+    if (!canvas || !tooltip || !container) return;
+
+    let rafId: number | null = null;
+    let lastEvent: MouseEvent | null = null;
+    let lastPath: string | null = null;
+
+    const updateTooltip = () => {
+      rafId = null;
+      const event = lastEvent;
+      if (!event) return;
+      const camera = cameraRef.current;
+      const glRenderer = glRendererRef.current;
+      if (!camera || !glRenderer) return;
+
+      const canvasRect = canvas.getBoundingClientRect();
+      const [worldX, worldY] = screenToWorld(
+        camera,
+        event.clientX - canvasRect.left,
+        event.clientY - canvasRect.top
+      );
+      const picked = glRenderer.pick(worldX, worldY);
+      const path = picked?.data.path ?? null;
+
+      if (path !== lastPath) {
+        lastPath = path;
+        tooltip.hidden = path === null;
+        if (path !== null) {
+          tooltip.textContent = path;
+        }
+      }
+      if (path !== null) {
+        const containerRect = container.getBoundingClientRect();
+        tooltip.style.left = `${event.clientX - containerRect.left}px`;
+        tooltip.style.top = `${event.clientY - containerRect.top}px`;
+      }
+    };
+
+    const handleMouseMove = (event: MouseEvent) => {
+      lastEvent = event;
+      if (rafId === null) {
+        rafId = requestAnimationFrame(updateTooltip);
+      }
+    };
+
+    const handleMouseLeave = () => {
+      lastEvent = null;
+      lastPath = null;
+      tooltip.hidden = true;
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    };
+
+    canvas.addEventListener("mousemove", handleMouseMove);
+    canvas.addEventListener("mouseleave", handleMouseLeave);
+    return () => {
+      canvas.removeEventListener("mousemove", handleMouseMove);
+      canvas.removeEventListener("mouseleave", handleMouseLeave);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   function svgPatternDefs() {
     const { svgPatternIds } = state.calculated.svgPatterns;
     const { neutralColour } = themedColours(state.config);
@@ -885,7 +965,7 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
   }
 
   return (
-    <aside className="Viz">
+    <aside className="Viz" ref={vizContainerRef}>
       <div className="chart-stack" ref={chartStackRef}>
         <canvas className="chart-gl" ref={glCanvasRef} />
         <svg className="chart-overlay" ref={d3Container}>
@@ -914,6 +994,7 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
           <g className="topGroup" />
         </svg>
       </div>
+      <VizTooltip ref={vizTooltipRef} />
       <svg className="timescale" ref={d3TimescaleContainer} />
     </aside>
   );

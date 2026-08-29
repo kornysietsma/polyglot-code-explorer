@@ -339,14 +339,14 @@ one).
 
 ### Step 6 — HTML hover tooltip
 
-- [ ] `src/VizTooltip.tsx` — a single positioned div.
-- [ ] Hover handler on the canvas, throttled to one `pick` per
+- [x] `src/VizTooltip.tsx` — a single positioned div.
+- [x] Hover handler on the canvas, throttled to one `pick` per
       `requestAnimationFrame`, updating only when the picked node changes; hides on
       mouse-out and on background.
-- [ ] Text stays exactly `node.data.path`, matching today's `svg:title`, so
+- [x] Text stays exactly `node.data.path`, matching today's `svg:title`, so
       screenshots stay comparable. Open question 3 (richer tooltip content) is
       deliberately **not** answered here.
-- [ ] Style it to be visible in both themes.
+- [x] Style it to be visible in both themes.
 
 **Verify — manual:** hover across dense and sparse areas of `openmrs`; the tooltip
 appears immediately (no ~1 s native delay), tracks the cursor, shows the right
@@ -625,3 +625,31 @@ step-3 checklist above for why.
   `selectAFileNode` (a grid scan of canvas click points, since there's no DOM
   element per cell any more) lands on a file node reliably. Baselines
   untouched, nothing to re-baseline yet.
+
+### Step 6
+
+- **`VizTooltip.tsx` takes `ref` as a plain prop** (React 19 - no `forwardRef`
+  needed; this repo has no prior `forwardRef` component, so this sets the
+  convention going forward). Viz.tsx writes to the node directly - text,
+  `hidden`, `style.left`/`top` - on every rAF-throttled pick, the same
+  imperative-DOM pattern already used for the canvas/camera refs, rather than
+  routing hover state through a React re-render on every `mousemove`.
+- **Tooltip position is computed against `.Viz`'s own bounding rect** (a new
+  `vizContainerRef` on the outer `<aside>`), not `chart-stack`'s - `.viz-tooltip`
+  sits as `.Viz`'s direct child per spec.md's target architecture, so it's
+  positioned independently of chart-stack's internal layout. `.Viz` gained
+  `position: relative` to anchor it (harmless on a CSS grid item).
+- **Styling reused existing theme tokens** (`--color-modal-bg`,
+  `--color-text`, `--color-borders` from `variables.scss`) rather than adding
+  new ones - already theme-aware, so "visible in both themes" needed no new
+  CSS variables.
+- **Second confirmed case of `playwright-cli`'s synthetic mouse commands being
+  unreliable in this environment** (see step 5's note on `mousedown`/`mouseup`):
+  repeated separate `playwright-cli mousemove x y` invocations reliably fired
+  only the first one or two, then silently stopped reaching the page - not a
+  rendering-blocked/timing issue (waited up to 0.4s between moves). Dispatching
+  real `mousemove` `MouseEvent`s directly on the canvas via `page.evaluate`
+  worked every time and is what was used to verify: 6+ scattered in-shape
+  points on `openmrs.json` each produced a distinct, correct tooltip path;
+  a background point (outside the circle-packed root) correctly hid it; and
+  `mouseleave` correctly hid it too.
