@@ -5,56 +5,67 @@ import { HierarchyNode } from "d3";
 
 import { nodeCircleAncestors } from "../nodeData";
 import { TreeNode } from "../polyglot_data.types";
-import { parseCssColour } from "./colours";
+import { parseCssColour, parsePatternId } from "./colours";
 import { assertConvex, fanTriangulate } from "./triangulate";
 
 export interface FillGeometry {
   // flat [x0,y0, x1,y1, ...] world-space triangle-list vertices
   positions: Float32Array;
-  // flat [r0,g0,b0, r1,g1,b1, ...] per-vertex colour in 0-1, one triple per position vertex
+  // flat [r0,g0,b0, r1,g1,b1, ...] per-vertex colour in 0-1, one triple per position vertex -
+  // meaningless (left as 0,0,0) for a vertex whose patternIndex is >= 0, since the shader reads
+  // the palette texture for that one instead (spec.md, "Team pattern visualisation").
   colours: Float32Array;
+  // one patternId per position vertex, or -1 for an ordinary flat-coloured vertex - the shader's
+  // `a_patternIndex` attribute, keyed into the `u_palette` texture GlRenderer.setGeometry()'s
+  // caller uploads alongside this.
+  patternIndices: Float32Array;
 }
 
 // A convex n-gon fans into (n-2) triangles, i.e. (n-2)*3 vertices - shared by buildFills (which
-// also needs the triangulated positions) and buildFillColours (which doesn't) so the two agree on
-// vertex count without buildFillColours re-triangulating.
+// also needs the triangulated positions) and buildFillAttributes (which doesn't) so the two agree
+// on vertex count without buildFillAttributes re-triangulating.
 function fanVertexCount(polygonPointCount: number): number {
   return Math.max(polygonPointCount - 2, 0) * 3;
 }
 
-// Per-vertex colour buffer only, matching the vertex layout buildFills would produce for the same
-// `nodes` - the colour-only counterpart used by GlRenderer.setColours() for a cheap `config`
-// change (spec.md, "The three update paths"): positions are untouched, so this skips
-// fanTriangulate/assertConvex entirely rather than re-deriving geometry it won't use.
-export function buildFillColours(
+// Per-vertex colour and pattern-index buffers only, matching the vertex layout buildFills would
+// produce for the same `nodes` - the colour-only counterpart used by GlRenderer.setColours() for
+// a cheap `config` change (spec.md, "The three update paths"): positions are untouched, so this
+// skips fanTriangulate/assertConvex entirely rather than re-deriving geometry it won't use. A
+// `url(#patternN)` fill (TeamPatternVisualization) routes that node's vertices through the
+// pattern-texture path instead of parseCssColour, which can't parse it.
+export function buildFillAttributes(
   nodes: readonly HierarchyNode<TreeNode>[],
   fillFn: (d: HierarchyNode<TreeNode>) => string
-): Float32Array {
+): { colours: Float32Array; patternIndices: Float32Array } {
   let totalVertices = 0;
   for (const node of nodes) {
     totalVertices += fanVertexCount(node.data.layout.polygon.length);
   }
 
   const colours = new Float32Array(totalVertices * 3);
-  let offset = 0;
+  const patternIndices = new Float32Array(totalVertices);
+  let colourOffset = 0;
+  let vertexOffset = 0;
   for (const node of nodes) {
     const vertexCount = fanVertexCount(node.data.layout.polygon.length);
-    const [r, g, b] = parseCssColour(fillFn(node));
+    const fill = fillFn(node);
+    const patternId = parsePatternId(fill);
+    const [r, g, b] = patternId === null ? parseCssColour(fill) : [0, 0, 0];
     for (let i = 0; i < vertexCount; i++) {
-      colours[offset] = r;
-      colours[offset + 1] = g;
-      colours[offset + 2] = b;
-      offset += 3;
+      colours[colourOffset] = r;
+      colours[colourOffset + 1] = g;
+      colours[colourOffset + 2] = b;
+      colourOffset += 3;
+      patternIndices[vertexOffset] = patternId === null ? -1 : patternId;
+      vertexOffset++;
     }
   }
-  return colours;
+  return { colours, patternIndices };
 }
 
 // One triangle fan per node's polygon (spec.md, "Fills"): Voronoi cells and circle
-// approximations are both convex, so the fan is an exact triangulation. `fillFn` must already be
-// resolved to a real CSS colour string - `url(#patternN)` fallback resolution
-// (colours.resolvePatternFallback) is the caller's job, not this module's, so this stays about
-// geometry only.
+// approximations are both convex, so the fan is an exact triangulation.
 export function buildFills(
   nodes: readonly HierarchyNode<TreeNode>[],
   fillFn: (d: HierarchyNode<TreeNode>) => string
@@ -70,9 +81,11 @@ export function buildFills(
     totalVertices += triangles.length / 2;
   }
 
+  const { colours, patternIndices } = buildFillAttributes(nodes, fillFn);
   return {
     positions: concatFloat32(positionChunks, totalVertices * 2),
-    colours: buildFillColours(nodes, fillFn),
+    colours,
+    patternIndices,
   };
 }
 

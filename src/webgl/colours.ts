@@ -30,51 +30,47 @@ export function parseCssColour(css: string): RGB {
 
 const PATTERN_URL = /^url\(#pattern(\d+)\)$/;
 
-// One reverse (PatternId -> first colour) map per distinct svgPatternIds Map, built once and
-// cached by object identity rather than rescanning svgPatternIds on every call - this runs once
-// per node during a colour-buffer rebuild (spec.md, "The three update paths"), so an O(n) scan
-// per call would make it O(n*m) across a whole tree.
-const reverseCache = new WeakMap<
-  ReadonlyMap<ColourKey, PatternId>,
-  ReadonlyMap<PatternId, string>
->();
-
-function firstColourByPatternId(
-  svgPatternIds: ReadonlyMap<ColourKey, PatternId>
-): ReadonlyMap<PatternId, string> {
-  const cached = reverseCache.get(svgPatternIds);
-  if (cached) return cached;
-
-  const reverse = new Map<PatternId, string>();
-  for (const [colourKey, patternId] of svgPatternIds) {
-    const first = colourKeyToColours(colourKey)[0];
-    if (first == undefined) {
-      throw new Error(
-        `resolvePatternFallback: pattern ${patternId} has no colours`
-      );
-    }
-    reverse.set(patternId, first);
-  }
-  reverseCache.set(svgPatternIds, reverse);
-  return reverse;
+// Extracts the pattern id from a `TeamPatternVisualization` fill (`url(#patternN)`,
+// state.ts's `PatternId`), or `null` for an ordinary CSS colour. geometry.ts uses this to route
+// a vertex through the palette-texture stripe path (`a_patternIndex >= 0`, spec.md's "Team
+// pattern visualisation") instead of `parseCssColour`, which can't parse a pattern URL.
+export function parsePatternId(fill: string): PatternId | null {
+  const match = PATTERN_URL.exec(fill);
+  return match ? Number(match[1]) : null;
 }
 
-// The flat-fill fallback for `TeamPatternVisualization`'s `url(#patternN)` fills, per spec.md's
-// "Team pattern visualisation": resolves the pattern id against the precomputed
-// ColourKey -> PatternId map (`state.calculated.svgPatterns.svgPatternIds`) and returns the
-// first colour of the triple. Anything that isn't a pattern URL passes through untouched. Stands
-// in until the real stripe shader lands in plan.md step 9.
-export function resolvePatternFallback(
-  fill: string,
-  svgPatternIds: ReadonlyMap<ColourKey, PatternId>
-): string {
-  const match = PATTERN_URL.exec(fill);
-  if (!match) return fill;
+export interface PatternPalette {
+  // N*3 texels * 3 channels, one RGB triple per pattern id in ascending id order - pattern ids
+  // are contiguous from 0 (svgPatterns.ts's calculateFilePatterns assigns them via
+  // `svgPatternIds.size`), so a pattern id is directly the texel-triple index, no lookup table
+  // needed. Uint8 because this uploads straight to a `gl.RGB`/`UNSIGNED_BYTE` texture.
+  rgb: Uint8Array;
+  patternCount: number;
+}
 
-  const patternId = Number(match[1]);
-  const colour = firstColourByPatternId(svgPatternIds).get(patternId);
-  if (colour == undefined) {
-    throw new Error(`resolvePatternFallback: unknown pattern id ${patternId}`);
+// Builds the N x 1 RGB palette texture data the stripe fragment shader samples (spec.md, "Team
+// pattern visualisation"): 3 texels per pattern, one per `SVG_PARTITIONS` band. A colour key with
+// fewer than 3 colours (`topTeamsPartitioned` can return fewer than `SVG_PARTITIONS` entries when
+// a team doesn't clear the quota) pads with `neutralColour` - matching the old SVG-era
+// `svgPatternDefs()`'s `?? neutralColour` fallback, so a partial split still renders sensibly.
+// `patternCount` 0 (no team data) is valid: the caller uploads a 1-texel placeholder rather than
+// a zero-width texture, and no vertex will ever have a non-negative `a_patternIndex` to sample it
+// with, since `svgPatternLookup` is empty too in that case.
+export function buildPatternPalette(
+  svgPatternIds: ReadonlyMap<ColourKey, PatternId>,
+  neutralColour: string
+): PatternPalette {
+  const patternCount = svgPatternIds.size;
+  const rgb = new Uint8Array(patternCount * 3 * 3);
+  for (const [colourKey, patternId] of svgPatternIds) {
+    const colours = colourKeyToColours(colourKey);
+    for (let band = 0; band < 3; band++) {
+      const [r, g, b] = parseCssColour(colours[band] ?? neutralColour);
+      const offset = (patternId * 3 + band) * 3;
+      rgb[offset] = Math.round(r * 255);
+      rgb[offset + 1] = Math.round(g * 255);
+      rgb[offset + 2] = Math.round(b * 255);
+    }
   }
-  return colour;
+  return { rgb, patternCount };
 }

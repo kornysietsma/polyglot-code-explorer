@@ -27,13 +27,7 @@ import {
 } from "./nodeData";
 import { FeatureFlags, Point, TreeNode } from "./polyglot_data.types";
 import { TimescaleIntervalData } from "./preprocess";
-import {
-  Action,
-  colourKeyToColours,
-  Config,
-  State,
-  themedColours,
-} from "./state";
+import { Action, Config, State, themedColours } from "./state";
 import { getCurrentVis } from "./VisualizationData";
 import { VizMetadata } from "./viz.types";
 import VizTooltip from "./VizTooltip";
@@ -44,12 +38,13 @@ import {
   overlayGroupTransform,
   screenToWorld,
 } from "./webgl/camera";
-import { resolvePatternFallback } from "./webgl/colours";
+import { buildPatternPalette, PatternPalette } from "./webgl/colours";
 import { GlRenderer, NestingStyle } from "./webgl/GlRenderer";
 
-// Builds the per-node fill-colour function the WebGL renderer uploads as its colour buffer:
-// the current visualisation's own fillFn, with `url(#patternN)` (TeamPatternVisualization)
-// resolved down to a flat colour via colours.ts's step-3 fallback. Replaces the SVG-era
+// Builds the per-node fill-colour function the WebGL renderer uploads as its colour buffer: just
+// the current visualisation's own fillFn. `TeamPatternVisualization`'s `url(#patternN)` fills pass
+// straight through to geometry.ts, which routes them through the palette-texture stripe shader
+// rather than parseCssColour (spec.md, "Team pattern visualisation") - replaces the SVG-era
 // `redrawPolygons`, which set this as a `.cell` path's `fill` style directly.
 function buildFillFn(
   metadata: VizMetadata,
@@ -62,8 +57,17 @@ function buildFillFn(
     features,
     undefined
   );
+  return (d) => visualization.fillFn(d);
+}
+
+// Builds the team-pattern palette texture data GlRenderer.setGeometry()/setColours() need
+// (spec.md, "Team pattern visualisation") - kept here rather than in webgl/ for the same reason
+// as buildFillFn/buildNestingStyle: it reads `state.calculated.svgPatterns` and the current
+// theme, so this stays the one place that couples the State type to the WebGL layer.
+function buildFillPalette(state: State): PatternPalette {
   const { svgPatternIds } = state.calculated.svgPatterns;
-  return (d) => resolvePatternFallback(visualization.fillFn(d), svgPatternIds);
+  const { neutralColour } = themedColours(state.config);
+  return buildPatternPalette(svgPatternIds, neutralColour);
 }
 
 // Builds the nesting stroke style GlRenderer.setGeometry() needs, from the same config/theme
@@ -213,7 +217,11 @@ const update = (
   if (nestingOnlyChange) {
     glRenderer.setNestingStyle(buildNestingStyle(state));
   } else {
-    glRenderer.setColours(visibleNodes, buildFillFn(metadata, features, state));
+    glRenderer.setColours(
+      visibleNodes,
+      buildFillFn(metadata, features, state),
+      buildFillPalette(state)
+    );
     glRenderer.setNestingStyle(buildNestingStyle(state));
   }
   glRenderer.setTransform(camera, glCanvas.width, glCanvas.height);
@@ -499,7 +507,8 @@ const draw = (
     allNodes,
     outlineNodes,
     buildFillFn(metadata, features, state),
-    buildNestingStyle(state)
+    buildNestingStyle(state),
+    buildFillPalette(state)
   );
   glRenderer.setTransform(camera, glCanvas.width, glCanvas.height);
   glRenderer.draw();
@@ -970,55 +979,6 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
     };
   }, []);
 
-  function svgPatternDefs() {
-    const { svgPatternIds } = state.calculated.svgPatterns;
-    const { neutralColour } = themedColours(state.config);
-    /* sample
-        <linearGradient id="diagonalHatch" gradientUnits="userSpaceOnUse"
-                    x2="30" spreadMethod="repeat" gradientTransform="rotate(-45)">
-      <stop offset="0" stop-color="orange"/>
-      <stop offset="0.33" stop-color="orange"/>
-      <stop offset="0.33" stop-color="blue"/>
-      <stop offset="0.67" stop-color="blue"/>
-      <stop offset="0.67" stop-color="red"/>
-      <stop offset="1.0" stop-color="red"/>
-    </linearGradient>
-    */
-    return [...svgPatternIds].map(([colourKey, patternId]) => {
-      const colours = colourKeyToColours(colourKey);
-      if (
-        colours.length == 3 &&
-        colours[2] == colours[1] &&
-        colours[1] == colours[0]
-      ) {
-        // solid colour - build a simpler gradient
-        return (
-          <linearGradient key={patternId} id={`pattern${patternId}`}>
-            <stop stopColor={colours[0]} />
-          </linearGradient>
-        );
-      } else {
-        return (
-          <linearGradient
-            key={patternId}
-            id={`pattern${patternId}`}
-            gradientUnits="userSpaceOnUse"
-            x2="10"
-            spreadMethod="repeat"
-            gradientTransform="rotate(-45)"
-          >
-            <stop offset="0" stopColor={colours[0]} />
-            <stop offset="0.33" stopColor={colours[0]} />
-            <stop offset="0.33" stopColor={colours[1] ?? neutralColour} />
-            <stop offset="0.67" stopColor={colours[1] ?? neutralColour} />
-            <stop offset="0.67" stopColor={colours[2] ?? neutralColour} />
-            <stop offset="1.0" stopColor={colours[2] ?? neutralColour} />
-          </linearGradient>
-        );
-      }
-    });
-  }
-
   return (
     <aside className="Viz" ref={vizContainerRef}>
       <div className="chart-stack" ref={chartStackRef}>
@@ -1040,11 +1000,6 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
             >
               <path d="M0,0L4,2L0,4z" fill="#ff6300" />
             </marker>
-            {state.config.visualization == "teamPattern" ? (
-              svgPatternDefs()
-            ) : (
-              <></>
-            )}
           </defs>
           <g className="topGroup" />
         </svg>

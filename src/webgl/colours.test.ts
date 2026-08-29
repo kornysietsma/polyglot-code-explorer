@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ColourKey, coloursToColourKey, PatternId } from "../state";
-import { parseCssColour, resolvePatternFallback } from "./colours";
+import { buildPatternPalette, parseCssColour, parsePatternId } from "./colours";
 
 // Actual default colours from state.ts (initialiseGlobalState), both themes - not exhaustive,
 // but the values the app actually ships with, per plan.md.
@@ -79,33 +79,59 @@ describe("parseCssColour", () => {
   });
 });
 
-describe("resolvePatternFallback", () => {
+describe("parsePatternId", () => {
+  it("extracts the id from a pattern URL", () => {
+    expect(parsePatternId("url(#pattern0)")).toBe(0);
+    expect(parsePatternId("url(#pattern42)")).toBe(42);
+  });
+
+  it("returns null for an ordinary CSS colour", () => {
+    expect(parsePatternId("#ff0000")).toBeNull();
+    expect(parsePatternId("rgb(1,2,3)")).toBeNull();
+  });
+});
+
+describe("buildPatternPalette", () => {
   const solidRed = coloursToColourKey(["#ff0000", "#00ff00", "#0000ff"]);
   const solidGrey = coloursToColourKey(["#111111", "#111111", "#111111"]);
+  // topTeamsPartitioned can return fewer than SVG_PARTITIONS entries (nodeData.ts) - a colour
+  // key with only 2 colours is a real shape, not a hypothetical.
+  const twoColours = coloursToColourKey(["#ff0000", "#00ff00"]);
   const svgPatternIds: ReadonlyMap<ColourKey, PatternId> = new Map([
     [solidRed, 0],
-    [solidGrey, 3],
+    [solidGrey, 1],
+    [twoColours, 2],
   ]);
 
-  it("resolves a pattern URL to the first colour of its triple", () => {
-    expect(resolvePatternFallback("url(#pattern0)", svgPatternIds)).toBe(
-      "#ff0000"
-    );
-    expect(resolvePatternFallback("url(#pattern3)", svgPatternIds)).toBe(
-      "#111111"
-    );
+  function texel(rgb: Uint8Array, patternId: number, band: number): number[] {
+    const offset = (patternId * 3 + band) * 3;
+    return [rgb[offset]!, rgb[offset + 1]!, rgb[offset + 2]!];
+  }
+
+  it("packs 3 RGB texels per pattern, in patternId order", () => {
+    const { rgb, patternCount } = buildPatternPalette(svgPatternIds, "#000000");
+    expect(patternCount).toBe(3);
+    expect(rgb.length).toBe(3 * 3 * 3);
+
+    expect(texel(rgb, 0, 0)).toEqual([255, 0, 0]);
+    expect(texel(rgb, 0, 1)).toEqual([0, 255, 0]);
+    expect(texel(rgb, 0, 2)).toEqual([0, 0, 255]);
+
+    expect(texel(rgb, 1, 0)).toEqual([17, 17, 17]);
+    expect(texel(rgb, 1, 1)).toEqual([17, 17, 17]);
+    expect(texel(rgb, 1, 2)).toEqual([17, 17, 17]);
   });
 
-  it("passes non-pattern fills through untouched", () => {
-    expect(resolvePatternFallback("#ff0000", svgPatternIds)).toBe("#ff0000");
-    expect(resolvePatternFallback("rgb(1,2,3)", svgPatternIds)).toBe(
-      "rgb(1,2,3)"
-    );
+  it("pads a colour key with fewer than 3 colours using neutralColour", () => {
+    const { rgb } = buildPatternPalette(svgPatternIds, "#123456");
+    expect(texel(rgb, 2, 0)).toEqual([255, 0, 0]);
+    expect(texel(rgb, 2, 1)).toEqual([0, 255, 0]);
+    expect(texel(rgb, 2, 2)).toEqual([0x12, 0x34, 0x56]);
   });
 
-  it("throws on an unknown pattern id", () => {
-    expect(() =>
-      resolvePatternFallback("url(#pattern99)", svgPatternIds)
-    ).toThrow(/unknown pattern id 99/);
+  it("returns a 0-length palette for no patterns at all", () => {
+    const { rgb, patternCount } = buildPatternPalette(new Map(), "#000000");
+    expect(patternCount).toBe(0);
+    expect(rgb.length).toBe(0);
   });
 });

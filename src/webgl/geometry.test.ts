@@ -8,7 +8,12 @@ import {
   Point,
   TreeNode,
 } from "../polyglot_data.types";
-import { buildFills, buildOutlines, outlineLevel } from "./geometry";
+import {
+  buildFillAttributes,
+  buildFills,
+  buildOutlines,
+  outlineLevel,
+} from "./geometry";
 
 // Same minimal-fixture convention as nodeData.test.ts's minimalFileNode.
 const DUMMY_LOC: LocData = {
@@ -75,11 +80,12 @@ describe("buildFills", () => {
       return colour;
     };
 
-    const { positions, colours } = buildFills(nodes, fillFn);
+    const { positions, colours, patternIndices } = buildFills(nodes, fillFn);
 
     // triangle -> 1 fan triangle (3 vertices), quad -> 2 fan triangles (6 vertices)
     expect(positions.length).toBe((3 + 6) * 2);
     expect(colours.length).toBe((3 + 6) * 3);
+    expect(patternIndices.length).toBe(3 + 6);
 
     // node "a"'s 3 vertices are all red
     for (let i = 0; i < 3; i++) {
@@ -93,12 +99,18 @@ describe("buildFills", () => {
         0, 1, 0,
       ]);
     }
+    // neither node is a team-pattern fill, so every vertex gets the "flat colour" sentinel
+    expect([...patternIndices]).toEqual(new Array(9).fill(-1));
   });
 
   it("returns empty arrays for an empty node list", () => {
-    const { positions, colours } = buildFills([], () => "#000000");
+    const { positions, colours, patternIndices } = buildFills(
+      [],
+      () => "#000000"
+    );
     expect(positions.length).toBe(0);
     expect(colours.length).toBe(0);
+    expect(patternIndices.length).toBe(0);
   });
 
   it("propagates assertConvex's rejection of a concave polygon", () => {
@@ -113,6 +125,38 @@ describe("buildFills", () => {
       hierarchy<TreeNode>(fileNode("c", concave)),
     ];
     expect(() => buildFills(nodes, () => "#000000")).toThrow(/not convex/);
+  });
+});
+
+describe("buildFillAttributes", () => {
+  it("routes a url(#patternN) fill to patternIndices, not parseCssColour", () => {
+    const nodes: HierarchyNode<TreeNode>[] = [
+      hierarchy<TreeNode>(fileNode("a", TRIANGLE)),
+      hierarchy<TreeNode>(fileNode("b", QUAD)),
+    ];
+    const fillByPath = new Map([
+      ["a", "url(#pattern7)"],
+      ["b", "#00ff00"],
+    ]);
+    const fillFn = (d: HierarchyNode<TreeNode>) => {
+      const fill = fillByPath.get(d.data.path);
+      if (fill == undefined) throw new Error(`no fill for ${d.data.path}`);
+      return fill;
+    };
+
+    const { colours, patternIndices } = buildFillAttributes(nodes, fillFn);
+
+    // node "a"'s 3 vertices are all pattern 7, and its colour bytes are unused (left at 0)
+    expect([...patternIndices.slice(0, 3)]).toEqual([7, 7, 7]);
+    expect([...colours.slice(0, 9)]).toEqual(new Array(9).fill(0));
+
+    // node "b"'s 6 vertices are a flat colour: -1 sentinel, real green
+    expect([...patternIndices.slice(3, 9)]).toEqual(new Array(6).fill(-1));
+    for (let i = 3; i < 9; i++) {
+      expect([colours[i * 3], colours[i * 3 + 1], colours[i * 3 + 2]]).toEqual([
+        0, 1, 0,
+      ]);
+    }
   });
 });
 

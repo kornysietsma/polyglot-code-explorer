@@ -1,11 +1,12 @@
 # Spec: replace the SVG visualisation renderer with WebGL
 
-Status: in progress. Branch `performance-improvements`. Steps 0-8 of `plan.md` are
+Status: in progress. Branch `performance-improvements`. Steps 0-9 of `plan.md` are
 done (camera math, `fanTriangulate`/`assertConvex`, colour helpers, fills and
 outlines rendering through WebGL with both the `.cell` and `.nesting` SVG layers
-deleted, quadtree picking/click-select, the HTML hover tooltip, and now the three
-separate update paths - `setTransform`/`setColours`/`setGeometry` - replacing the
-naive full-rebuild routing); see `plan.md` for what's left.
+deleted, quadtree picking/click-select, the HTML hover tooltip, the three separate
+update paths - `setTransform`/`setColours`/`setGeometry` - replacing the naive
+full-rebuild routing, and now the team-pattern stripe shader replacing the flat
+fallback); see `plan.md` for what's left.
 
 ## Problem
 
@@ -406,8 +407,16 @@ Remaining mechanics:
 
 - Upload the palette as an `N x 1` RGB texture, 3 texels per pattern. The pattern
   count is bounded by distinct colour triples, so this stays small.
-- Per-vertex `a_patternIndex` (float), used only when `u_patternMode` is set.
+- Per-vertex `a_patternIndex` (float).
 - `v_world` must be passed from the vertex shader as a varying.
+
+**Decision, revised after implementation (step 9):** no separate `u_patternMode`
+uniform. `a_patternIndex` doubles as its own mode switch: `-1` for an ordinary
+flat-coloured vertex, a real pattern id (`>= 0`) for a striped one. A global mode
+uniform would have been wrong anyway - `TeamPatternVisualization` itself mixes
+patterned and flat vertices in one scene (`neutralColour`/`circlePackBackground`/
+`nonexistentColour` overrides in `BaseVisualization.fillFn` are flat even when that
+visualisation is active), so per-vertex was always the real granularity.
 
 **Known limitation, carried over from today:** a cell smaller than one stripe period
 can land inside a single band and read as single-owner. Rejected alternative:
@@ -416,9 +425,9 @@ inherently zoom-invariant, immune to that failure) - rejected because it breaks 
 continuous cross-cell fabric that gives this visualisation its character. Revisit
 only if the small-cell case proves misleading in practice.
 
-**Sequence this last.** Ship the first working renderer with `teamPattern` falling
-back to the first colour of its triple (flat fill), and add the stripe shader as a
-separate step. Everything else is independent of it.
+**Done (step 9).** `TeamPatternVisualization` now renders through the palette-texture
+stripe shader described above; the step-3 flat fallback (`colours.resolvePatternFallback`)
+and `svgPatternDefs()`/`<linearGradient>` defs are deleted.
 
 ## Expected visual deltas
 
@@ -457,9 +466,11 @@ Re-baseline these deliberately; anything else is a bug.
    "Picking" above.
 3. Should the tooltip show more than the path (LOC, age, churn) now that it is
    cheap? Deliberately deferred to keep screenshot parity in the first pass.
-4. Is 10 CSS pixels still the right stripe period once width no longer scales with
-   zoom? It was chosen against a world-space pattern; a different constant may read
-   better now. Cheap to tune - it is one uniform.
+4. ~~Is 10 CSS pixels still the right stripe period once width no longer scales with
+   zoom?~~ **Resolved (step 9):** kept 10 CSS px (`GlRenderer.ts`'s `STRIPE_PERIOD_CSS`)
+   - read fine by eye at both the default zoom and a ~2x zoom against
+     `data/default.json`'s striped cells. Still just one constant to retune later if a
+     larger data set's cell sizes make it read differently.
 
 ## Verification
 

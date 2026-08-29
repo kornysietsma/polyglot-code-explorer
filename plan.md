@@ -441,24 +441,25 @@ change" inefficiency. Split the naive routing from step 4.
 
 **Verify — automated:** `npm run check`.
 
-### Step 9 — Team pattern stripe shader
+### Step 9 — Team pattern stripe shader — done
 
 Sequenced last of the rendering work, exactly as `spec.md` says: everything else
 is independent of it.
 
-- [ ] Palette texture: `N × 1` RGB, 3 texels per pattern, built from
+- [x] Palette texture: `N × 1` RGB, 3 texels per pattern, built from
       `state.calculated.svgPatterns`. `SVG_PARTITIONS`, `topTeamsPartitioned` and
       `coloursToColourKey` are **unchanged** — only the rendering moves.
-- [ ] Per-vertex `a_patternIndex`, used only when `u_patternMode` is set;
-      `v_world` passed as a varying.
-- [ ] Fragment shader per `spec.md` — phase anchored to **world** space, period
+- [x] Per-vertex `a_patternIndex`; `v_world` passed as a varying. **Revised**: no
+      separate `u_patternMode` uniform — `a_patternIndex`'s own `-1` sentinel is the
+      mode switch (see spec.md's "Team pattern visualisation").
+- [x] Fragment shader per `spec.md` — phase anchored to **world** space, period
       fixed in **screen** space via `u_scale`. Do **not** use `gl_FragCoord`
       directly; that gives the shower-door artefact.
-- [ ] Remove the step-3 flat fallback path for `teamPattern`.
-- [ ] **Delete** `svgPatternDefs()` and the `<linearGradient>` defs from
+- [x] Remove the step-3 flat fallback path for `teamPattern`.
+- [x] **Delete** `svgPatternDefs()` and the `<linearGradient>` defs from
       `Viz.tsx`, and the `teamPattern` branch that renders them.
-- [ ] Tune the stripe period (open question 4): 10 CSS px was chosen against a
-      world-space pattern. Try 8/10/14 and pick by eye — it is one uniform.
+- [x] Tune the stripe period (open question 4): kept 10 CSS px — read fine by eye
+      at default and ~2x zoom on `data/default.json`. See progress notes.
 
 **Verify — manual, side by side with the worktree:**
 
@@ -618,7 +619,7 @@ step - 8, 9):**
   `glRendererRef.current` is read inside the cleanup itself (not hoisted to a
   variable at effect-setup time), since it's set imperatively by `draw()`
   outside React's render cycle - a plain `eslint-disable-next-line
-  react-hooks/exhaustive-deps` on that line covers the stale-ref warning
+react-hooks/exhaustive-deps` on that line covers the stale-ref warning
   the lint rule raises for that pattern (same rationale as CLAUDE.md's
   repo-wide `react-hooks/refs: off`).
 - Verified manually (playwright-cli, `spring-projects.json`, 80,691 nodes,
@@ -635,11 +636,72 @@ step - 8, 9):**
   - Visualisation switch: **87 ms** (Programming Language -> Lines of Code),
     **247 ms** (-> Churn). Both are a large improvement over the pre-step-8
     naive full rebuild (448-587 ms, spec.md), but **miss the spec's <50 ms
-    target** - recorded here rather than rounded away, per plan-level decision
-    4. The remaining cost is in `buildFillFn`/`fillFn` evaluation per node
-    (visualisation-specific scale lookups) and `buildFillColours`'s per-vertex
-    fan-out, not in the GPU upload itself; profiling that further is out of
+    target** - recorded here rather than rounded away, per plan-level decision 4. The remaining cost is in `buildFillFn`/`fillFn` evaluation per node
+    (visualisation-specific scale lookups) and the colour buffer's per-vertex
+    fan-out (`geometry.ts`'s `buildFillAttributes`, renamed in step 9 - see
+    below), not in the GPU upload itself; profiling that further is out of
     scope for this step, which was specifically about eliminating the
     geometry/picking-index rebuild, not the colour computation cost. Worth
     revisiting in step 10's perf pass if the shortfall still matters once the
     full picture (including pan/zoom fps) is in.
+
+**Step 9 findings:**
+
+- `geometry.ts`'s `buildFillColours` is renamed `buildFillAttributes` and now
+  returns `{ colours, patternIndices }`, not just `colours` - a `url(#patternN)`
+  fill (`TeamPatternVisualization`) routes that node's vertices to the `-1`
+  sentinel colour (unused, left at 0) plus a real `patternIndices` entry, instead
+  of trying to `parseCssColour` a URL string. `buildFills` calls it internally,
+  same as before.
+- `colours.ts`'s `resolvePatternFallback`/`firstColourByPatternId`/`reverseCache`
+  (the step-3 flat-fallback machinery) are deleted outright, replaced by
+  `parsePatternId(fill)` (pure regex extraction, `null` for a non-pattern fill)
+  and `buildPatternPalette(svgPatternIds, neutralColour)` (the `N×1` RGB texture
+  data, 3 texels per pattern, padding a short colour key with `neutralColour`
+  exactly like the deleted `svgPatternDefs()` did with its `?? neutralColour`).
+- **Revised after implementation:** dropped the spec's `u_patternMode` uniform.
+  `a_patternIndex`'s `-1`/`>=0` sentinel is sufficient and is per-vertex anyway
+  (a global mode flag couldn't have been correct - `TeamPatternVisualization`
+  itself mixes patterned and flat vertices via `BaseVisualization.fillFn`'s
+  `neutralColour`/`circlePackBackground`/`nonexistentColour` overrides). One
+  fewer uniform, one less thing to keep in sync with the active visualisation.
+- `GlRenderer` gained a palette texture (`NEAREST` + `CLAMP_TO_EDGE`, texture
+  unit 0, never rebound elsewhere so it needs no rebinding in `draw()` beyond a
+  defensive `bindTexture` call) and a `fillPatternIndexBuffer`. Both `setGeometry`
+  and `setColours` now take a `PatternPalette` argument and reupload it via a
+  shared private `uploadPalette()` - correctness-over-cleverness choice: the
+  palette is small (bounded by distinct colour triples) and can move on a cheap
+  `config` change (switching to/from `teamPattern`, or a team/date-range edit
+  that changes `svgPatternIds`), so it doesn't get its own fourth update path.
+  A `patternCount` of 0 (no team data) uploads a 1-texel placeholder rather than
+  a zero-width texture - safe because no vertex will ever have a non-negative
+  `patternIndex` to sample it with in that case.
+- `Viz.tsx`: `buildFillFn` no longer wraps `resolvePatternFallback` - it just
+  returns the visualisation's own `fillFn`. New `buildFillPalette(state)` helper
+  (mirrors `buildNestingStyle`) wraps `colours.buildPatternPalette` with
+  `state.calculated.svgPatterns.svgPatternIds` and the current theme's
+  `neutralColour`. `svgPatternDefs()` and its JSX branch in the `<defs>` block
+  are deleted; `colourKeyToColours` is no longer imported by `Viz.tsx`.
+- Verified manually (playwright-cli, `data/default.json`, both the new WebGL
+  renderer at :5173 and the old SVG renderer at the `../explorer-svg` worktree
+  at :5174 side by side): `default.json` ships with no teams configured, so the
+  first check (both renderers, `teamPattern` on) was solid-colour parity only -
+  pixel-identical between the two. Created two real teams via the "Users and
+  Teams" dialog (one user each) on both tabs independently to get an actual
+  multi-colour split: **structure matched exactly** between renderers (same
+  cells striped, same relative stripe positions/angle) - the two auto-assigned
+  colour choices differed only because team-creation order differed between the
+  two independent sessions, not a rendering bug. Zoomed ~2x: stripe width
+  stayed constant on screen (the deliberate change from the old zoom-scaling
+  SVG gradient). Panned via `page.mouse` drag: stripe phase travelled with the
+  content, not the viewport - no shower-door artefact.
+- **Observation, out of scope for this step:** panning via a synthetic
+  `page.mouse.down/move/up` drag on `canvas.chart-gl` throws a caught-and-ignored
+  `TypeError: Cannot read properties of null (reading 'document')` from d3's
+  internal `nodrag_default`, called from `.chart-stack`'s `mousedowned` handler.
+  Reproduces identically regardless of visualisation (not team-pattern-specific)
+  and does **not** reproduce on the old SVG renderer with the same gesture, so
+  it's tied to attaching `d3.zoom` to a plain `div` (step 1), not to anything
+  step 9 touched. Pan still visually works despite the error (confirmed by
+  screenshot). Not investigated further here since it's unrelated to this
+  step's scope - worth a look during step 10's manual pan/zoom pass.
