@@ -217,11 +217,11 @@ collinear-points edge case.
 
 ### Step 3 — `colours.ts`: CSS colour → RGB, memoised
 
-- [ ] `parseCssColour(css)` → `[r, g, b]` in 0–1, memoised in a `Map`. Build on
+- [x] `parseCssColour(css)` → `[r, g, b]` in 0–1, memoised in a `Map`. Build on
       `d3.color()` (already a dependency) rather than hand-rolling hex/rgb/named
       parsing. Throw on unparseable input — a silently-black cell is exactly the
       failure mode this repo avoids elsewhere.
-- [ ] `resolvePatternFallback(fill, state)` — recognises `url(#patternN)`, looks
+- [x] `resolvePatternFallback(fill, state)` — recognises `url(#patternN)`, looks
       the id up in `state.calculated.svgPatterns`, and returns the **first** colour
       of the triple. This is the `teamPattern` flat fallback that stands until
       step 9. Everything else passes through untouched.
@@ -573,3 +573,29 @@ open questions, anything that contradicts the spec. Fold the durable parts into
   `data/default.json` (`package.json`'s node) for the "accepts real data"
   case, and a generated regular polygon for the circle-approximation and
   12-gon cases - no need to embed a real 128-point circlePack polygon.
+- **User correction after the first pass:** `assertConvex` was written to
+  throw on a collinear vertex, matching a literal reading of the plan's
+  verification bullet. Corrected to tolerate it (skip, don't flag as a sign
+  mismatch) — the current Voronoi layout algorithm can produce a collinear
+  vertex on an otherwise-valid cell, and that's bad input in the data file,
+  not something fixable by hand. Only a genuine concave turn throws.
+
+### Step 3
+
+- `resolvePatternFallback`'s second parameter is narrower than the plan
+  text's literal `(fill, state)`: it takes
+  `svgPatternIds: ReadonlyMap<ColourKey, PatternId>` (i.e.
+  `state.calculated.svgPatterns.svgPatternIds`) rather than the whole `State`
+  object, since that's the only piece it needs and it keeps the module
+  trivially testable without constructing a full `State`. Step 4's call site
+  passes `state.calculated.svgPatterns.svgPatternIds`.
+- Reverse (`PatternId` -> first colour) lookup is built once per distinct
+  `svgPatternIds` Map and cached by object identity in a `WeakMap`, rather
+  than linear-scanning `svgPatternIds` on every call — this runs once per
+  node during a colour-buffer rebuild (spec.md's "three update paths"), so an
+  O(n) scan per call would be O(n\*m) across a whole tree. Same memoisation
+  spirit as `parseCssColour`'s cache, just keyed on object identity instead
+  of the string value.
+- `parseCssColour` built on `d3.color()` per spec.md, following the existing
+  `import * as d3 from "d3"` convention (`Viz.tsx`, `state.ts` already do
+  this) rather than a named import.
