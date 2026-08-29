@@ -99,28 +99,47 @@ All line references are `src/Viz.tsx` unless stated.
 
 ```
 <aside class="Viz">
-  <canvas class="chart-gl">      <- WebGL: all fills + all outlines
-  <svg   class="chart-overlay">  <- transparent, on top, pointer-events: none
-     <defs> arrow marker </defs>
-     <g class="topGroup">        <- same viewBox + same transform as the canvas
-        .selected paths          <- ancestor chain only, a handful of elements
-        .coupling paths          <- only when coupling is enabled
+  <div class="chart-stack">      <- d3.zoom lives here (see below); sized to match old svg.chart
+     <canvas class="chart-gl">      <- WebGL: all fills + all outlines
+     <svg   class="chart-overlay">  <- transparent, on top, pointer-events: none
+        <defs> arrow marker </defs>
+        <g class="topGroup">        <- same viewBox + a transform compensated for it (see below)
+           .selected paths          <- ancestor chain only, a handful of elements
+           .coupling paths          <- only when coupling is enabled
   <div class="viz-tooltip">      <- HTML tooltip, replaces svg:title
-  <svg class="timescale">        <- UNCHANGED
+  <svg class="timescale">        <- UNCHANGED, outside chart-stack
 ```
 
 The canvas takes pointer events. The overlay is `pointer-events: none` except
 `.coupling` paths, which keep their own click handler and `<title>`.
 
-`d3.zoom` stays attached and remains the single source of truth for the transform.
-Its handler updates a uniform *and* sets `transform` on the overlay's `g.topGroup`,
-so the two layers stay locked. The overlay has few enough elements that the SVG
-transform cost is irrelevant there.
+`d3.zoom` is attached to `.chart-stack`, not to either layer, and stays attached
+there permanently - it is the single source of truth for the transform. This
+matters, and isn't just a convenience: `d3.zoom` reads pointer coordinates via
+`d3.pointer()`, which resolves through an SVG element's own `viewBox` transform
+if attached to one. Attaching to a plain wrapper `div` instead keeps `d3.zoom`'s
+`x`/`y`/`k` in plain CSS pixels local to the container - i.e. _after_ the fit,
+matching the chain in "Picking" below (`viewBox fit -> d3.zoom transform -> CSS
+pixels -> DPR`) - and, because the wrapper is an ancestor of both layers, it
+keeps receiving events regardless of which layer currently has
+`pointer-events`, so it never has to move again once the canvas takes over
+pointer events (`plan.md` step 5).
+
+One consequence: the overlay's `<g class="topGroup">` transform is no longer
+`event.transform.toString()` verbatim. The overlay SVG keeps its own `viewBox`,
+so the browser re-applies an identical fit to whatever the group's transform
+produces, on top of what's set - to land the overlay on the same pixels the
+canvas computes explicitly (fit-then-zoom), the group's transform has to
+pre-compensate for that second fit. `camera.ts`'s `overlayGroupTransform()`
+solves exactly that (`fit^-1` composed with fit-then-zoom), which collapses
+algebraically to a plain translate+scale. The overlay has few enough elements
+that the SVG transform cost is irrelevant there.
 
 ### Module layout
 
 ```
 src/webgl/
+  camera.ts       - fitTransform(), screenToWorld(), overlayGroupTransform(); pure, unit-tested
   GlRenderer.ts   - context, program, buffers, uniforms, draw(); the only stateful object
   geometry.ts     - buildFills(), buildOutlines(): TreeNode[] -> typed arrays
   triangulate.ts  - fanTriangulate() + assertConvex()
@@ -388,13 +407,14 @@ Re-baseline these deliberately; anything else is a bug.
 - **Screenshot suite:** `npm run e2e`. Open every reported diff and decide, then
   re-baseline with `npm run e2e:update`. Per CLAUDE.md this is a review aid, not a
   pass/fail gate - but the deltas must all be explicable by the list above.
-- **Perf:** re-run the frame-time benchmark from
-  `docs/rendering-performance.md` against the new renderer and record the numbers.
+- **Perf:** re-run `scripts/bench-render.ts` (the checked-in successor to the
+  throwaway scripts in `docs/rendering-performance.md`) against the new
+  renderer and record the numbers.
 - `npm run check` clean throughout.
 
 ## Next step
 
-Run the `wf-2-create-plan` workflow against this spec to produce `plan.md` with
-ordered, independently-verifiable steps. Fold anything durable back into
-`CLAUDE.md` when the work lands, then delete `spec.md` and `plan.md` - git keeps
+`plan.md` has the ordered, independently-verifiable steps and tracks progress
+against them - work through it. Fold anything durable back into `CLAUDE.md`
+when the work lands, then delete `spec.md` and `plan.md` - git keeps
 the history.

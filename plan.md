@@ -502,119 +502,57 @@ open questions, anything that contradicts the spec. Fold the durable parts into
 
 ### Step 0
 
-- **WebGL in Playwright Chromium: real GPU, but only after a fix.** Headless
-  Chromium on this Mac defaults to the SwiftShader software backend even though a
-  real GPU (Intel UHD Graphics 630 - the same chip spec.md's numbers were measured
-  on) is present and is picked up automatically in headed mode with no extra
-  flags. Passing `--use-angle=metal` to `chromium.launch()` restores the real GPU
-  in headless mode too (confirmed via `UNMASKED_RENDERER_WEBGL`:
-  `ANGLE (Intel, ANGLE Metal Renderer: Intel(R) UHD Graphics 630, ...)`). Baked
-  into `scripts/bench-render.ts` as `GPU_ARGS`, applied on Darwin only, and used
-  for both `webgl-check` and `bench`. Without it every later WebGL benchmark and
-  screenshot run would silently measure SwiftShader instead of the GPU path the
-  whole plan is designed around - worth knowing before step 4, not after.
-- **Benchmark harness:** `scripts/bench-render.ts` (`npm run bench:webgl-check`,
-  `npm run bench -- <dataFile> [--steps] [--warmup] [--port] [--headed]`). Spawns
-  its own `vite --port 5183` (data file is baked in via `__EXPLORER_DATA__` at
-  server-start time, so switching files means a new server, not a query param),
-  waits for either `.Viz` or the Loader's error screen, then drives 30-40
-  synthetic zoom-wheel events at the viz's centre point entirely inside
-  `page.evaluate` (in-page `dispatchEvent`, not Playwright's out-of-process mouse
-  API - that adds IPC latency per event that would swamp a 16ms/frame WebGL
-  measurement) and reports mean/median/min/max frame time from a passive
-  `requestAnimationFrame` sampler. Verified the wheel events actually move
-  `.topGroup`'s `transform` (not just sampling idle vsync) by hand before trusting
-  the numbers.
-  - **Simplification from the original methodology:** wheel-only, no simulated
-    drag-pan. d3-zoom's wheel handler already changes translate as well as scale
-    (to hold the point under the cursor fixed), so it exercises the same
-    `zoomed()` transform-write `Viz.tsx` measures; a real drag would need
-    simulating d3-zoom's window-level mousemove/mouseup rebinding for no benefit
-    to what's being measured (the cost of writing a new transform), so it wasn't
-    worth the complexity.
-- **SVG baseline, openmrs: ~572-577 ms/frame mean** (two runs, headless, GPU
-  fixed: 576.6 and 571.9; median ~590, range 317-783). Repeatable within ~1%
-  across runs - the stability check passes.
-- **SVG baseline, spring-projects: ~1894 ms/frame mean** (headless, GPU fixed;
-  median 1983, range 1167-2400). Scales ~3.3x over openmrs, close to the ~3.6x
-  node-count ratio spec.md predicts - the harness's node-count scaling is
-  sane even though the absolute number differs from the historical one (below).
-- **These numbers are noticeably lower than spec.md's 2222 ms/frame** for the
-  "current SVG" openmrs case (~4x lower) despite using the same real GPU. Most
-  likely explanation: spec.md's number came from a throwaway script driving a
-  larger sweeping pan+zoom gesture, where this harness alternates small
-  zoom-in/zoom-out wheel ticks around one point - smaller transform deltas per
-  step, so less newly-exposed/re-rasterised area per frame. Not chasing this
-  further: per plan-level decision 1, what matters is that this harness's own
-  before/after comparison (steps 0 -> 7 -> 10) is internally consistent, and the
-  qualitative finding is unchanged either way - hundreds of ms/frame is nowhere
-  near the 16.7 ms target, and openmrs->spring-projects scaling matches
-  expectations. If step 10's WebGL number comes back suspiciously low as well
-  (e.g. sub-1ms, suggesting the wheel deltas are being clamped/no-opped against
-  `scaleExtent`), revisit the gesture size then.
-- **A/B worktree:** created at `../explorer-svg` (i.e.
+- **GPU fix, needed again at steps 4/7/10:** headless Playwright Chromium on
+  this Mac defaults to software SwiftShader even though a real GPU (Intel UHD
+  630 - the chip spec.md's numbers were measured on) is present and used
+  automatically in headed mode. `chromium.launch({ args: ["--use-angle=metal"] })`
+  restores it in headless mode too. Baked into `scripts/bench-render.ts` as
+  `GPU_ARGS` (Darwin only) - without it, every later benchmark and screenshot
+  run would silently measure SwiftShader instead.
+- **Benchmark harness:** `scripts/bench-render.ts` - `npm run bench:webgl-check`,
+  `npm run bench -- <dataFile> [--steps] [--warmup] [--port] [--headed]`. Spawns
+  its own `vite` server per data file (the data file is baked in via
+  `__EXPLORER_DATA__` at server-start time, not a query param),
+  then drives 30-40 synthetic zoom-wheel events in-page (`dispatchEvent`, not
+  Playwright's out-of-process mouse API - that adds IPC latency that would
+  swamp a 16ms/frame measurement) and reports mean/median/min/max frame time.
+  Wheel-only (no simulated drag): d3-zoom's wheel handler already changes
+  translate as well as scale, exercising the same transform-write a drag does.
+- **SVG baselines for step 10 to compare against:** openmrs ~572-577 ms/frame
+  mean (repeatable within ~1%), spring-projects ~1894 ms/frame mean - both
+  headless, GPU fixed. Both are ~4x lower than spec.md's 2222ms figure for the
+  same openmrs case, most likely because this harness's small wheel-driven
+  zoom deltas expose less new area per frame than the original sweeping
+  drag gesture did; not chased further since openmrs->spring-projects scaling
+  (~3.3x, close to the ~3.6x node-count ratio) confirms the harness itself is
+  sound, and the qualitative finding (hundreds of ms vs. a 16.7ms target) is
+  unaffected either way. If step 10's WebGL number comes back suspiciously low
+  (sub-1ms, suggesting wheel deltas are being clamped against `scaleExtent`),
+  revisit the gesture size then.
+- **A/B worktree** at `../explorer-svg` (i.e.
   `/Users/korny/Dropbox/prj/dev/polyglot/explorer-svg`), checked out at `fd71cf6`
-  (detached HEAD), `node_modules` created and marked
-  `com.dropbox.ignored` before `npm install` (376 packages, clean). Verified
-  `npx vite --port 5174` serves the pre-WebGL renderer, then stopped it - start it
-  again whenever a side-by-side is actually needed (step 4 onward), no need to
-  leave it running between sessions.
+  (detached HEAD), `node_modules` dropbox-ignored before `npm install`. Not
+  currently running - start with `cd ../explorer-svg && npx vite --port 5174`
+  whenever a side-by-side is actually needed (step 4 onward).
 
 ### Step 1
 
-- **d3.zoom is attached to a new `.chart-stack` wrapper div, not to the SVG.**
-  This wasn't explicit in spec.md/plan.md but follows from the chain they
-  document (`world -> viewBox fit -> d3.zoom transform -> CSS pixels`): d3.zoom's
-  `d3.pointer()` resolves coordinates through an SVG element's own viewBox
-  transform, which would put zoom back in _world_ units, not CSS pixels - the
-  opposite of the documented chain, and the opposite of what today's SVG-only
-  code actually does (today's zoom, attached to `svg.chart`, operates in world
-  units; `group.attr("transform", event.transform.toString())` only works
-  because the SVG's own viewBox re-fits it afterwards). A plain wrapper div has
-  no viewBox, so `d3.pointer` reports plain CSS pixels local to it - matching the
-  documented chain - and it's a stable host that never needs to move: it still
-  receives every event once the overlay switches to `pointer-events: none` in
-  step 5 (events bubble up through it regardless of which descendant layer
-  currently has pointer-events), so d3.zoom is attached exactly once, ever.
-  Excludes `svg.timescale` (a sibling, outside the wrapper) so scrolling over the
-  timescale/brush doesn't pan the main viz - it didn't before, and still doesn't.
-- **Consequence: the overlay's `<g>` transform is no longer `event.transform`
-  verbatim.** Since the overlay SVG keeps its own viewBox, the browser re-applies
-  an identical fit to whatever we put on the group, on top of what we set. To
-  keep the overlay pixel-locked to the canvas (fit-then-zoom), the group's
-  transform has to pre-compensate: `overlayGroupTransform()` in camera.ts solves
-  `fit^-1 . (fit-then-zoom)`, which collapses algebraically to a plain
-  translate+scale. Verified against a hand-rolled "simulate the browser's own
-  fit on top" check in camera.test.ts, and confirmed visually - the SVG content
-  and the canvas debug quad move in exact lockstep through pan/zoom/resize with
-  no drift, on both `explorertest` (circlePack root) and `omf.json`
-  (nestedCircles, varying circle depth per branch).
-- **Manual verification was pixel-precise, not just eyeballed.** Read the debug
-  canvas's own pixels back via `getImageData` and compared against hand-computed
-  expectations from the layout data: at identity zoom the root's circle (root
-  width/height 323.32, in a 1024x1024 CSS box) touches all four canvas edges
-  exactly (measured 0-1023 both axes, matching `1024/323.32 * 323.32 = 1024`);
-  after a wheel zoom at the exact canvas centre, `d3.zoom`'s own transform read
-  back as `k=0.5743...` (matching the hand-derived `2^(-0.8)` from d3-zoom's
-  default wheel delta formula for a 400-unit scroll), and the debug circle's
-  measured diameter (589px) and centre (511.5, 511.5 - exactly canvas centre)
-  matched the camera-predicted values to the pixel. Drag-pan was verified the
-  same way (`__zoom.x/y` moved by exactly the mouse-drag delta in CSS pixels).
-- **One real bug found and fixed during verification, but it was in the test
-  methodology, not the app**: an early manual check used a mouse target
-  (640, 758) computed from a bounding rect measured against a taller page state;
-  the actual viewport was only 720px tall, so `elementFromPoint` at that
-  coordinate returned `null`, the wheel event fell through to native page
-  scroll, and I initially misread the resulting `scrollY` change as a working
-  zoom. `document.elementFromPoint` returning `null` (rather than the expected
-  element) was the tell. Resizing the Playwright viewport to comfortably contain
-  the whole 1024px-tall chart-stack fixed it. Worth remembering next time a
-  manual pan/zoom check on this app looks like it's "working" but the numbers
-  don't add up - check the viewport size before the camera math.
-- ResizeObserver verified by resizing the browser viewport width (1024 -> 700
-  CSS px): canvas backing store resized to match, fit correctly switched from
-  height-constrained to width-constrained, and the debug quad + SVG content
-  re-fit together with no drift.
+- **`d3.zoom` is attached to a new `.chart-stack` wrapper div, not to either
+  layer** - this changed spec.md's "Target architecture" section (now the
+  source of truth for the design and why); don't re-derive it here.
+- Verified pixel-precisely, not just by eye: read the debug canvas back via
+  `getImageData` and checked against hand-computed expectations from the
+  layout data (fit scale/centring, and the zoom transform's `k`/`x`/`y` after a
+  known wheel delta) - matched to the pixel. Confirmed on both `explorertest`
+  (circlePack root) and `omf.json` (nestedCircles, varying circle depth per
+  branch), through pan, zoom, and window resize, with no drift between the
+  canvas and the SVG overlay.
+- **Gotcha for future manual playwright-cli checks on this app:** a mouse
+  target computed from a `getBoundingClientRect()` that's taller than the
+  actual viewport silently fails - `elementFromPoint` returns `null`, the
+  event falls through to native page scroll, and a `scrollY` change is easy to
+  mistake for a working pan/zoom. Resize the viewport to comfortably contain
+  the chart area (1024px tall) before trusting any pan/zoom measurement.
 - No visual regression: SVG cell/nesting/selection rendering is byte-for-byte
   the same code path as before, just inside a renamed `svg.chart-overlay`
   sitting over the new (otherwise-empty-but-for-the-debug-quad) canvas.
