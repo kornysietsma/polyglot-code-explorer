@@ -303,19 +303,19 @@ anything (only the surviving `.nesting` strokes respond). Restored in step 5.
 
 Closes the regression opened by step 4 immediately.
 
-- [ ] `src/webgl/picking.ts` — `pointInConvexPolygon(polygon, x, y)` (sign
+- [x] `src/webgl/picking.ts` — `pointInConvexPolygon(polygon, x, y)` (sign
       consistency across edges); `buildIndex(nodes)` over `node.layout.center`
       using `d3.quadtree`; `pick(worldX, worldY)` — nearest centroid, then a
       widening search of ~16 nearest candidates, then `null` for a background
       click. Per `spec.md`; no `gl` import.
-- [ ] `Viz.tsx`: canvas `click` → `screenToWorld` (step 1) → `pick` →
+- [x] `Viz.tsx`: canvas `click` → `screenToWorld` (step 1) → `pick` →
       `dispatch({ type: "selectNode", payload: node.data.path })`. Identical
       payload to today.
-- [ ] Canvas takes pointer events; overlay becomes `pointer-events: none` with
+- [x] Canvas takes pointer events; overlay becomes `pointer-events: none` with
       `.coupling` paths re-enabling their own. Note the `.nesting` layer loses its
       click handler here rather than in step 7 — directory-border clicks are
       dropped deliberately (`spec.md` decision 3).
-- [ ] `tests/screenshots.spec.ts`: rework `selectAFileNode` to click canvas
+- [x] `tests/screenshots.spec.ts`: rework `selectAFileNode` to click canvas
       coordinates. The layout is deterministic (polygons come from the data file),
       so a fixed offset within `.Viz` works; keep the existing
       "retry until the inspector shows a file" loop as the safety net.
@@ -598,3 +598,30 @@ step-3 checklist above for why.
   including the still-SVG nesting/selection layers). `npm run e2e` behaved
   exactly as plan-level decision 3 predicted: only shot 7 failed (fixed in
   step 5), the other 9 came back with zero diffs. Baselines untouched.
+
+### Step 5
+
+- **`GlRenderer` owns the pick index, `picking.ts` stays pure.** `setGeometry`
+  calls `picking.buildIndex(nodes)` and stores the result privately;
+  `GlRenderer.pick(worldX, worldY)` just delegates to `picking.pick()`. This
+  matches the forward-reference comment step 4 already left on `setGeometry`
+  ("rebinds the picking index once it exists") - `picking.ts` itself never
+  imports `gl`, so it's still testable under Vitest.
+- **Manual verification used synthetic `MouseEvent` dispatch on the canvas,
+  not `playwright-cli`'s `mousedown`/`mouseup` pair** - those didn't reliably
+  register as a `click` in this environment (root cause not chased; dispatching
+  a real `click` event directly worked every time and is what the Playwright
+  test suite itself uses under the hood). Confirmed across `default.json`,
+  `openmrs.json` (circlePack, 34k nodes) and `omf.json` (nestedCircles): a
+  dozen-plus points scattered inside the root shape each resolved to a
+  distinct, correct file path, and points genuinely outside the root
+  shape/circle-pack gaps correctly returned no selection (background click).
+- **Directory-border clicks silently do nothing now**, rather than selecting
+  the directory (spec.md decision 3) - confirmed this doesn't regress
+  anything else: the `.nesting` layer still renders (SVG, unchanged), it just
+  has no click handler.
+- `npm run e2e`: all 10 shots pass with **zero diffs**, including shot 7 - its
+  baseline is the Inspector panel, not the canvas, and the reworked
+  `selectAFileNode` (a grid scan of canvas click points, since there's no DOM
+  element per cell any more) lands on a file node reliably. Baselines
+  untouched, nothing to re-baseline yet.

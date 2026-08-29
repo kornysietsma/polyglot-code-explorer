@@ -7,6 +7,7 @@ import { HierarchyNode } from "d3";
 import { TreeNode } from "../polyglot_data.types";
 import { Camera, worldToClipTransform } from "./camera";
 import { buildFills } from "./geometry";
+import { buildIndex, pick as pickInIndex, PickIndex } from "./picking";
 import { FILL_FRAGMENT_SHADER, FILL_VERTEX_SHADER } from "./shaders";
 
 function compileShader(
@@ -87,6 +88,7 @@ export class GlRenderer {
   private readonly uScale: WebGLUniformLocation;
   private readonly uTranslate: WebGLUniformLocation;
   private fillVertexCount = 0;
+  private pickIndex: PickIndex | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl", { antialias: true });
@@ -134,6 +136,16 @@ export class GlRenderer {
     gl.bufferData(gl.ARRAY_BUFFER, colours, gl.DYNAMIC_DRAW);
 
     this.fillVertexCount = positions.length / 2;
+    this.pickIndex = buildIndex(nodes);
+  }
+
+  // Hit-tests a world-space point against the current geometry (plan.md step 5). `picking.ts`
+  // stays gl-free and independently testable; this just delegates to it against whichever index
+  // setGeometry() last built. `null` before the first setGeometry() call, or for a background
+  // click - identical to today's directory-border-click drop (spec.md decision 3).
+  pick(worldX: number, worldY: number): HierarchyNode<TreeNode> | null {
+    if (!this.pickIndex) return null;
+    return pickInIndex(this.pickIndex, worldX, worldY);
   }
 
   // Camera-only update: writes the transform uniforms, touches no buffer. `canvasWidthPx` /

@@ -32,6 +32,18 @@
       width: 100%;
       height: 100%;
     }
+
+    // The canvas takes pointer events now (webgl/picking.ts does the hit-testing); the overlay
+    // only carries selection/nesting strokes and coupling arcs (plan.md step 5). Coupling paths
+    // re-enable their own pointer-events - they keep their existing click handler and <title>
+    // (spec.md, "Interaction").
+    > svg.chart-overlay {
+      pointer-events: none;
+
+      .coupling {
+        pointer-events: auto;
+      }
+    }
   }
 
   > svg.timescale {

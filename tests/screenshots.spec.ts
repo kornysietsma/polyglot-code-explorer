@@ -27,27 +27,30 @@ async function expandPanel(page: Page, title: string) {
     .click();
 }
 
-// Selecting a specific node means clicking the pre-computed D3 canvas at a pixel
-// position - there's no text-based way to pick a single file, and the layout is
-// deterministic because the polygons come from the data file. Try successively larger
-// cells (by rendered area) until one resolves to a file rather than a directory.
+// Selecting a specific node means clicking the WebGL canvas at a pixel position - since
+// step 4/5 there is no DOM element per cell to query or click (plan.md step 5). The
+// layout is deterministic (polygons come from the data file), so a fixed offset within
+// the canvas works - but rather than hardcode one that only holds for today's fixture,
+// try a grid of offsets and keep the "retry until the inspector shows a file" loop as
+// the safety net, since a fixed point could land on a directory cell (truncated at the
+// depth limit, and rendered flat exactly like a file) instead of a leaf file.
 async function selectAFileNode(page: Page) {
-  const cells = page.locator("svg.chart path.cell");
-  const count = await cells.count();
-  const boxes: { index: number; area: number }[] = [];
-  for (let i = 0; i < count; i++) {
-    const box = await cells.nth(i).boundingBox();
-    if (box && box.width > 0 && box.height > 0) {
-      boxes.push({ index: i, area: box.width * box.height });
-    }
+  const canvas = page.locator("canvas.chart-gl");
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error("chart-gl canvas not found");
   }
-  boxes.sort((a, b) => a.area - b.area);
 
-  for (const { index } of boxes) {
-    await cells.nth(index).click({ force: true });
-    await page.waitForTimeout(100);
-    if (await page.getByText(/^File type:/).isVisible()) {
-      return;
+  const steps = 8;
+  for (let iy = 1; iy < steps; iy++) {
+    for (let ix = 1; ix < steps; ix++) {
+      const x = box.x + (box.width * ix) / steps;
+      const y = box.y + (box.height * iy) / steps;
+      await page.mouse.click(x, y);
+      await page.waitForTimeout(100);
+      if (await page.getByText(/^File type:/).isVisible()) {
+        return;
+      }
     }
   }
   throw new Error("Could not find a clickable file node in the rendered tree");

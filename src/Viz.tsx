@@ -35,6 +35,7 @@ import {
   fitTransform,
   IDENTITY_ZOOM,
   overlayGroupTransform,
+  screenToWorld,
 } from "./webgl/camera";
 import { resolvePatternFallback } from "./webgl/colours";
 import { GlRenderer } from "./webgl/GlRenderer";
@@ -464,16 +465,10 @@ const draw = (
     .enter()
     .append("path")
     .classed("nesting", true);
-  redrawNesting(nestingNodesSelection.merge(newNestingNodes), state).on(
-    "click",
-    function (
-      this: SVGPathElement,
-      event: PointerEvent,
-      node: HierarchyNode<TreeNode>
-    ) {
-      dispatch({ type: "selectNode", payload: node.data.path });
-    }
-  );
+  // No click handler here (plan.md step 5): the overlay is pointer-events: none now that the
+  // canvas does picking, and directory-border clicks are dropped deliberately (spec.md
+  // decision 3) rather than replaced with an equivalent on the canvas.
+  redrawNesting(nestingNodesSelection.merge(newNestingNodes), state);
 
   nestingNodesSelection.exit().remove();
 
@@ -810,6 +805,35 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
     observer.observe(stackEl);
     return () => observer.disconnect();
   }, [dataRef]);
+
+  // Click-to-select (plan.md step 5): the canvas now owns pointer events (see main_areas.scss -
+  // the overlay is pointer-events: none except .coupling), so this replaces the old .cell click
+  // handler. A native listener rather than a React `onClick` prop because `screenToWorld` and
+  // `pick` both need the *current* camera/renderer, which live in refs, not props or state - this
+  // is attached once and reads `.current` fresh on every click. Same dispatched action as before.
+  useEffect(() => {
+    const canvas = glCanvasRef.current;
+    if (!canvas) return;
+
+    const handleClick = (event: MouseEvent) => {
+      const camera = cameraRef.current;
+      const glRenderer = glRendererRef.current;
+      if (!camera || !glRenderer) return;
+      const rect = canvas.getBoundingClientRect();
+      const [worldX, worldY] = screenToWorld(
+        camera,
+        event.clientX - rect.left,
+        event.clientY - rect.top
+      );
+      const picked = glRenderer.pick(worldX, worldY);
+      if (picked) {
+        dispatch({ type: "selectNode", payload: picked.data.path });
+      }
+    };
+
+    canvas.addEventListener("click", handleClick);
+    return () => canvas.removeEventListener("click", handleClick);
+  }, [dispatch]);
 
   function svgPatternDefs() {
     const { svgPatternIds } = state.calculated.svgPatterns;
