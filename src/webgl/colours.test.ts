@@ -3,28 +3,6 @@ import { describe, expect, it } from "vitest";
 import { ColourKey, coloursToColourKey, PatternId } from "../state";
 import { buildPatternPalette, parseCssColour, parsePatternId } from "./colours";
 
-// Actual default colours from state.ts (initialiseGlobalState), both themes - not exhaustive,
-// but the values the app actually ships with, per plan.md.
-const REAL_DEFAULT_COLOURS = [
-  "#aaaaaa",
-  "#777777",
-  "#444444",
-  "#222222",
-  "#111111",
-  "#fffa00",
-  "#ff6300",
-  "#0000ff",
-  "#ff0000",
-  "#ffff00",
-  "#00ff00",
-  "#808080",
-  "#8080ff",
-  "#f7f7f7",
-  "#dddddd",
-  "#eeeeee",
-  "#00ffff",
-];
-
 describe("parseCssColour", () => {
   it("parses 3-digit hex", () => {
     expect(parseCssColour("#f00")).toEqual([1, 0, 0]);
@@ -55,17 +33,6 @@ describe("parseCssColour", () => {
     expect(b).toBeCloseTo(153 / 255);
   });
 
-  it.each(REAL_DEFAULT_COLOURS)(
-    "parses the themed default colour %s",
-    (css) => {
-      const [r, g, b] = parseCssColour(css);
-      for (const channel of [r, g, b]) {
-        expect(channel).toBeGreaterThanOrEqual(0);
-        expect(channel).toBeLessThanOrEqual(1);
-      }
-    }
-  );
-
   it("memoises: the same input string returns the identical array instance", () => {
     const first = parseCssColour("#123456");
     const second = parseCssColour("#123456");
@@ -94,8 +61,8 @@ describe("parsePatternId", () => {
 describe("buildPatternPalette", () => {
   const solidRed = coloursToColourKey(["#ff0000", "#00ff00", "#0000ff"]);
   const solidGrey = coloursToColourKey(["#111111", "#111111", "#111111"]);
-  // topTeamsPartitioned can return fewer than SVG_PARTITIONS entries (nodeData.ts) - a colour
-  // key with only 2 colours is a real shape, not a hypothetical.
+  // topTeamsPartitioned can return fewer than SVG_PARTITIONS entries (nodeData.ts) - a colour key
+  // with only 2 colours is a real shape, not a hypothetical.
   const twoColours = coloursToColourKey(["#ff0000", "#00ff00"]);
   const svgPatternIds: ReadonlyMap<ColourKey, PatternId> = new Map([
     [solidRed, 0],

@@ -1,48 +1,22 @@
 import { hierarchy, HierarchyNode } from "d3";
 import { describe, expect, it } from "vitest";
 
-import {
-  FileNode,
-  LocData,
-  NodeLayout,
-  Point,
-  TreeNode,
-} from "../polyglot_data.types";
+import { Point, TreeNode } from "../polyglot_data.types";
+import { minimalFileNode } from "../testFixtures";
 import {
   buildFillAttributes,
   buildFills,
   buildOutlines,
+  DEFAULT_OUTLINE_LEVEL,
+  NESTED_LEVEL_COUNT,
   outlineLevel,
 } from "./geometry";
 
-// Same minimal-fixture convention as nodeData.test.ts's minimalFileNode.
-const DUMMY_LOC: LocData = {
-  language: "test",
-  binary: false,
-  blanks: 1,
-  code: 2,
-  comments: 3,
-  lines: 4,
-  bytes: 5,
-};
-
-function layoutFor(polygon: Point[]): NodeLayout {
-  return { algorithm: "voronoi", center: [0, 0], polygon };
-}
-
-function fileNode(
-  path: string,
-  polygon: Point[],
-  circleAncestors = 0
-): FileNode {
-  return {
-    name: path,
-    path,
-    layout: layoutFor(polygon),
-    value: 0,
+function fileNode(path: string, polygon: Point[], circleAncestors = 0) {
+  return minimalFileNode(path, path, {
+    layout: { polygon },
     circleAncestors,
-    data: { loc: DUMMY_LOC },
-  };
+  });
 }
 
 // `depth` is readonly in d3's HierarchyNode type (it's normally computed by walking a real
@@ -161,21 +135,27 @@ describe("buildFillAttributes", () => {
 });
 
 describe("outlineLevel", () => {
+  const DEFAULT = DEFAULT_OUTLINE_LEVEL;
+
+  it("puts the shared default slot immediately after the configurable levels", () => {
+    expect(DEFAULT).toBe(NESTED_LEVEL_COUNT);
+  });
+
   it.each([
     // depth, circleAncestors, expected level
-    [0, 0, 4], // level -1: above the first circle-ancestor level -> default
+    [0, 0, DEFAULT], // level -1: above the first circle-ancestor level -> default
     [1, 0, 0],
     [2, 0, 1],
     [3, 0, 2],
     [4, 0, 3],
-    [5, 0, 4], // level 4: past the 4 nested colours -> default
-    [8, 0, 4],
+    [5, 0, DEFAULT], // past the configurable nested colours -> default
+    [8, 0, DEFAULT],
     // omf.json's varying-circle-depth case: the same tree depth maps to a different level
     // depending on how many circle-packed ancestors this particular branch has.
     [2, 1, 0],
     [3, 1, 1],
     [3, 2, 0],
-    [2, 2, 4], // level -1 again, just reached via a higher circleAncestors this time
+    [2, 2, DEFAULT], // level -1 again, just reached via a higher circleAncestors this time
   ])(
     "depth %d, circleAncestors %d -> level %d",
     (depth, circleAncestors, expected) => {
@@ -233,8 +213,7 @@ describe("buildOutlines", () => {
     const node = atDepth(hierarchy<TreeNode>(fileNode("b", triangle, 0)), 1);
     const { normals } = buildOutlines([node]);
 
-    // Edge 2 is (0,4) -> (0,0) in this fixture... instead just check every normal in the
-    // buffer is unit length, which covers the diagonal edge (3,0)->(0,4) along with the two
+    // Every normal in the buffer, which covers the diagonal edge (3,0)->(0,4) along with the two
     // axis-aligned ones.
     for (let i = 0; i < normals.length; i += 2) {
       const nx = normals[i]!;

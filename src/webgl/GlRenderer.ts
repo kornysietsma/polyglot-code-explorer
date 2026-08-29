@@ -1,13 +1,17 @@
-// The only stateful, gl-owning object in the WebGL renderer (plan.md decision 6: deliberately
-// untested by Vitest - jsdom has no WebGL context - verified manually and by the screenshot
-// suite instead).
+// The only stateful, gl-owning object in the WebGL renderer.
 
 import { HierarchyNode } from "d3";
 
 import { TreeNode } from "../polyglot_data.types";
+import { SVG_PARTITIONS } from "../svgPatterns";
 import { Camera, worldToClipTransform, worldToDeviceScale } from "./camera";
 import { parseCssColour, PatternPalette } from "./colours";
-import { buildFillAttributes, buildFills, buildOutlines } from "./geometry";
+import {
+  buildFillAttributes,
+  buildFills,
+  buildOutlines,
+  OUTLINE_LEVEL_COUNT,
+} from "./geometry";
 import { buildIndex, pick as pickInIndex, PickIndex } from "./picking";
 import {
   FILL_FRAGMENT_SHADER,
@@ -16,17 +20,23 @@ import {
   OUTLINE_VERTEX_SHADER,
 } from "./shaders";
 
-// CSS pixels. Chosen against a world-space pattern (spec.md's open question 4); revisit by eye
-// if it reads wrong once the stripe no longer scales with zoom - it's a single uniform.
+// CSS pixels. Chosen by eye against a world-space pattern that scaled with zoom; revisit the same
+// way if it reads wrong - it's a single uniform.
 const STRIPE_PERIOD_CSS = 10;
+
+// One entry per outline level, so exactly OUTLINE_LEVEL_COUNT of them: geometry.ts's nested levels
+// followed by the shared defaultStroke/defaultWidth slot at DEFAULT_OUTLINE_LEVEL. A tuple rather
+// than an array because the shader indexes fixed-size uniform arrays of this length, and because
+// the only producer (Viz.tsx's buildNestingStyle) spreads a 4-tuple plus one - so the length is
+// checkable at compile time and needs no runtime guard.
+export type OutlineLevels<T> = readonly [T, T, T, T, T];
 
 // The nesting stroke style, resolved from `state.config.nesting` / `themedColours(state.config)`
 // by the caller (Viz.tsx) rather than imported here, so this module stays decoupled from the
-// State type. Index 4 is the shared defaultStroke/defaultWidth slot - see geometry.ts's
-// `outlineLevel`.
+// State type.
 export interface NestingStyle {
-  widths: readonly number[]; // length 5: 4 nested levels + 1 default
-  strokeColours: readonly string[]; // length 5: 4 nested levels + 1 default
+  widths: OutlineLevels<number>;
+  strokeColours: OutlineLevels<string>;
 }
 
 function compileShader(
@@ -93,11 +103,11 @@ function mustGetUniformLocation(
   return location;
 }
 
-// Owns the GL context and both programs' buffers. Fill positions/colours live in separate
-// buffers (spec.md, "The three update paths"): setColours() rewrites only the colour buffer,
-// leaving positions and the picking index untouched. Outline positions/normals/levels are static
-// per setGeometry() call; only the u_widths/u_strokeColours uniforms change for a nesting colour
-// or width edit, via the standalone setNestingStyle().
+// Owns the GL context and both programs' buffers. Fill positions/colours live in separate buffers
+// (CLAUDE.md, "The three update paths"): setColours() rewrites only the colour buffer, leaving
+// positions and the picking index untouched. Outline positions/normals/levels are static per
+// setGeometry() call; only the u_widths/u_strokeColours uniforms change for a nesting colour or
+// width edit, via the standalone setNestingStyle().
 export class GlRenderer {
   private readonly gl: WebGLRenderingContext;
 
@@ -143,11 +153,10 @@ export class GlRenderer {
     }
     this.gl = gl;
 
-    // The outline index buffer easily exceeds 65,535 vertices at openmrs/spring-projects scale
-    // (spec.md, "Outlines" budget) - WebGL1's native ELEMENT_ARRAY_BUFFER index type without this
-    // extension. Universally supported on desktop/ANGLE; throw loudly rather than silently
-    // falling back to a chunked-draw scheme nobody asked for (CLAUDE.md's convention on missing
-    // data: fail loud, not subtly wrong).
+    // The outline index buffer easily exceeds the 65,535 vertices WebGL1's native
+    // ELEMENT_ARRAY_BUFFER index type can address without this extension. Universally supported on
+    // desktop/ANGLE; throw loudly rather than silently falling back to a chunked-draw scheme
+    // nobody asked for (CLAUDE.md's convention on missing data: fail loud, not subtly wrong).
     if (!gl.getExtension("OES_element_index_uint")) {
       throw new Error(
         "GlRenderer: OES_element_index_uint unavailable - required for outline index buffers at this scale"
@@ -192,11 +201,11 @@ export class GlRenderer {
       "u_paletteWidth"
     );
 
-    // The team-pattern palette (spec.md, "Team pattern visualisation"): an N x 1 RGB texture,
-    // sampled by patternId in the fragment shader. NEAREST + CLAMP_TO_EDGE - discrete colour
-    // swatches, not something to interpolate between, and both are required for a non-power-of-2
-    // width under WebGL1 without mipmaps. Bound once here to texture unit 0, which nothing else in
-    // this renderer ever uses, so it never needs rebinding.
+    // The team-pattern palette: an N x 1 RGB texture, sampled by patternId in the fragment
+    // shader. NEAREST + CLAMP_TO_EDGE - discrete colour swatches, not something to interpolate
+    // between, and both are required for a non-power-of-2 width under WebGL1 without mipmaps.
+    // Bound once here to texture unit 0, which nothing else in this renderer ever uses, so it
+    // never needs rebinding.
     const paletteTexture = gl.createTexture();
     if (!paletteTexture) {
       throw new Error("GlRenderer: could not create palette texture");
@@ -247,15 +256,15 @@ export class GlRenderer {
       "u_strokeColours"
     );
 
-    // Standard alpha blending (spec.md, "Draw order") - all current colours are opaque, but
-    // blending costs nothing when unused and future fills may not be.
+    // Standard alpha blending - all current colours are opaque, but blending costs nothing when
+    // unused and future fills may not be.
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   }
 
   // Rebuilds and re-uploads the fill buffers, the outline buffers, and the nesting-style
   // uniforms, and rebinds the picking index - the `expensiveConfig` (depth) path, the most
-  // expensive of the three update paths (spec.md). A cheap `config` change goes through
+  // expensive of the three update paths (CLAUDE.md). A cheap `config` change goes through
   // setColours()/setNestingStyle() instead (Viz.tsx routes on this). Reallocates rather than
   // patching in place - a future re-layout can change a polygon's vertex count.
   //
@@ -263,8 +272,8 @@ export class GlRenderer {
   // internally: `fillNodes` is the leaf/depth-limit "cell" set (also what the picking index is
   // built from - a pick must never return a node with no fill), `outlineNodes` is the wider union
   // of that same cell set with the "nesting" set (every visible node from the first
-  // circle-ancestor level down to the depth limit) - see spec.md's "Outlines". Both are cached
-  // once per draw() in Viz.tsx (`visibleNodesRef` / `outlineNodesRef`) rather than rebuilt here.
+  // circle-ancestor level down to the depth limit). Both are cached once per draw() in Viz.tsx
+  // (`visibleNodesRef` / `outlineNodesRef`) rather than rebuilt here.
   setGeometry(
     fillNodes: readonly HierarchyNode<TreeNode>[],
     outlineNodes: readonly HierarchyNode<TreeNode>[],
@@ -316,13 +325,15 @@ export class GlRenderer {
   }
 
   // Colour-only update for a cheap `config` change that isn't a nesting colour/width edit
-  // (visualisation switch, date range, teams, theme) - rewrites the fill colour and
-  // pattern-index buffers, leaves the position buffer and the picking index untouched (spec.md,
-  // "The three update paths"). `fillNodes` must be the same list `setGeometry()` was last called
-  // with, or the buffers' vertex counts won't match the position buffer's. `palette` is rebuilt
-  // here too - switching to or from `TeamPatternVisualization`, or a team/date-range change that
-  // moves `svgPatternIds`, is exactly a cheap `config` change (spec.md, "Team pattern
-  // visualisation").
+  // (visualisation switch, date range, teams, theme) - rewrites the fill colour and pattern-index
+  // buffers, leaves the position buffer and the picking index untouched (CLAUDE.md, "The three
+  // update paths"). `palette` is rebuilt here too: switching to or from
+  // `TeamPatternVisualization`, or a team/date-range change that moves `svgPatternIds`, is exactly
+  // a cheap `config` change.
+  //
+  // `fillNodes` must be the same list `setGeometry()` was last called with. Passing a different
+  // one leaves the colour buffer shorter or longer than the position buffer, which GL will happily
+  // draw from out of range, so the vertex counts are checked rather than documented.
   setColours(
     fillNodes: readonly HierarchyNode<TreeNode>[],
     fillFn: (d: HierarchyNode<TreeNode>) => string,
@@ -330,6 +341,11 @@ export class GlRenderer {
   ): void {
     const { gl } = this;
     const { colours, patternIndices } = buildFillAttributes(fillNodes, fillFn);
+    if (patternIndices.length !== this.fillVertexCount) {
+      throw new Error(
+        `GlRenderer.setColours: got ${patternIndices.length} vertices for a geometry of ${this.fillVertexCount} - fillNodes must match the list setGeometry() was last called with`
+      );
+    }
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.fillColourBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, colours, gl.DYNAMIC_DRAW);
@@ -340,13 +356,12 @@ export class GlRenderer {
     this.uploadPalette(palette);
   }
 
-  // Uploads the team-pattern palette texture (spec.md, "Team pattern visualisation"). A
-  // `patternCount` of 0 (no team data at all) still uploads a 1-texel placeholder rather than a
+  // A `patternCount` of 0 (no team data at all) still uploads a 1-texel placeholder rather than a
   // zero-width texture - safe because no vertex will have a non-negative `a_patternIndex` to
   // sample it with in that case (`svgPatternLookup` is empty too).
   private uploadPalette(palette: PatternPalette): void {
     const { gl } = this;
-    const width = Math.max(palette.patternCount * 3, 1);
+    const width = Math.max(palette.patternCount * SVG_PARTITIONS, 1);
     const rgb =
       palette.patternCount > 0 ? palette.rgb : new Uint8Array([0, 0, 0]);
 
@@ -369,19 +384,14 @@ export class GlRenderer {
   }
 
   // Uniform-only update for nesting colours/widths - no buffer touched, since level is a
-  // per-vertex attribute (spec.md, "Outlines"). Called from setGeometry() to establish the
-  // uniforms on a full rebuild, and directly by callers (Viz.tsx) for a colour-picker/width-slider
-  // drag - the cheapest of the three update paths.
+  // per-vertex attribute. Called from setGeometry() to establish the uniforms on a full rebuild,
+  // and directly by callers (Viz.tsx) for a colour-picker/width-slider drag - the cheapest of the
+  // three update paths.
   setNestingStyle(nestingStyle: NestingStyle): void {
     const { widths, strokeColours } = nestingStyle;
-    if (widths.length !== 5 || strokeColours.length !== 5) {
-      throw new Error(
-        `GlRenderer: nestingStyle must have exactly 5 widths/colours (4 nested levels + default), got ${widths.length}/${strokeColours.length}`
-      );
-    }
     const { gl } = this;
-    const rgb = new Float32Array(15);
-    for (let i = 0; i < 5; i++) {
+    const rgb = new Float32Array(OUTLINE_LEVEL_COUNT * 3);
+    for (let i = 0; i < OUTLINE_LEVEL_COUNT; i++) {
       const [r, g, b] = parseCssColour(strokeColours[i]!);
       rgb[i * 3] = r;
       rgb[i * 3 + 1] = g;
@@ -393,10 +403,9 @@ export class GlRenderer {
     gl.uniform3fv(this.uStrokeColours, rgb);
   }
 
-  // Hit-tests a world-space point against the current fill geometry (plan.md step 5). `picking.ts`
-  // stays gl-free and independently testable; this just delegates to it against whichever index
-  // setGeometry() last built. `null` before the first setGeometry() call, or for a background
-  // click - identical to today's directory-border-click drop (spec.md decision 3).
+  // Hit-tests a world-space point against the current fill geometry. `picking.ts` stays gl-free
+  // and independently testable; this just delegates to it against whichever index setGeometry()
+  // last built. `null` before the first setGeometry() call, or for a background click.
   pick(worldX: number, worldY: number): HierarchyNode<TreeNode> | null {
     if (!this.pickIndex) return null;
     return pickInIndex(this.pickIndex, worldX, worldY);
@@ -432,7 +441,7 @@ export class GlRenderer {
     gl.uniform1f(this.uDpr, camera.dpr);
   }
 
-  // Painter's algorithm, no depth buffer (spec.md, "Draw order"): all fills, then all outlines.
+  // Painter's algorithm, no depth buffer: all fills, then all outlines.
   draw(): void {
     const { gl } = this;
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
