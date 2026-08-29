@@ -201,9 +201,9 @@ quad tracks the SVG perfectly.
 
 Pure, no GL, no app change.
 
-- [ ] `fanTriangulate(points)` → flat `Float32Array` of triangle vertices,
+- [x] `fanTriangulate(points)` → flat `Float32Array` of triangle vertices,
       `(n-2) × 3` vertices for an n-gon, winding preserved from input order.
-- [ ] `assertConvex(points, path)` — sign-consistency of the cross product across
+- [x] `assertConvex(points, path)` — sign-consistency of the cross product across
       consecutive edge pairs. Throws with the node path in the message. Guarded to
       development builds (`import.meta.env.DEV`), per `spec.md`.
 
@@ -556,3 +556,20 @@ open questions, anything that contradicts the spec. Fold the durable parts into
 - No visual regression: SVG cell/nesting/selection rendering is byte-for-byte
   the same code path as before, just inside a renamed `svg.chart-overlay`
   sitting over the new (otherwise-empty-but-for-the-debug-quad) canvas.
+
+### Step 2
+
+- **`assertConvex` self-guards on `import.meta.env.DEV`** rather than making
+  every call site check it - one `if` at the top, callers always call it
+  unconditionally. `import.meta.env.DEV` is `true` under Vitest, so the dev
+  behaviour is exactly what the tests exercise.
+- **Collinear consecutive points are tolerated, not thrown on** - a zero cross
+  product is treated as inconclusive rather than a sign mismatch. Deliberate:
+  the current Voronoi layout algorithm can produce a collinear vertex on an
+  otherwise-valid cell, and that's bad input in the data file that can't be
+  hand-fixed, so `assertConvex` must not block on it. Only a genuine sign
+  flip (an actual concave turn) throws.
+- Test fixture uses a real 15-point Voronoi cell lifted from
+  `data/default.json` (`package.json`'s node) for the "accepts real data"
+  case, and a generated regular polygon for the circle-approximation and
+  12-gon cases - no need to embed a real 128-point circlePack polygon.
