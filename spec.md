@@ -460,6 +460,13 @@ Re-baseline these deliberately; anything else is a bug.
 - **Antialiasing.** GPU AA differs from Skia's. This is the one that makes
   screenshot baselines less portable across machines than they are today - worth
   knowing before re-baselining, given CLAUDE.md treats canvas diffs as real bugs.
+- **Shot 7 selects a different file.** `selectAFileNode` (`tests/screenshots.spec.ts`)
+  used to sort `.cell` DOM elements by rendered area and click the smallest; there
+  is no per-cell DOM element to sort any more (plan.md step 5), so it raster-scans
+  canvas coordinates and clicks the first one that resolves to a file. That is a
+  different selection strategy, not a broken one, so the file shown in shot 7's
+  Inspector panel legitimately changes. Confirmed deterministic (same file, same
+  pixel diff count, across repeated runs) - not flaky, just different.
 
 ## Out of scope
 

@@ -495,22 +495,56 @@ meet target. **Visualisation-switch time misses its <50 ms target** — 83 ms an
 `docs/rendering-performance.md`'s new "After" section rather than rounded away,
 per plan-level decision 4. Full numbers and method there; not duplicated here.
 
-### Step 11 — Screenshot review and the single deliberate re-baseline
+### Step 11 — Screenshot review and the single deliberate re-baseline — done
 
 The one place the frozen baselines get spent. Take it seriously.
 
-- [ ] `npm run e2e`. Open **every** reported diff image.
-- [ ] For each, write down which entry in `spec.md`'s "Expected visual deltas" it
+- [x] `npm run e2e`. Open **every** reported diff image.
+- [x] For each, write down which entry in `spec.md`'s "Expected visual deltas" it
       corresponds to: stroke overpaint order, stripe width, or antialiasing.
-- [ ] Anything that cannot be attributed to that list is a **bug**. Fix it and
+- [x] Anything that cannot be attributed to that list is a **bug**. Fix it and
       re-run before re-baselining. Per CLAUDE.md, a diff on the visualisation
       canvas is normally a real bug — this is the exception, and it only holds for
       deltas on that list.
-- [ ] Confirm shots 8 and 9 (control panels, no canvas) are **pixel-identical**.
+- [x] Confirm shots 8 and 9 (control panels, no canvas) are **pixel-identical**.
       A diff there means something leaked out of the renderer.
-- [ ] `npm run e2e:update`, once. Commit the baselines in their own commit with
+- [x] `npm run e2e:update`, once. Commit the baselines in their own commit with
       the attribution list in the message — this is the one commit body worth more
       than a line.
+
+**Result:** at the suite's committed 2% tolerance (`playwright.config.ts`),
+`npm run e2e` **passed clean with zero reported diffs** — all 10 shots. That's
+not the same as "nothing changed": running the same suite at `maxDiffPixelRatio:
+0` (temporarily, reverted after) surfaced real per-pixel diffs on 8 of the 10
+shots, every one explicable:
+
+- Shots 1-6, 10: thin hairline diffs along cell/nesting borders (stroke overpaint
+  order - all fills now draw before all outlines, so outlines always win) plus
+  faint AA diffs across the whole frame, including the unrelated-code timescale
+  chart and page text - GPU AA compositing differs subtly from Skia's even where
+  no pixel of app code changed. Confirmed non-structural by cropping a
+  suspicious-looking solid triangular patch in shot 1's diff (a tiny sliver cell
+  where AA/hairline pixels cover most of its small area) and comparing the actual
+  crops side by side - visually identical.
+- Shot 7: **not** a rendering delta - a different file is selected
+  (`VisualizationData.tsx` vs. the old baseline's `components.types.ts`), because
+  `selectAFileNode`'s step-5 rework raster-scans canvas coordinates and clicks the
+  first hit, rather than sorting `.cell` DOM elements by area and clicking the
+  smallest (impossible now - no such DOM elements exist). Confirmed deterministic
+  across repeated runs (same file, same 1576-pixel diff count each time), not
+  flaky. Documented as a new bullet in spec.md's "Expected visual deltas".
+- Shots 8, 9: **zero bytes changed** - `--update-snapshots` left them untouched
+  even at 0% tolerance, confirming nothing leaked out of the renderer into the
+  control panels.
+
+**Re-baseline mechanics, worth recording:** `npm run e2e:update` at the
+_committed_ 0.02 tolerance did nothing - Playwright only rewrites a snapshot that
+first fails the comparison, and every shot already passed within 2%, so the
+1-2%-different SVG-era baselines would have stayed in git untouched, including
+shot 7's genuinely-wrong file content, passing only by tolerance luck. Re-ran the
+update at `maxDiffPixelRatio: 0` (temporarily, reverted immediately after) to
+force a true re-baseline against current output; config diff is a no-op in the
+final commit. 8 of 10 PNGs changed (8, 9 didn't - see above).
 
 ### Step 12 — Fold back, clean up, release notes
 
