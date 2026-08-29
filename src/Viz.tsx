@@ -419,19 +419,21 @@ const draw = (
     );
   refs.visibleNodes.current = allNodes;
 
-  // The outline set is the union of that cell set with the nesting set (every node from the first
-  // circle-ancestor level down to the depth limit, regardless of whether it has a fill). A node
-  // can qualify via either condition; `outlineLevel` (geometry.ts) falls back to the shared
-  // default stroke for whichever one it didn't qualify through. Sorted depth-descending so
-  // shallower/wider outlines paint over deeper ones - there is no depth buffer.
+  // The outline set is every node below the root, down to the depth limit, whether or not it has
+  // a fill - that includes the circle-packed nodes, whose boundaries are otherwise only implied
+  // by whatever their children happen to tile (nothing at all, for a circle full of circles).
+  // `outlineLevel` (geometry.ts) is what tells a circle boundary from a nesting stroke. The root
+  // is left out - its boundary is the edge of the whole diagram - except when the depth limit
+  // makes it the only cell drawn. Sorted depth-descending so shallower/wider outlines paint over
+  // deeper ones; there is no depth buffer.
   const outlineNodes = rootNode
     .descendants()
     .filter(
       (d) =>
         d.depth <= expensiveConfig.depth &&
-        (d.children === undefined ||
-          d.depth === expensiveConfig.depth ||
-          d.depth >= 1 + nodeCircleAncestors(d.data))
+        (d.depth >= 1 ||
+          d.children === undefined ||
+          d.depth === expensiveConfig.depth)
     )
     .sort((left, right) => right.depth - left.depth);
   refs.outlineNodes.current = outlineNodes;

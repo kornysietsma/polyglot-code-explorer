@@ -74,14 +74,27 @@ and **`circlePack` and `nestedCircles` are two different modes, not a rename**:
 
 That last point is why depth handling is a per-node count rather than a global flag.
 `preprocess.linkParents` computes `circleAncestors` on every node — the number of _strict_
-ancestors whose algorithm is a circle type (`isCirclePacked`) — and `Viz.tsx` reads it via
-`nodeCircleAncestors` at four sites to offset `d.depth`. Nesting strokes sit one level deeper than
-selection strokes; that 1-level difference is deliberate, so keep the relationship if you touch
-those offsets. Compute this in preprocess, not per-node-per-redraw — `Viz` redraws are
-performance-sensitive.
+ancestors whose algorithm is a circle type (`isCirclePacked`) — and two sites read it via
+`nodeCircleAncestors` to offset `d.depth`: `Viz.tsx`'s selection stroke and `geometry.ts`'s
+`outlineLevel`. Nesting strokes sit one level deeper than selection strokes; that 1-level
+difference is deliberate, so keep the relationship if you touch those offsets. Compute this in
+preprocess, not per-node-per-redraw — `Viz` redraws are performance-sensitive.
 
 `nodeCircleAncestors` throws rather than defaulting when the field is missing, because 0 is
 exactly the old buggy value and would show up as subtly-wrong nesting instead of a failure.
+
+`depth === circleAncestors` is the test for "the layout draws this node itself as a circle" — it
+says every ancestor is circle-packed. Those nodes need an outline of their own: a circle full of
+packed circles has nothing tiling its boundary, so dropping them from the outline set makes the
+group's circle vanish entirely — the regression the `omf.json` `nesteda`/`nestedc`/`nesteds`
+groups are the case to check for.
+
+The nesting levels are therefore split by kind, in `outlineLevel`: **every circle takes level 0**
+("top level" in the Colours and Lines panel), however deeply the packing nests, and voronoi
+nesting inside a circle starts at **level 1** — so levels 1-3 consistently mean "directories
+inside a repo", whatever depth that repo's circle sits at. A file with no circle packing has no
+level-0 circles to draw, so its top-level directories keep level 0 and nothing shifts. The root
+is the only circle never outlined.
 
 ### WebGL rendering (`src/webgl/`)
 
@@ -116,7 +129,8 @@ numbers: `docs/rendering-performance.md`.
   Outlines are one GPU quad per edge (`gl.LINES` with width>1 is unreliable across
   drivers), offset in the vertex shader so width stays constant in screen space —
   this reproduces `vector-effect: non-scaling-stroke` at zero per-frame cost.
-  `outlineLevel()` is the exported, unit-tested nesting-level formula.
+  `outlineLevel()` is the exported, unit-tested nesting-level formula, and the
+  one place a circle boundary is told from a nesting stroke.
   `NESTED_LEVEL_COUNT`/`OUTLINE_LEVEL_COUNT` are defined here and used everywhere
   else — including interpolated into `shaders.ts`'s fixed-size GLSL uniform array
   declarations, since GLSL array sizes must be compile-time constants. Don't
@@ -204,7 +218,10 @@ sharp edges; read them before changing either.
   make `npm run e2e` pass clean while the actual pixels differ.** A real re-baseline (not just
   "does it currently pass") needs checking at `maxDiffPixelRatio: 0` first, or
   `npm run e2e:update` will silently leave a stale-but-still-passing baseline in place instead
-  of updating it — confirmed doing exactly this during the WebGL rewrite's re-baseline.
+  of updating it — confirmed doing exactly this during the WebGL rewrite's re-baseline, and
+  again when re-baselining the circle outlines, where it reported "10 passed" and rewrote
+  nothing. `npx playwright test --update-snapshots=all` rewrites regardless of tolerance; check
+  the result at `maxDiffPixelRatio: 0` afterwards to prove the baselines actually moved.
 - **`tests/screenshots.spec.ts`'s `selectAFileNode` clicks canvas coordinates, not a DOM
   element.** Since the WebGL rewrite there's no per-cell DOM node to target; it raster-scans a
   grid of canvas points and clicks the first one that resolves to a file. Which file that is

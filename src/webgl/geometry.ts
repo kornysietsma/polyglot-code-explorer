@@ -110,15 +110,24 @@ export interface OutlineGeometry {
   indices: Uint32Array;
 }
 
-// Nodes closer to the root than their own circleAncestors count sit in the circle-packed region
-// above where nesting strokes start; nodes deeper than the configured nesting levels run out of
-// distinct colours/widths. Both fall back to the shared defaultStroke/defaultWidth slot.
-// Exported standalone (no HierarchyNode dependency) so it can be tested directly against the
-// formula, including the `omf.json` case where circle depth varies per branch (CLAUDE.md,
-// "Circle-packed layouts and circleAncestors").
+// Two kinds of outline share one buffer, told apart by `depth === circleAncestors` - which is
+// exactly "every ancestor is circle-packed", i.e. the layout draws this node itself as a circle:
+//  - a circle boundary. Every circle takes level 0, however deep it is nested, so all the
+//    circle-packing in a file reads as one boundary style.
+//  - an ordinary nesting stroke, levelled by depth inside the innermost circle, starting at
+//    level 1 - so levels 1..3 mean "voronoi nesting inside a circle", consistently across
+//    branches whose circles sit at different depths (CLAUDE.md, "Circle-packed layouts and
+//    circleAncestors"). A file with no circle packing at all has no level-0 circles to draw, so
+//    its top-level directories take level 0 and nothing shifts.
+// The root falls back to the shared defaultStroke/defaultWidth slot, as does anything deeper
+// than the configured nesting levels. Exported standalone (no HierarchyNode dependency) so it
+// can be tested directly against the formula, including the `omf.json` case where circle depth
+// varies per branch.
 export function outlineLevel(depth: number, circleAncestors: number): number {
-  const level = depth - (circleAncestors + 1);
-  if (level < 0 || level >= NESTED_LEVEL_COUNT) return DEFAULT_OUTLINE_LEVEL;
+  if (depth === 0) return DEFAULT_OUTLINE_LEVEL; // the root, which is normally not outlined
+  if (depth === circleAncestors) return 0; // a circle
+  const level = circleAncestors > 0 ? depth - circleAncestors : depth - 1;
+  if (level >= NESTED_LEVEL_COUNT) return DEFAULT_OUTLINE_LEVEL;
   return level;
 }
 
