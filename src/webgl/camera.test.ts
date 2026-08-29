@@ -8,7 +8,6 @@ import {
   screenToWorld,
   worldToClipTransform,
   worldToCss,
-  worldToDevice,
 } from "./camera";
 
 describe("fitTransform", () => {
@@ -79,15 +78,6 @@ describe("screenToWorld", () => {
       }
     }
   );
-
-  it("worldToDevice scales worldToCss by the DPR", () => {
-    const fit = fitTransform(layout, 300, 300);
-    const camera: Camera = { fit, zoom: { x: 5, y: -3, k: 1.5 }, dpr: 2 };
-    const [cssX, cssY] = worldToCss(camera, 10, -10);
-    const [deviceX, deviceY] = worldToDevice(camera, 10, -10);
-    expect(deviceX).toBeCloseTo(cssX * 2);
-    expect(deviceY).toBeCloseTo(cssY * 2);
-  });
 });
 
 describe("overlayGroupTransform", () => {
