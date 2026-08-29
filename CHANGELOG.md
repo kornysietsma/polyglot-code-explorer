@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-29
+
+### Changed
+
+- The visualisation canvas (cell fills, nesting/selection outlines) now renders through WebGL
+  instead of SVG. Pan and zoom on a large data file (e.g. `spring-projects.json`, 80,691 nodes)
+  went from ~1900 ms/frame to a vsync-capped ~16.7 ms/frame. Switching visualisation, dragging a
+  nesting colour/width control, and depth changes are all faster too - see
+  `docs/rendering-performance.md` for the full before/after numbers.
+- Hover now shows an HTML tooltip instead of the native SVG title, with no ~1 s native delay.
+- Outlines are drawn once per node, rather than once for the cell and again for each nesting
+  level. On a typical data file that removes over 19,000 outlines that were pixel-identical to
+  one already drawn. No visible change; it is why the outline pass is affordable at all.
+- The visualisation canvas recovers from a lost WebGL context (GPU reset, driver restart) by
+  rebuilding itself, instead of going permanently blank.
+
+### Known regressions
+
+- Clicking a directory's border no longer selects the directory (it selects the leaf cell under
+  the cursor, matching what a click anywhere else on that cell already did). Directories are
+  still reachable via the Inspector breadcrumb and the depth control.
+- The canvas is opaque to screen readers, where the old SVG paths were at least DOM nodes.
+
 ## [0.7.0] - 2026-08-28
 
 A large internal refactor rather than a feature release. Nothing about the data format changed and

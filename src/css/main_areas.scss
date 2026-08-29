@@ -15,15 +15,61 @@
 
 .Viz {
   background-color: var(--color-viz-bg);
+  // Anchors .viz-tooltip's `position: absolute` - the tooltip position is computed in Viz.tsx
+  // against this element's own bounding rect, not chart-stack's, so it stays correct regardless
+  // of chart-stack's internal layout.
+  position: relative;
 
-  > svg.chart {
+  // Wraps the canvas + overlay pair so they can be absolutely stacked and exactly co-located, and
+  // so d3.zoom (attached here, not to either layer - see camera.ts) keeps receiving events
+  // regardless of which layer currently has pointer-events.
+  > .chart-stack {
+    position: relative;
     width: 100%;
     height: 1024px;
+
+    > canvas.chart-gl,
+    > svg.chart-overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    // The canvas takes pointer events (webgl/picking.ts does the hit-testing); the overlay only
+    // carries selection strokes and coupling arcs. Coupling paths re-enable their own
+    // pointer-events - they keep their own click handler and <title>.
+    > svg.chart-overlay {
+      pointer-events: none;
+
+      .coupling {
+        pointer-events: auto;
+      }
+    }
   }
 
   > svg.timescale {
     width: 100%;
     height: 130px;
+  }
+
+  // Position (left/top) and visibility are set imperatively by Viz.tsx on every rAF-throttled
+  // pick - this block is purely the static look. `--color-modal-bg`/`--color-text`/
+  // `--color-borders` are already theme-aware (variables.scss), so this needs no new tokens to
+  // read correctly in both themes.
+  > .viz-tooltip {
+    position: absolute;
+    // Offset so the tooltip doesn't sit directly under the cursor it's tracking.
+    transform: translate(12px, 16px);
+    pointer-events: none;
+    z-index: 1;
+    padding: 2px 6px;
+    border: 1px solid var(--color-borders);
+    border-radius: 3px;
+    background-color: var(--color-modal-bg);
+    color: var(--color-text);
+    font-size: 0.75em;
+    white-space: nowrap;
   }
 }
 

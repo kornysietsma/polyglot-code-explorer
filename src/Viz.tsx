@@ -27,77 +27,40 @@ import {
 } from "./nodeData";
 import { FeatureFlags, Point, TreeNode } from "./polyglot_data.types";
 import { TimescaleIntervalData } from "./preprocess";
-import { Action, colourKeyToColours, State, themedColours } from "./state";
-import { getCurrentVis } from "./VisualizationData";
+import { Action, State, themedColours } from "./state";
 import { VizMetadata } from "./viz.types";
+import VizTooltip from "./VizTooltip";
+import {
+  buildFillFn,
+  buildFillPalette,
+  buildNestingStyle,
+  isNestingOnlyChange,
+} from "./vizUpdatePaths";
+import {
+  Camera,
+  fitTransform,
+  IDENTITY_ZOOM,
+  LayoutSize,
+  overlayGroupTransform,
+  screenToWorld,
+} from "./webgl/camera";
+import { GlRenderer } from "./webgl/GlRenderer";
 
-const redrawPolygons = (
-  svgSelection: Selection<
-    SVGPathElement,
-    HierarchyNode<TreeNode>,
-    SVGGElement,
-    unknown
-  >,
-  metadata: VizMetadata,
-  features: FeatureFlags,
-  state: State
-) => {
-  const { config } = state;
-
-  const visualization = getCurrentVis(config).buildVisualization(
-    state,
-    metadata,
-    features,
-    undefined
-  );
-
-  return svgSelection
-    .attr("d", (d) => {
-      return `${d3.line()(d.data.layout.polygon)}z`;
-    })
-    .style("fill", (d) => visualization.fillFn(d))
-    .style("stroke", themedColours(config).defaultStroke)
-    .style("stroke-width", config.nesting.defaultWidth)
-    .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
-};
-
-const redrawNesting = (
-  svgSelection: Selection<
-    SVGPathElement,
-    HierarchyNode<TreeNode>,
-    SVGGElement,
-    unknown
-  >,
-  state: State
-) => {
-  const { config } = state;
-
-  const strokeWidthFn = (d: HierarchyNode<TreeNode>) => {
-    const nesting = d.depth - (nodeCircleAncestors(d.data) + 1);
-    if (nesting < 0) return 0;
-    if (nesting >= config.nesting.nestedWidths.length)
-      return config.nesting.defaultWidth;
-    return config.nesting.nestedWidths[nesting] || config.nesting.defaultWidth;
-  };
-
-  const strokeColourFn = (d: HierarchyNode<TreeNode>) => {
-    const nesting = d.depth - (nodeCircleAncestors(d.data) + 1);
-    const theme = themedColours(config);
-
-    if (nesting < 0) return 0;
-    if (nesting >= theme.nestedStrokes.length) return theme.defaultStroke;
-    return theme.nestedStrokes[nesting] || theme.defaultStroke;
-  };
-
-  return svgSelection
-    .attr("d", (d) => {
-      return `${d3.line()(d.data.layout.polygon)}z`;
-    })
-    .style("fill", "none")
-    .style("stroke", strokeColourFn)
-    .style("stroke-width", strokeWidthFn)
-    .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
-};
+// The mutable handles draw()/update() work through. Bundled rather than passed one by one: they
+// are all set imperatively outside React's render cycle (CLAUDE.md: `react-hooks/refs` is off
+// repo-wide for exactly this reason), and every one of them is needed by both functions.
+interface VizRefs {
+  overlaySvg: RefObject<SVGSVGElement | null>;
+  glCanvas: RefObject<HTMLCanvasElement | null>;
+  chartStack: RefObject<HTMLDivElement | null>;
+  camera: RefObject<Camera | null>;
+  glRenderer: RefObject<GlRenderer | null>;
+  // The fill/cell set, also what the picking index is built from.
+  visibleNodes: RefObject<HierarchyNode<TreeNode>[] | null>;
+  // A strict superset of visibleNodes - outlines are one per node, unioning what used to be two
+  // overlapping SVG layers.
+  outlineNodes: RefObject<HierarchyNode<TreeNode>[] | null>;
+}
 
 const redrawSelection = (
   svgSelection: Selection<
@@ -157,22 +120,40 @@ function findSelectionPath(
 }
 
 const update = (
-  d3Container: React.RefObject<SVGSVGElement | null>,
-  files: TreeNode,
+  refs: VizRefs,
   metadata: VizMetadata,
   features: FeatureFlags,
-  state: State
+  state: State,
+  nestingOnlyChange: boolean
 ) => {
-  if (!d3Container.current) {
+  if (!refs.overlaySvg.current) {
     throw new Error("No current container");
   }
-  const vizEl = d3Container.current;
-  const svg = d3.select(vizEl);
-  // if (!svg instanceof SVGElement) {
-  //   throw new Error("Invalid root SVG element");
-  // }
-  redrawPolygons(svg.selectAll(".cell"), metadata, features, state);
-  redrawNesting(svg.selectAll(".nesting"), state);
+  const svg = d3.select(refs.overlaySvg.current);
+  const glCanvas = refs.glCanvas.current;
+  const camera = refs.camera.current;
+  const glRenderer = refs.glRenderer.current;
+  const visibleNodes = refs.visibleNodes.current;
+  if (!glCanvas || !camera || !glRenderer || !visibleNodes) {
+    throw new Error(
+      "update called before draw, so the WebGL renderer is not ready"
+    );
+  }
+  // A cheap `config` change never touches geometry or the picking index. Anything that can move
+  // fill colour (visualisation, date range, teams, theme) rewrites the colour buffer; a
+  // nesting-only edit skips even that, since level is a per-vertex attribute and the widths and
+  // colours it indexes are uniforms. The nesting uniforms are then rewritten either way - on the
+  // colour path because a theme switch moves nestedStrokes/defaultStroke too.
+  if (!nestingOnlyChange) {
+    glRenderer.setColours(
+      visibleNodes,
+      buildFillFn(metadata, features, state),
+      buildFillPalette(state)
+    );
+  }
+  glRenderer.setNestingStyle(buildNestingStyle(state));
+  glRenderer.setTransform(camera, glCanvas.width, glCanvas.height);
+  glRenderer.draw();
 
   // TODO: DRY this up - or should selecting just be expensive config?
   if (!metadata.hierarchyNodesByPath) {
@@ -319,47 +300,95 @@ function drawCoupling(
 }
 
 const updateCoupling = (
-  d3Container: React.RefObject<SVGSVGElement | null>,
+  refs: VizRefs,
   files: TreeNode,
   metadata: VizMetadata,
   state: State,
   dispatch: React.Dispatch<Action>
 ) => {
-  if (!d3Container.current) {
+  if (!refs.overlaySvg.current) {
     throw new Error("No current container");
   }
-  const vizEl = d3Container.current;
-  const svg = d3.select(vizEl);
+  const svg = d3.select(refs.overlaySvg.current);
   const group: Selection<SVGGElement, CouplingLink, SVGSVGElement, unknown> =
     svg.selectAll(".topGroup");
   drawCoupling(group, files, metadata, state, dispatch);
 };
 
+// Re-fits the camera to the chart-stack's current CSS box and DPR, and matches the canvas's
+// backing-store resolution to it. The canvas's CSS size stays declarative (100%/100% in
+// main_areas.scss); only the device-pixel resolution is set here. Returns the camera it stored, so
+// callers that go on to draw don't re-read the ref.
+//
+// Shared by draw() and the resize/DPR handlers, which differ only in whether they keep the
+// existing zoom - a resize must not throw away the user's pan and zoom, a full redraw resets it.
+function refitCamera(
+  refs: VizRefs,
+  layout: LayoutSize,
+  zoom = IDENTITY_ZOOM
+): Camera | null {
+  const chartStackEl = refs.chartStack.current;
+  const glCanvas = refs.glCanvas.current;
+  if (!chartStackEl || !glCanvas) return null;
+
+  const cssWidth = chartStackEl.clientWidth;
+  const cssHeight = chartStackEl.clientHeight;
+  const dpr = window.devicePixelRatio || 1;
+  const camera: Camera = {
+    fit: fitTransform(layout, cssWidth, cssHeight),
+    zoom,
+    dpr,
+  };
+  refs.camera.current = camera;
+  glCanvas.width = Math.round(cssWidth * dpr);
+  glCanvas.height = Math.round(cssHeight * dpr);
+  return camera;
+}
+
+// The root node's layout dimensions, which the whole camera is fitted to. Throws rather than
+// defaulting: a tree with no size would silently render as a dot.
+function layoutSize(files: TreeNode): LayoutSize {
+  const { width, height } = files.layout;
+  if (!width || !height) {
+    throw new Error("Root node has no width or height!");
+  }
+  return { width, height };
+}
+
 const draw = (
-  d3Container: React.RefObject<SVGSVGElement | null>,
+  refs: VizRefs,
   files: TreeNode,
   metadata: VizMetadata,
   features: FeatureFlags,
   state: State,
   dispatch: React.Dispatch<Action>
 ) => {
-  const { config, expensiveConfig } = state;
-  const {
-    layout: { timescaleHeight },
-  } = config;
+  const { expensiveConfig } = state;
 
-  if (!d3Container.current) {
+  if (!refs.overlaySvg.current) {
     console.warn("in draw but d3container not yet current");
     return;
   }
-  const vizEl = d3Container.current;
-  const w = vizEl.clientWidth;
-  const h = vizEl.clientHeight - timescaleHeight;
-
-  const { layout } = files;
-  if (!layout.width || !layout.height) {
-    throw new Error("Root node has no width or height!");
+  const chartStackEl = refs.chartStack.current;
+  const glCanvas = refs.glCanvas.current;
+  if (!chartStackEl || !glCanvas) {
+    console.warn("in draw but canvas layer not yet mounted");
+    return;
   }
+  const vizEl = refs.overlaySvg.current;
+  const w = chartStackEl.clientWidth;
+  const h = chartStackEl.clientHeight;
+
+  const layout = layoutSize(files);
+  const camera = refitCamera(refs, layout);
+  if (!camera) {
+    console.warn("in draw but canvas layer not yet mounted");
+    return;
+  }
+  if (!refs.glRenderer.current) {
+    refs.glRenderer.current = new GlRenderer(glCanvas);
+  }
+  const glRenderer = refs.glRenderer.current;
 
   const svg = d3
     .select(vizEl)
@@ -380,71 +409,42 @@ const draw = (
   metadata.hierarchyNodesByPath = hierarchyNodesByPath;
 
   // note we filter out nodes that are parents who will be hidden by their children, for speed
-  // so only show parent nodes at the clipping level.
+  // so only show parent nodes at the clipping level. This is the cell set - also what the picking
+  // index is built from, so a pick can never return a node with no fill.
   const allNodes = rootNode
     .descendants()
     .filter((d) => d.depth <= expensiveConfig.depth)
     .filter(
       (d) => d.children === undefined || d.depth === expensiveConfig.depth
     );
+  refs.visibleNodes.current = allNodes;
 
-  const nodes = group
-    .selectAll<SVGPathElement, HierarchyNode<TreeNode>>(".cell")
-    .data(allNodes, function (node) {
-      return node.data.path;
-    });
-
-  // TODO - consider reworking this with join which seems to be the new hotness?
-  const newNodes = nodes.enter().append("path").classed("cell", true);
-
-  redrawPolygons(nodes.merge(newNodes), metadata, features, state)
-    .on(
-      "click",
-      function (
-        this: SVGPathElement,
-        event: PointerEvent,
-        node: HierarchyNode<TreeNode>
-      ) {
-        dispatch({ type: "selectNode", payload: node.data.path });
-      }
-    )
-    .append("svg:title")
-    .text((n) => n.data.path);
-
-  nodes.exit().remove();
-
-  const nestingNodes = rootNode
+  // The outline set is the union of that cell set with the nesting set (every node from the first
+  // circle-ancestor level down to the depth limit, regardless of whether it has a fill). A node
+  // can qualify via either condition; `outlineLevel` (geometry.ts) falls back to the shared
+  // default stroke for whichever one it didn't qualify through. Sorted depth-descending so
+  // shallower/wider outlines paint over deeper ones - there is no depth buffer.
+  const outlineNodes = rootNode
     .descendants()
     .filter(
       (d) =>
-        d.depth >= 1 + nodeCircleAncestors(d.data) &&
-        d.depth <= state.expensiveConfig.depth
+        d.depth <= expensiveConfig.depth &&
+        (d.children === undefined ||
+          d.depth === expensiveConfig.depth ||
+          d.depth >= 1 + nodeCircleAncestors(d.data))
     )
     .sort((left, right) => right.depth - left.depth);
+  refs.outlineNodes.current = outlineNodes;
 
-  const nestingNodesSelection = group
-    .selectAll<SVGPathElement, HierarchyNode<TreeNode>>(".nesting")
-    .data(nestingNodes, function (node) {
-      return node.data.path;
-    });
-  const newNestingNodes = nestingNodesSelection
-    .enter()
-    .append("path")
-    .classed("nesting", true);
-  redrawNesting(nestingNodesSelection.merge(newNestingNodes), state).on(
-    "click",
-    function (
-      this: SVGPathElement,
-      event: PointerEvent,
-      node: HierarchyNode<TreeNode>
-    ) {
-      dispatch({ type: "selectNode", payload: node.data.path });
-    }
+  glRenderer.setGeometry(
+    allNodes,
+    outlineNodes,
+    buildFillFn(metadata, features, state),
+    buildNestingStyle(state),
+    buildFillPalette(state)
   );
-
-  nestingNodesSelection.exit().remove();
-
-  // TODO
+  glRenderer.setTransform(camera, glCanvas.width, glCanvas.height);
+  glRenderer.draw();
 
   const selectionPath = findSelectionPath(state, metadata.hierarchyNodesByPath);
   const selectionNodes = group
@@ -467,15 +467,38 @@ const draw = (
   group.selectAll(".coupling").raise();
 
   // zooming - see https://observablehq.com/@d3/zoomable-map-tiles?collection=@d3/d3-zoom
-  const zoomed = (
-    event: D3ZoomEvent<SVGSVGElement, HierarchyNode<TreeNode>>
-  ) => {
-    group.attr("transform", event.transform.toString());
+  //
+  // Attached to the chart-stack wrapper, not to the SVG or the canvas: it's a plain HTML
+  // element with no viewBox, so d3.pointer() reports coordinates in plain CSS pixels local to
+  // it - which is why the camera composes fit *then* zoom (camera.ts) - and, being an ancestor of
+  // both layers, it keeps receiving events no matter which one currently takes pointer events.
+  const zoomed = (event: D3ZoomEvent<HTMLDivElement, unknown>) => {
+    // Re-read rather than closing over `camera`: a resize replaces the whole camera, and this
+    // handler outlives it.
+    const fitted = refs.camera.current ?? camera;
+    const nextCamera: Camera = {
+      ...fitted,
+      zoom: {
+        x: event.transform.x,
+        y: event.transform.y,
+        k: event.transform.k,
+      },
+    };
+    refs.camera.current = nextCamera;
+
+    const overlay = overlayGroupTransform(nextCamera);
+    group.attr(
+      "transform",
+      `translate(${overlay.x},${overlay.y}) scale(${overlay.k})`
+    );
+
+    glRenderer.setTransform(nextCamera, glCanvas.width, glCanvas.height);
+    glRenderer.draw();
   };
 
-  svg.call(
+  d3.select(chartStackEl).call(
     d3
-      .zoom<SVGSVGElement, unknown>()
+      .zoom<HTMLDivElement, unknown>()
       .extent([
         [0, 0],
         [w, h],
@@ -632,10 +655,28 @@ const updateBodyTheme = (newTheme: string) => {
 };
 
 const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
-  const d3Container: RefObject<SVGSVGElement | null> =
-    useRef<SVGSVGElement | null>(null);
   const d3TimescaleContainer: RefObject<SVGSVGElement | null> =
     useRef<SVGSVGElement | null>(null);
+  const vizContainerRef: RefObject<HTMLElement | null> =
+    useRef<HTMLElement | null>(null);
+  const vizTooltipRef: RefObject<HTMLDivElement | null> =
+    useRef<HTMLDivElement | null>(null);
+
+  // Stable for the component's lifetime: every field is a ref, and useRef never changes identity.
+  const refs = useRef<VizRefs>({
+    overlaySvg: { current: null },
+    glCanvas: { current: null },
+    chartStack: { current: null },
+    camera: { current: null },
+    glRenderer: { current: null },
+    visibleNodes: { current: null },
+    outlineNodes: { current: null },
+  }).current;
+
+  // A full redraw bound to the latest data and state, refreshed by the main effect below. The GL
+  // context-loss handler needs to rebuild everything from scratch, but it is registered once and
+  // so can't close over either.
+  const redrawAllRef = useRef<(() => void) | null>(null);
 
   const debouncedDispatch = useMemo(
     () => _.debounce((nextValue) => dispatch(nextValue), 250),
@@ -643,6 +684,18 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
   );
 
   const prevState = usePrevious(state);
+
+  // Releases the GL context's buffers and programs on unmount - `draw()` creates the renderer
+  // lazily on the ref, so there's nothing to clean up if it was never mounted. Empty deps: this
+  // must run its cleanup exactly once, on unmount, not after every render.
+  useEffect(() => {
+    return () => {
+      // refs.glRenderer.current is set imperatively by draw() outside React's render cycle
+      // (CLAUDE.md: react-hooks/refs is off repo-wide for the same reason), so reading it fresh
+      // at unmount is correct, not stale.
+      refs.glRenderer.current?.destroy();
+    };
+  }, [refs]);
 
   useEffect(() => {
     const {
@@ -652,13 +705,15 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
     } = dataRef.current;
     const { config, expensiveConfig, couplingConfig } = state;
     const { features } = data;
+    redrawAllRef.current = () =>
+      draw(refs, data.tree, metadata, features, state, dispatch);
     if (
       prevState === undefined ||
       !_.isEqual(prevState.expensiveConfig, expensiveConfig)
     ) {
       console.log("expensive config change - rebuild all");
       console.time("redraw");
-      draw(d3Container, data.tree, metadata, features, state, dispatch);
+      draw(refs, data.tree, metadata, features, state, dispatch);
       console.timeEnd("redraw");
       console.time("redrawTimescale");
       drawTimescale(
@@ -672,9 +727,14 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
       updateBodyTheme(state.config.colours.currentTheme);
     } else {
       if (!_.isEqual(prevState.config, config)) {
-        console.log("cheap config change - just redraw");
+        const nestingOnlyChange = isNestingOnlyChange(prevState.config, config);
+        console.log(
+          nestingOnlyChange
+            ? "nesting-only change - uniform update"
+            : "cheap config change - just redraw"
+        );
         console.time("update");
-        update(d3Container, data.tree, metadata, features, state);
+        update(refs, metadata, features, state, nestingOnlyChange);
         console.timeEnd("update");
         if (
           prevState.config.colours.currentTheme !==
@@ -686,88 +746,216 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
       if (!_.isEqual(prevState.couplingConfig, couplingConfig)) {
         console.log("coupling change");
         console.time("update coupling");
-        updateCoupling(d3Container, data.tree, metadata, state, dispatch);
+        updateCoupling(refs, data.tree, metadata, state, dispatch);
         console.timeEnd("update coupling");
       }
     }
-  }, [dataRef, state, dispatch, debouncedDispatch, prevState]);
+  }, [dataRef, state, dispatch, debouncedDispatch, prevState, refs]);
 
-  function svgPatternDefs() {
-    const { svgPatternIds } = state.calculated.svgPatterns;
-    const { neutralColour } = themedColours(state.config);
-    /* sample
-        <linearGradient id="diagonalHatch" gradientUnits="userSpaceOnUse"
-                    x2="30" spreadMethod="repeat" gradientTransform="rotate(-45)">
-      <stop offset="0" stop-color="orange"/>
-      <stop offset="0.33" stop-color="orange"/>
-      <stop offset="0.33" stop-color="blue"/>
-      <stop offset="0.67" stop-color="blue"/>
-      <stop offset="0.67" stop-color="red"/>
-      <stop offset="1.0" stop-color="red"/>
-    </linearGradient>
-    */
-    return [...svgPatternIds].map(([colourKey, patternId]) => {
-      const colours = colourKeyToColours(colourKey);
-      if (
-        colours.length == 3 &&
-        colours[2] == colours[1] &&
-        colours[1] == colours[0]
-      ) {
-        // solid colour - build a simpler gradient
-        return (
-          <linearGradient key={patternId} id={`pattern${patternId}`}>
-            <stop stopColor={colours[0]} />
-          </linearGradient>
-        );
-      } else {
-        return (
-          <linearGradient
-            key={patternId}
-            id={`pattern${patternId}`}
-            gradientUnits="userSpaceOnUse"
-            x2="10"
-            spreadMethod="repeat"
-            gradientTransform="rotate(-45)"
-          >
-            <stop offset="0" stopColor={colours[0]} />
-            <stop offset="0.33" stopColor={colours[0]} />
-            <stop offset="0.33" stopColor={colours[1] ?? neutralColour} />
-            <stop offset="0.67" stopColor={colours[1] ?? neutralColour} />
-            <stop offset="0.67" stopColor={colours[2] ?? neutralColour} />
-            <stop offset="1.0" stopColor={colours[2] ?? neutralColour} />
-          </linearGradient>
-        );
+  // Re-fit on resize or a DPR change, then redraw the existing geometry at the new transform - no
+  // rebuild needed. The overlay SVG's own viewBox re-fits itself natively; nothing to do there.
+  // Skips until the first `draw()` has created the renderer, and keeps the user's current zoom.
+  //
+  // ResizeObserver alone isn't enough: dragging the window to a monitor with a different pixel
+  // ratio changes the DPR without changing the CSS box, so the canvas would keep its old
+  // backing-store resolution and render soft. `matchMedia` on the current ratio fires exactly when
+  // it stops matching, and is re-armed on the new ratio each time.
+  useEffect(() => {
+    const stackEl = refs.chartStack.current;
+    if (!stackEl) return;
+
+    const refitAndDraw = () => {
+      const glRenderer = refs.glRenderer.current;
+      const canvas = refs.glCanvas.current;
+      if (!glRenderer || !canvas) return;
+      const { layout } = dataRef.current.data.tree;
+      if (!layout.width || !layout.height) return;
+      const camera = refitCamera(
+        refs,
+        { width: layout.width, height: layout.height },
+        refs.camera.current?.zoom ?? IDENTITY_ZOOM
+      );
+      if (!camera) return;
+      glRenderer.setTransform(camera, canvas.width, canvas.height);
+      glRenderer.draw();
+    };
+
+    const observer = new ResizeObserver(refitAndDraw);
+    observer.observe(stackEl);
+
+    let dprQuery: MediaQueryList | null = null;
+    const watchDpr = () => {
+      dprQuery?.removeEventListener("change", onDprChange);
+      dprQuery = window.matchMedia(
+        `(resolution: ${window.devicePixelRatio}dppx)`
+      );
+      dprQuery.addEventListener("change", onDprChange);
+    };
+    function onDprChange() {
+      refitAndDraw();
+      watchDpr();
+    }
+    watchDpr();
+
+    return () => {
+      observer.disconnect();
+      dprQuery?.removeEventListener("change", onDprChange);
+    };
+  }, [dataRef, refs]);
+
+  // A lost GL context takes every buffer, program and texture with it, and the canvas stays blank
+  // with no error unless we rebuild. preventDefault() on the loss event is what makes the browser
+  // promise a restore; on restore the old GlRenderer's handles are all dead, so drop it and let
+  // draw() build a new one against the same canvas.
+  useEffect(() => {
+    const canvas = refs.glCanvas.current;
+    if (!canvas) return;
+
+    const handleLost = (event: Event) => {
+      event.preventDefault();
+      console.warn("WebGL context lost - waiting for restore");
+    };
+    const handleRestored = () => {
+      console.warn("WebGL context restored - rebuilding renderer");
+      refs.glRenderer.current = null;
+      redrawAllRef.current?.();
+    };
+
+    canvas.addEventListener("webglcontextlost", handleLost);
+    canvas.addEventListener("webglcontextrestored", handleRestored);
+    return () => {
+      canvas.removeEventListener("webglcontextlost", handleLost);
+      canvas.removeEventListener("webglcontextrestored", handleRestored);
+    };
+  }, [refs]);
+
+  // The canvas owns pointer events (see main_areas.scss - the overlay is pointer-events: none
+  // except .coupling). A native listener rather than a React `onClick` prop because `screenToWorld`
+  // and `pick` both need the *current* camera/renderer, which live in refs, not props or state -
+  // this is attached once and reads `.current` fresh on every click.
+  useEffect(() => {
+    const canvas = refs.glCanvas.current;
+    if (!canvas) return;
+
+    const handleClick = (event: MouseEvent) => {
+      const camera = refs.camera.current;
+      const glRenderer = refs.glRenderer.current;
+      if (!camera || !glRenderer) return;
+      const rect = canvas.getBoundingClientRect();
+      const [worldX, worldY] = screenToWorld(
+        camera,
+        event.clientX - rect.left,
+        event.clientY - rect.top
+      );
+      const picked = glRenderer.pick(worldX, worldY);
+      if (picked) {
+        dispatch({ type: "selectNode", payload: picked.data.path });
       }
-    });
-  }
+    };
+
+    canvas.addEventListener("click", handleClick);
+    return () => canvas.removeEventListener("click", handleClick);
+  }, [dispatch, refs]);
+
+  // Hover tooltip. Picking on every raw `mousemove` would run a quadtree search on every pixel the
+  // cursor crosses; instead the latest event is stashed in a ref and a single `pick()` runs once
+  // per animation frame (`rafId` guards against scheduling more than one). The DOM is only touched
+  // when the picked node's path actually changes - sweeping the mouse across one large cell
+  // shouldn't touch the DOM every frame - but the tooltip still tracks the cursor position on
+  // every throttled tick, since it must move even while the picked node stays the same.
+  useEffect(() => {
+    const canvas = refs.glCanvas.current;
+    const tooltip = vizTooltipRef.current;
+    const container = vizContainerRef.current;
+    if (!canvas || !tooltip || !container) return;
+
+    let rafId: number | null = null;
+    let lastEvent: MouseEvent | null = null;
+    let lastPath: string | null = null;
+
+    const updateTooltip = () => {
+      rafId = null;
+      const event = lastEvent;
+      if (!event) return;
+      const camera = refs.camera.current;
+      const glRenderer = refs.glRenderer.current;
+      if (!camera || !glRenderer) return;
+
+      const canvasRect = canvas.getBoundingClientRect();
+      const [worldX, worldY] = screenToWorld(
+        camera,
+        event.clientX - canvasRect.left,
+        event.clientY - canvasRect.top
+      );
+      const picked = glRenderer.pick(worldX, worldY);
+      const path = picked?.data.path ?? null;
+
+      if (path !== lastPath) {
+        lastPath = path;
+        tooltip.hidden = path === null;
+        if (path !== null) {
+          tooltip.textContent = path;
+        }
+      }
+      if (path !== null) {
+        const containerRect = container.getBoundingClientRect();
+        tooltip.style.left = `${event.clientX - containerRect.left}px`;
+        tooltip.style.top = `${event.clientY - containerRect.top}px`;
+      }
+    };
+
+    const handleMouseMove = (event: MouseEvent) => {
+      lastEvent = event;
+      if (rafId === null) {
+        rafId = requestAnimationFrame(updateTooltip);
+      }
+    };
+
+    const handleMouseLeave = () => {
+      lastEvent = null;
+      lastPath = null;
+      tooltip.hidden = true;
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    };
+
+    canvas.addEventListener("mousemove", handleMouseMove);
+    canvas.addEventListener("mouseleave", handleMouseLeave);
+    return () => {
+      canvas.removeEventListener("mousemove", handleMouseMove);
+      canvas.removeEventListener("mouseleave", handleMouseLeave);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, [refs]);
 
   return (
-    <aside className="Viz">
-      <svg className="chart" ref={d3Container}>
-        <defs>
-          {/* arrowhead marker definition */}
-          <marker
-            id="arrow"
-            viewBox="0 0 4 4"
-            refX="2"
-            refY="2"
-            markerWidth="5"
-            markerHeight="5"
-            markerUnits="strokeWidth"
-            // xoverflow="visible"  TODO: this was here and invalid - check
-            overflow="visible"
-            orient="auto-start-reverse"
-          >
-            <path d="M0,0L4,2L0,4z" fill="#ff6300" />
-          </marker>
-          {state.config.visualization == "teamPattern" ? (
-            svgPatternDefs()
-          ) : (
-            <></>
-          )}
-        </defs>
-        <g className="topGroup" />
-      </svg>
+    <aside className="Viz" ref={vizContainerRef}>
+      <div className="chart-stack" ref={refs.chartStack}>
+        <canvas className="chart-gl" ref={refs.glCanvas} />
+        <svg className="chart-overlay" ref={refs.overlaySvg}>
+          <defs>
+            {/* arrowhead marker definition */}
+            <marker
+              id="arrow"
+              viewBox="0 0 4 4"
+              refX="2"
+              refY="2"
+              markerWidth="5"
+              markerHeight="5"
+              markerUnits="strokeWidth"
+              // xoverflow="visible"  TODO: this was here and invalid - check
+              overflow="visible"
+              orient="auto-start-reverse"
+            >
+              <path d="M0,0L4,2L0,4z" fill="#ff6300" />
+            </marker>
+          </defs>
+          <g className="topGroup" />
+        </svg>
+      </div>
+      <VizTooltip ref={vizTooltipRef} />
       <svg className="timescale" ref={d3TimescaleContainer} />
     </aside>
   );
