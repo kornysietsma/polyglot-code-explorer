@@ -1,6 +1,5 @@
-// Pure hit-testing for the WebGL fill layer - no `gl` import, so this is testable under
-// Vitest's jsdom environment (plan.md decision 6). `screenToWorld` (camera.ts) is the caller's
-// job; everything here works in world units so click and hover picking can't drift apart.
+// Pure hit-testing for the WebGL fill layer. `screenToWorld` (camera.ts) is the caller's job;
+// everything here works in world units so click and hover picking can't drift apart.
 
 import { HierarchyNode, Quadtree, quadtree, QuadtreeLeaf } from "d3";
 
@@ -14,10 +13,10 @@ export interface PickIndex {
 
 // Sign-consistency of the cross product across every edge - the same technique triangulate.ts's
 // assertConvex uses to validate convexity, used here the other way round, as a containment test.
-// Exact for convex polygons (spec.md, "Picking"). A point exactly on an edge (zero cross
-// product) is treated as inside rather than as a miss, matching assertConvex's tolerance of a
-// collinear vertex: adjacent cells share a border, so "exactly on the line" has to resolve to a
-// cell, not fall through as a background click.
+// Exact for convex polygons. A point exactly on an edge (zero cross product) is treated as inside
+// rather than as a miss, matching assertConvex's tolerance of a collinear vertex: adjacent cells
+// share a border, so "exactly on the line" has to resolve to a cell, not fall through as a
+// background click.
 export function pointInConvexPolygon(
   polygon: readonly Point[],
   x: number,
@@ -37,9 +36,8 @@ export function pointInConvexPolygon(
   return true;
 }
 
-// One point per node, keyed on node.layout.center (spec.md, "Picking"). Build from the same
-// depth-filtered node list the fill geometry uses, so a pick can never return a node that isn't
-// actually drawn.
+// One point per node, keyed on node.layout.center. Build from the same depth-filtered node list
+// the fill geometry uses, so a pick can never return a node that isn't actually drawn.
 export function buildIndex(
   nodes: readonly HierarchyNode<TreeNode>[]
 ): PickIndex {
@@ -81,9 +79,9 @@ function collectWithinRadius(
 }
 
 // Doubles the search radius from a seed derived from the tree's own extent until at least
-// `minCount` centroids are found or the search already covers the whole tree (spec.md's
-// "growing bbox" over "the ~16 nearest centroids"). There's no history of a previous radius to
-// reuse - picking must work correctly on the very first click after a tree is built.
+// `minCount` centroids are found or the search already covers the whole tree. There's no history
+// of a previous radius to reuse - picking must work correctly on the very first click after a
+// tree is built.
 function nearestCandidates(
   tree: Quadtree<HierarchyNode<TreeNode>>,
   x: number,
@@ -107,9 +105,8 @@ function nearestCandidates(
 
 // Nearest centroid first - the fast path for the overwhelming majority of clicks. If that
 // polygon doesn't actually contain the point (possible for clipped/weighted cells, where the
-// centroid can sit outside the point-of-interest's true area - spec.md's "Picking"), widen to
-// the nearest ~16 centroids, closest first, and take the first whose polygon contains the
-// point. `null` means a background click.
+// centroid can sit outside the cell's true area), widen to the nearest ~16 centroids, closest
+// first, and take the first whose polygon contains the point. `null` means a background click.
 export function pick(
   index: PickIndex,
   worldX: number,

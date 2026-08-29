@@ -27,12 +27,11 @@ async function expandPanel(page: Page, title: string) {
     .click();
 }
 
-// Selecting a specific node means clicking the WebGL canvas at a pixel position - since
-// step 4/5 there is no DOM element per cell to query or click (plan.md step 5). The
-// layout is deterministic (polygons come from the data file), so a fixed offset within
-// the canvas works - but rather than hardcode one that only holds for today's fixture,
-// try a grid of offsets and keep the "retry until the inspector shows a file" loop as
-// the safety net, since a fixed point could land on a directory cell (truncated at the
+// Selecting a specific node means clicking the WebGL canvas at a pixel position - there is no DOM
+// element per cell to query or click. The layout is deterministic (polygons come from the data
+// file), so a fixed offset within the canvas works - but rather than hardcode one that only holds
+// for today's fixture, try a grid of offsets and keep the "retry until the inspector shows a file"
+// loop as the safety net, since a fixed point could land on a directory cell (truncated at the
 // depth limit, and rendered flat exactly like a file) instead of a leaf file.
 async function selectAFileNode(page: Page) {
   const canvas = page.locator("canvas.chart-gl");

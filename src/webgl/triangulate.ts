@@ -1,8 +1,7 @@
-// Pure geometry helpers for the WebGL fill/outline pipeline - no `gl` import, so this is
-// testable under Vitest's jsdom environment (plan.md decision 6).
+// Pure geometry helpers for the WebGL fill/outline pipeline.
 //
-// Voronoi cells and circle approximations are both convex (spec.md, "Fills"), so a triangle fan
-// from the first vertex is an exact triangulation - no earcut needed.
+// Voronoi cells and circle approximations are both convex, so a triangle fan from the first
+// vertex is an exact triangulation - no earcut needed.
 
 import { Point } from "../polyglot_data.types";
 
@@ -43,8 +42,8 @@ export function fanTriangulate(points: readonly Point[]): Float32Array {
 // is bad input we can't hand-fix in the data file, so this deliberately doesn't throw on it -
 // only a genuine concave turn (an inconsistent sign) does.
 //
-// Guarded to development builds per spec.md: this walks every vertex of every polygon, so it is
-// skipped in production once the shape of the data is trusted.
+// Guarded to development builds: this walks every vertex of every polygon, so it is skipped in
+// production once the shape of the data is trusted.
 export function assertConvex(points: readonly Point[], path: string): void {
   if (!import.meta.env.DEV) return;
 

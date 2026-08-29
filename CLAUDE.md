@@ -104,7 +104,10 @@ numbers: `docs/rendering-performance.md`.
   outline), their buffers, `draw()`, `pick()`, `destroy()`. Requires
   `OES_element_index_uint` (WebGL1's native index type is `UNSIGNED_SHORT`, too
   small for these buffers) and throws in the constructor if it's unavailable.
-  Exposes three update methods instead of one `render()` — see below.
+  Exposes three update methods instead of one `render()` — see below. It holds no
+  recovery logic of its own: a lost GL context is handled in `Viz.tsx`, which
+  drops the renderer on `webglcontextrestored` and rebuilds from scratch via the
+  `redrawAllRef` thunk the main effect keeps current.
 - `geometry.ts` — `buildFills()`/`buildOutlines()`: tree nodes → typed arrays.
   Polygons are convex (Voronoi cells, circle approximations), so
   `triangulate.ts`'s `fanTriangulate()` is an exact triangulation, no earcut
@@ -114,6 +117,10 @@ numbers: `docs/rendering-performance.md`.
   drivers), offset in the vertex shader so width stays constant in screen space —
   this reproduces `vector-effect: non-scaling-stroke` at zero per-frame cost.
   `outlineLevel()` is the exported, unit-tested nesting-level formula.
+  `NESTED_LEVEL_COUNT`/`OUTLINE_LEVEL_COUNT` are defined here and used everywhere
+  else — including interpolated into `shaders.ts`'s fixed-size GLSL uniform array
+  declarations, since GLSL array sizes must be compile-time constants. Don't
+  restate either as a literal.
 - `picking.ts` — `d3-quadtree` over cell centroids (`node.layout.center`); nearest
   centroid, then a widening search over ~16 candidates, then
   `pointInConvexPolygon()`. **Picking returns the leaf node under the cursor,
@@ -131,15 +138,23 @@ numbers: `docs/rendering-performance.md`.
 `setGeometry()`) are the reason positions and colours live in separate buffers.
 Pan/zoom writes only uniforms; switching visualisation rewrites only the colour
 buffer; only a depth (`expensiveConfig`) change re-triangulates and reallocates
-both buffers plus the picking index. `Viz.tsx`'s `isNestingOnlyChange()` detects
-the finest-grained case exactly (not heuristically): `state.ts`'s `setLines`
-action is the only one that ever touches nesting colours/widths and touches
-nothing else, so "nesting fields differ, nothing else does" routes straight to a
-uniform-only `setNestingStyle()` update with no buffer touched at all. Positions
-and colours are cached per-`draw()` in `Viz.tsx` as `visibleNodesRef` (the
-fill/cell set, also what the picking index is built from) and `outlineNodesRef`
-(a strict superset — outlines are one per node, unioning what used to be two
-overlapping SVG layers).
+both buffers plus the picking index. `vizUpdatePaths.ts`'s `isNestingOnlyChange()`
+detects the finest-grained case exactly (not heuristically): `state.ts`'s
+`setLines` action is the only one that ever touches nesting colours/widths and
+touches nothing else, so "nesting fields differ, nothing else does" routes
+straight to a uniform-only `setNestingStyle()` update with no buffer touched at
+all. Node lists are cached per-`draw()` in `Viz.tsx`'s `VizRefs` as
+`visibleNodes` (the fill/cell set, also what the picking index is built from) and
+`outlineNodes` (a strict superset — outlines are one per node, unioning what used
+to be two overlapping SVG layers). `setColours()` throws if handed a `visibleNodes`
+that doesn't match the geometry currently uploaded.
+
+`src/vizUpdatePaths.ts` is where `State` meets the renderer: it builds the fill
+function, pattern palette and nesting style the three update paths take, and
+decides which path a config change needs. It lives outside `src/webgl/` so those
+modules stay decoupled from the `State` type — keep that direction, and keep the
+module pure, since it's the one part of the update routing that unit tests can
+reach (`Viz.tsx` itself is imperative D3 throughout).
 
 **Team pattern stripes** (`TeamPatternVisualization`) render through a fragment
 shader, not the old SVG `<linearGradient>`. The phase is anchored to **world**

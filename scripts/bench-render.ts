@@ -20,8 +20,8 @@ const repoRoot = path.resolve(import.meta.dirname, "..");
 // Playwright's headless Chromium defaults to the SwiftShader software backend on macOS,
 // even when a real GPU is available - headed mode picks up the real GPU with no extra
 // flags. Forcing the ANGLE Metal backend restores real GPU acceleration in headless mode
-// too. Confirmed by hand (webgl-check reported SwiftShader without this, the real "ANGLE
-// Metal Renderer: Intel(R) UHD Graphics 630" with it) - see plan.md step 0 progress notes.
+// too. Confirmed by hand: `webgl-check` reports SwiftShader without this, and the real "ANGLE
+// Metal Renderer: Intel(R) UHD Graphics 630" with it.
 const GPU_ARGS = process.platform === "darwin" ? ["--use-angle=metal"] : [];
 
 interface FrameStats {

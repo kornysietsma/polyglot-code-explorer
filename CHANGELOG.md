@@ -17,11 +17,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   nesting colour/width control, and depth changes are all faster too - see
   `docs/rendering-performance.md` for the full before/after numbers.
 - Hover now shows an HTML tooltip instead of the native SVG title, with no ~1 s native delay.
-
-### Fixed
-
-- Directories no longer clip 19,000+ redundant duplicate outline paths in typical data files
-  (an outline is now drawn once per node instead of once per cell and again per nesting level).
+- Outlines are drawn once per node, rather than once for the cell and again for each nesting
+  level. On a typical data file that removes over 19,000 outlines that were pixel-identical to
+  one already drawn. No visible change; it is why the outline pass is affordable at all.
+- The visualisation canvas recovers from a lost WebGL context (GPU reset, driver restart) by
+  rebuilding itself, instead of going permanently blank.
 
 ### Known regressions
 

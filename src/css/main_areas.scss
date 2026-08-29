@@ -15,15 +15,14 @@
 
 .Viz {
   background-color: var(--color-viz-bg);
-  // Anchors .viz-tooltip's `position: absolute` (plan.md step 6) - tooltip position is computed
-  // in Viz.tsx against this element's own bounding rect, not chart-stack's, so it stays correct
-  // regardless of chart-stack's internal layout.
+  // Anchors .viz-tooltip's `position: absolute` - the tooltip position is computed in Viz.tsx
+  // against this element's own bounding rect, not chart-stack's, so it stays correct regardless
+  // of chart-stack's internal layout.
   position: relative;
 
-  // Wraps the canvas + overlay pair so they can be absolutely stacked and exactly
-  // co-located, and so d3.zoom (attached here, not to either layer - see camera.ts)
-  // keeps receiving events regardless of which layer currently has pointer-events.
-  // Same box svg.chart used to occupy alone.
+  // Wraps the canvas + overlay pair so they can be absolutely stacked and exactly co-located, and
+  // so d3.zoom (attached here, not to either layer - see camera.ts) keeps receiving events
+  // regardless of which layer currently has pointer-events.
   > .chart-stack {
     position: relative;
     width: 100%;
@@ -37,11 +36,9 @@
       height: 100%;
     }
 
-    // The canvas takes pointer events now (webgl/picking.ts does the hit-testing); the overlay
-    // only carries selection strokes and coupling arcs - nesting strokes moved to the canvas in
-    // plan.md step 7. Coupling paths
-    // re-enable their own pointer-events - they keep their existing click handler and <title>
-    // (spec.md, "Interaction").
+    // The canvas takes pointer events (webgl/picking.ts does the hit-testing); the overlay only
+    // carries selection strokes and coupling arcs. Coupling paths re-enable their own
+    // pointer-events - they keep their own click handler and <title>.
     > svg.chart-overlay {
       pointer-events: none;
 
@@ -56,10 +53,10 @@
     height: 130px;
   }
 
-  // Replaces the SVG-era per-node <title> (plan.md step 6). Position (left/top) and visibility
-  // are set imperatively by Viz.tsx on every rAF-throttled pick - this block is purely the
-  // static look. `--color-modal-bg`/`--color-text`/`--color-borders` are already theme-aware
-  // (variables.scss), so this needs no new tokens to read correctly in both themes.
+  // Position (left/top) and visibility are set imperatively by Viz.tsx on every rAF-throttled
+  // pick - this block is purely the static look. `--color-modal-bg`/`--color-text`/
+  // `--color-borders` are already theme-aware (variables.scss), so this needs no new tokens to
+  // read correctly in both themes.
   > .viz-tooltip {
     position: absolute;
     // Offset so the tooltip doesn't sit directly under the cursor it's tracking.
