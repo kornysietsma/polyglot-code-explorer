@@ -149,14 +149,16 @@ src/webgl/
                     worldToClipTransform() (world -> WebGL clip space, as a
                     scale/translate pair for the vertex shader); pure, unit-tested
   GlRenderer.ts   - context, two programs (fill, outline) each with their own buffers
-                    and uniforms, draw(); the only stateful object. setGeometry() takes
-                    two node lists - see "The three update paths" - plus a NestingStyle
-                    (widths/colours, index 4 = default) for the outline uniforms. Also
-                    owns the picking index: setGeometry() rebuilds it via
-                    picking.buildIndex() over the fill node list, and pick() delegates
-                    to picking.pick() - so Viz.tsx only ever calls GlRenderer.pick(),
-                    never picking.ts directly. Requires OES_element_index_uint (see
-                    "Outlines" below) - throws in the constructor if unavailable.
+                    and uniforms, draw(); the only stateful object. Exposes the three
+                    update-path methods - see "The three update paths" - setGeometry()
+                    (two node lists, a NestingStyle, and a PatternPalette),
+                    setColours() (fillFn + PatternPalette, no geometry), and
+                    setNestingStyle() (uniforms only). Also owns the picking index:
+                    setGeometry() rebuilds it via picking.buildIndex() over the fill
+                    node list, and pick() delegates to picking.pick() - so Viz.tsx only
+                    ever calls GlRenderer.pick(), never picking.ts directly. Requires
+                    OES_element_index_uint (see "Outlines" below) - throws in the
+                    constructor if unavailable.
   geometry.ts     - buildFills(), buildOutlines(): TreeNode[] -> typed arrays
   triangulate.ts  - fanTriangulate() + assertConvex()
   colours.ts      - parseCssColour() -> [r,g,b], memoised; palette texture for patterns
@@ -302,6 +304,21 @@ Both are computed once per `draw()` and cached in `Viz.tsx` refs
 The `useEffect` in `Viz.tsx` (L647-693) already discriminates these cases via
 `_.isEqual` on `expensiveConfig` / `config` / `couplingConfig`. Keep that shape and
 route each branch to the matching method.
+
+**Decision, revised after implementation (step 8):** the "cheap `config` change"
+row above is really two sub-paths, not one, and the split matters enough to detect
+exactly rather than approximately. `Viz.tsx`'s `isNestingOnlyChange(prevConfig,
+nextConfig)` blanks out the nesting-relevant fields (`config.nesting` and the
+current theme's `nestedStrokes`/`defaultStroke`) from both configs and `_.isEqual`s
+the rest: if the nesting fields differ and nothing else does, it's a pure
+`setNestingStyle()` uniform update (no buffer touched at all - the fastest of the
+three paths in practice); otherwise it's `setColours()` (which also refreshes
+`setNestingStyle()` regardless, since a theme switch moves `nestedStrokes`/
+`defaultStroke` too, alongside every other themed colour). This is exact rather
+than a heuristic because `state.ts`'s `setLines` action is the only one that ever
+touches those nesting fields, and it touches nothing else - so "nesting fields
+differ, nothing else does" is precisely "a `setLines` dispatch happened", not an
+approximation of it.
 
 ## Picking
 
@@ -477,7 +494,9 @@ Re-baseline these deliberately; anything else is a bug.
 - **Unit (Vitest):** `fanTriangulate` vertex counts and winding; `assertConvex`
   rejects a known concave polygon; `pointInConvexPolygon` against hand-built cases
   including points exactly on an edge; nesting-level assignment against the
-  formula above; `parseCssColour` for hex, rgb() and named colours.
+  formula above; `parseCssColour` for hex, rgb() and named colours;
+  `parsePatternId`/`buildPatternPalette` for pattern-URL extraction and palette
+  packing, including the padded-short-colour-key case.
 - **Manual, via the `playwright-cli` skill** (CLAUDE.md: not a browser plugin):
   load `spring-projects`, confirm 60 fps pan/zoom, click-select, hover tooltip,
   depth changes, every visualisation, both themes, coupling on `default.json`.
