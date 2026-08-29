@@ -1,24 +1,25 @@
 # Spec: replace the SVG visualisation renderer with WebGL
 
-Status: in progress. Branch `performance-improvements`. Steps 0-6 of `plan.md` are
-done (camera math, `fanTriangulate`/`assertConvex`, colour helpers, fills rendering
-through WebGL with the `.cell` SVG layer deleted, quadtree picking/click-select, and
-the HTML hover tooltip); see `plan.md` for what's left.
+Status: in progress. Branch `performance-improvements`. Steps 0-7 of `plan.md` are
+done (camera math, `fanTriangulate`/`assertConvex`, colour helpers, fills and now
+outlines rendering through WebGL with both the `.cell` and `.nesting` SVG layers
+deleted, quadtree picking/click-select, and the HTML hover tooltip); see `plan.md`
+for what's left.
 
 ## Problem
 
 Pan and zoom on a large data file is unusable. Measured on `data/openmrs.json`
 (33,931 nodes) in headed Chrome, Intel UHD 630, DPR 1, synthetic pan+zoom over 30-40 frames:
 
-| Approach | ms/frame |
-|---|---|
-| **Current SVG (`transform` attr on `<g>`)** | **2222** |
-| SVG minus `non-scaling-stroke` | 1701 |
-| SVG minus the whole nesting layer | 1073 |
-| SVG with no strokes at all | 429 |
-| SVG, every tweak combined | 445 |
-| Canvas 2D, batched by colour, cached `Path2D` | 179 |
-| **WebGL, one static buffer, one draw call** | **16.6 (vsync-capped)** |
+| Approach                                      | ms/frame                |
+| --------------------------------------------- | ----------------------- |
+| **Current SVG (`transform` attr on `<g>`)**   | **2222**                |
+| SVG minus `non-scaling-stroke`                | 1701                    |
+| SVG minus the whole nesting layer             | 1073                    |
+| SVG with no strokes at all                    | 429                     |
+| SVG, every tweak combined                     | 445                     |
+| Canvas 2D, batched by colour, cached `Path2D` | 179                     |
+| **WebGL, one static buffer, one draw call**   | **16.6 (vsync-capped)** |
 
 The cost is re-rasterising ~56,000 vector paths on the CPU every frame. The SVG
 `transform` attribute invalidates the whole subtree, and Skia does not cache it.
@@ -49,7 +50,7 @@ and the caveats on these numbers.
    `d3.zoom`, ~1 MB bundle, geo-oriented machinery for one static draw call);
    regl (small dependency for modest convenience); Canvas 2D (measured, too slow).
 3. **Picking returns the leaf node under the cursor.** Today, clicking a directory's
-   border stroke selects the *directory*, because `.nesting` paths are `fill: none`
+   border stroke selects the _directory_, because `.nesting` paths are `fill: none`
    and painted after `.cell` paths. That is emergent from paint order, not designed.
    It is dropped deliberately. Directories are still selectable via the Inspector
    breadcrumb and the depth control.
@@ -89,7 +90,7 @@ All line references are `src/Viz.tsx` unless stated.
   circle-pack backgrounds and not-yet-created files.
 - **Exception:** `TeamPatternVisualization.scale` returns `` `url(#pattern${v})` ``
   - an SVG paint-server reference, not a colour. This is the only visualisation
-  that is not a flat fill. See "Team pattern visualisation" below.
+    that is not a flat fill. See "Team pattern visualisation" below.
 - `update()` (L159, called at L677 on cheap config change) calls `redrawPolygons`,
   which **re-sets `.attr("d", ...)` on every path** (L55-57) even when only the
   colour changed. Switching visualisation currently rewrites 22k path geometries
@@ -145,10 +146,15 @@ src/webgl/
   camera.ts       - fitTransform(), screenToWorld(), overlayGroupTransform(),
                     worldToClipTransform() (world -> WebGL clip space, as a
                     scale/translate pair for the vertex shader); pure, unit-tested
-  GlRenderer.ts   - context, program, buffers, uniforms, draw(); the only stateful
-                    object. Also owns the picking index: setGeometry() rebuilds it via
-                    picking.buildIndex(), and pick() delegates to picking.pick() - so
-                    Viz.tsx only ever calls GlRenderer.pick(), never picking.ts directly.
+  GlRenderer.ts   - context, two programs (fill, outline) each with their own buffers
+                    and uniforms, draw(); the only stateful object. setGeometry() takes
+                    two node lists - see "The three update paths" - plus a NestingStyle
+                    (widths/colours, index 4 = default) for the outline uniforms. Also
+                    owns the picking index: setGeometry() rebuilds it via
+                    picking.buildIndex() over the fill node list, and pick() delegates
+                    to picking.pick() - so Viz.tsx only ever calls GlRenderer.pick(),
+                    never picking.ts directly. Requires OES_element_index_uint (see
+                    "Outlines" below) - throws in the constructor if unavailable.
   geometry.ts     - buildFills(), buildOutlines(): TreeNode[] -> typed arrays
   triangulate.ts  - fanTriangulate() + assertConvex()
   colours.ts      - parseCssColour() -> [r,g,b], memoised; palette texture for patterns
@@ -177,8 +183,11 @@ for each cell polygon with points p[0..n-1]:
 ```
 
 Measured on openmrs: 22,209 polygons -> 282,243 triangle vertices, 129 ms to
-build, 26 ms to upload, 5.6 MB. Extrapolating to spring-projects: ~470 ms and
-~20 MB. Acceptable as a one-off.
+build, 26 ms to upload, 5.6 MB. Measured on spring-projects (step 7): 558,849
+vertices, ~10.7 MB. Acceptable as a one-off - the full `draw()` rebuild
+(fills + outlines + both buffer uploads + the picking index, still the naive
+step-4-through-7 routing) is 448-587 ms end to end, comfortably inside the <1 s
+target even before step 8 splits the update paths.
 
 `assertConvex()` must run in development builds and throw on a concave polygon -
 a genuine sign flip between consecutive edges. Silent fan-triangulation of a
@@ -186,7 +195,7 @@ concave polygon renders subtly wrong rather than failing, which is exactly the
 failure mode CLAUDE.md warns about for `nodeCircleAncestors`. Guard it the same
 way.
 
-**Decision, revised after implementation:** a *collinear* vertex (zero cross
+**Decision, revised after implementation:** a _collinear_ vertex (zero cross
 product, no turn at all) is tolerated, not treated as a violation. The current
 Voronoi layout algorithm can legitimately produce one on an otherwise-valid
 cell, and that is bad geometry baked into the data file - not something an
@@ -224,6 +233,12 @@ if level < 0 or level >= 4: use index 4 (defaultStroke / defaultWidth)
 else: use index level (nestedStrokes[level] / nestedWidths[level])
 ```
 
+The index-4 fallback is what makes the union safe: a node that qualifies only via
+the cell condition (its own level is usually out of nesting range) reproduces the
+old `.cell` layer's unconditional default stroke, and a node past the 4 configured
+levels reproduces the old `redrawNesting`'s own overflow-to-default. Same rule,
+both cases - no separate code path needed.
+
 **Preserve the existing depth-descending sort** when writing the index buffer, so
 shallower/wider outlines paint over deeper ones exactly as they do today.
 
@@ -231,11 +246,24 @@ Because widths and colours are uniform-array lookups keyed by a per-vertex level
 byte, **editing nesting colours or widths in the UI becomes a uniform update with
 no buffer re-upload at all.**
 
-Budget: at 80k nodes the outline buffer is the big one - roughly 1.3M vertices at
-openmrs scale, ~26 MB with level-byte packing, so ~90 MB at spring-projects scale.
-If that proves too heavy, pack `a_normal` as two `Int16` and the level as a
-`Uint8` via `vertexAttribPointer` normalisation before reaching for anything
-cleverer.
+**Measured (step 7), not projected:** unpacked (`Float32` positions/normals/level,
+`Uint32` indices - no packing applied, per plan.md's "measure before optimising"),
+openmrs is 1,275,364 outline vertices / 1,913,046 indices / ~31.6 MB; spring-projects
+is 1,951,436 vertices / 2,927,154 indices / ~48.4 MB (~59 MB combined with fills).
+Comfortable as-is - well short of the ~90 MB this section originally projected, so
+the `Int16`-normal/`Uint8`-level packing fallback below is **not needed** and stays
+purely as a documented option if a future, larger data set changes that:
+
+```
+pack a_normal as two Int16 and the level as a Uint8, via vertexAttribPointer
+normalisation, rather than three Float32s per vertex
+```
+
+**WebGL1's native element index type is `UNSIGNED_SHORT`** (max 65,535) - both
+measurements above are millions of indices, so `GlRenderer` requires the
+`OES_element_index_uint` extension (universally supported on desktop/ANGLE) and
+throws in its constructor if it's unavailable, rather than silently chunking into
+multiple `drawElements` calls.
 
 ### Draw order
 
@@ -248,16 +276,26 @@ current colours are opaque.
 This is the core of the design and the reason to keep positions and colours in
 **separate buffers**.
 
-| Trigger | Work | Target |
-|---|---|---|
-| Pan / zoom (`d3.zoom`) | write `u_scale`, `u_translate`; set overlay `<g>` transform | every frame, ~0 ms |
-| Cheap `config` change: visualisation, date range, theme, teams, nesting colours | rewrite **colour buffer only** (or, for nesting colours/widths, just uniforms). Positions untouched. | <50 ms |
-| `expensiveConfig` change (depth), or any future runtime re-layout | re-triangulate, re-upload positions *and* colours, rebuild the picking index | 100-500 ms |
+| Trigger                                                                         | Work                                                                                                 | Target             |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------ |
+| Pan / zoom (`d3.zoom`)                                                          | write `u_scale`, `u_translate`; set overlay `<g>` transform                                          | every frame, ~0 ms |
+| Cheap `config` change: visualisation, date range, theme, teams, nesting colours | rewrite **colour buffer only** (or, for nesting colours/widths, just uniforms). Positions untouched. | <50 ms             |
+| `expensiveConfig` change (depth), or any future runtime re-layout               | re-triangulate, re-upload positions _and_ colours, rebuild the picking index                         | 100-500 ms         |
 
 Expose these as three distinct methods on `GlRenderer` - `setTransform()`,
-`setColours(fillFn)`, `setGeometry(nodes)` - rather than one `render()`.
+`setColours(fillFn)`, `setGeometry(...)` - rather than one `render()`.
 `setGeometry` must reallocate rather than patch in place, because a future
 re-layout can change a polygon's vertex count.
+
+**Decision, revised after implementation (step 7):** `setGeometry` takes **two**
+node lists, not one - `setGeometry(fillNodes, outlineNodes, fillFn, nestingStyle)`.
+The fill/cell set (also what the picking index is built from) and the outline set
+(spec's union, above) are genuinely different filters over the tree - the outline
+set is a strict superset once any intermediate directory exists between the
+circle-ancestor level and the depth limit - so one shared list can't drive both.
+Both are computed once per `draw()` and cached in `Viz.tsx` refs
+(`visibleNodesRef` for fills/picking, `outlineNodesRef` for outlines), reused by
+`update()` for the cheap-config path exactly like `visibleNodesRef` already was.
 
 The `useEffect` in `Viz.tsx` (L647-693) already discriminates these cases via
 `_.isEqual` on `expensiveConfig` / `config` / `couplingConfig`. Keep that shape and
@@ -410,8 +448,9 @@ Re-baseline these deliberately; anything else is a bug.
 
 ## Open questions
 
-1. Does the outline buffer at spring-projects scale (~90 MB) actually fit
-   comfortably? Measure before optimising the packing.
+1. ~~Does the outline buffer at spring-projects scale (~90 MB) actually fit
+   comfortably?~~ **Resolved (step 7):** yes - measured ~48.4 MB for outlines
+   (~59 MB combined with fills), see "Outlines" above. No packing needed.
 2. ~~Is quadtree picking accurate enough at clipped-cell edges, or is GPU picking
    needed?~~ **Resolved (step 5):** yes, quadtree picking is accurate enough - see
    "Picking" above.
