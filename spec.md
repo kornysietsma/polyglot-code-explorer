@@ -1,9 +1,9 @@
 # Spec: replace the SVG visualisation renderer with WebGL
 
-Status: in progress. Branch `performance-improvements`. Steps 0-4 of `plan.md` are
-done (camera math, `fanTriangulate`/`assertConvex`, colour helpers, and fills
-rendering through WebGL with the `.cell` SVG layer deleted); see `plan.md` for
-what's left.
+Status: in progress. Branch `performance-improvements`. Steps 0-6 of `plan.md` are
+done (camera math, `fanTriangulate`/`assertConvex`, colour helpers, fills rendering
+through WebGL with the `.cell` SVG layer deleted, quadtree picking/click-select, and
+the HTML hover tooltip); see `plan.md` for what's left.
 
 ## Problem
 
@@ -145,11 +145,15 @@ src/webgl/
   camera.ts       - fitTransform(), screenToWorld(), overlayGroupTransform(),
                     worldToClipTransform() (world -> WebGL clip space, as a
                     scale/translate pair for the vertex shader); pure, unit-tested
-  GlRenderer.ts   - context, program, buffers, uniforms, draw(); the only stateful object
+  GlRenderer.ts   - context, program, buffers, uniforms, draw(); the only stateful
+                    object. Also owns the picking index: setGeometry() rebuilds it via
+                    picking.buildIndex(), and pick() delegates to picking.pick() - so
+                    Viz.tsx only ever calls GlRenderer.pick(), never picking.ts directly.
   geometry.ts     - buildFills(), buildOutlines(): TreeNode[] -> typed arrays
   triangulate.ts  - fanTriangulate() + assertConvex()
   colours.ts      - parseCssColour() -> [r,g,b], memoised; palette texture for patterns
-  picking.ts      - buildIndex(), pick(worldX, worldY) via d3-quadtree
+  picking.ts      - pointInConvexPolygon(), buildIndex(), pick(worldX, worldY) via
+                    d3-quadtree; pure, called only from GlRenderer (above)
   shaders.ts      - vertex/fragment source as template strings
 src/VizTooltip.tsx - HTML tooltip component
 src/Viz.tsx        - orchestration; keeps the SVG overlay, selection, coupling, timescale
@@ -287,6 +291,14 @@ offscreen framebuffer and `gl.readPixels(x, y, 1, 1)`. That is pixel-exact by
 construction and handles any future concave geometry, at the cost of a pipeline
 sync per pick. Fine for clicks; less good for per-mousemove hover.
 
+**Resolved (step 5):** the nearest-centroid-then-widening-search approach above is
+accurate enough - confirmed both by a unit test that constructs the exact failure
+case (a clipped cell whose declared centroid is further from a query point than an
+adjacent cell's, per `picking.test.ts`) and by manual clicking/hovering across
+`openmrs.json` (circlePack, 34k nodes) and `omf.json` (nestedCircles). The GPU
+picking fallback was not needed and stays documented above only as a fallback if a
+future data set proves otherwise.
+
 ## Interaction
 
 - **Click** -> `pick()` -> `dispatch({ type: "selectNode", payload: node.data.path })`.
@@ -400,8 +412,9 @@ Re-baseline these deliberately; anything else is a bug.
 
 1. Does the outline buffer at spring-projects scale (~90 MB) actually fit
    comfortably? Measure before optimising the packing.
-2. Is quadtree picking accurate enough at clipped-cell edges, or is GPU picking
-   needed? Decide by clicking around the real app.
+2. ~~Is quadtree picking accurate enough at clipped-cell edges, or is GPU picking
+   needed?~~ **Resolved (step 5):** yes, quadtree picking is accurate enough - see
+   "Picking" above.
 3. Should the tooltip show more than the path (LOC, age, churn) now that it is
    cheap? Deliberately deferred to keep screenshot parity in the first pass.
 4. Is 10 CSS pixels still the right stripe period once width no longer scales with

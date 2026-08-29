@@ -125,7 +125,9 @@ These are decisions about the _work_, not the design. The design decisions live 
   fixed. Don't try to optimise it earlier — correctness first, and step 8 has the
   measurement. `update()` also caches the depth-filtered node list in a new
   `visibleNodesRef` (populated by `draw()`) so it doesn't need to rebuild the
-  hierarchy filter on every cheap change.
+  hierarchy filter on every cheap change. `GlRenderer`'s picking index (step 5)
+  is already built from this same list; step 7's `buildOutlines(nodes)` should
+  take it too, for the same reason.
 - **`fillFn` returns `url(#patternN)` for `teamPattern` only.** Until step 9 that
   resolves to a flat fallback colour (step 3). `svgPatternDefs()` and the
   `<linearGradient>` defs stay in place, unused by the canvas, until step 9.
@@ -526,130 +528,44 @@ The one place the frozen baselines get spent. Take it seriously.
 
 Append findings here as steps complete — measured numbers, decisions taken on the
 open questions, anything that contradicts the spec. Fold the durable parts into
-`CLAUDE.md` at step 12.
+`CLAUDE.md` at step 12. Steps 0-6 are done; their play-by-play has been trimmed
+now that steps 7+ don't depend on the details — the durable facts they produced
+are folded into `spec.md` (module layout, the resolved picking question) or into
+"Technical context the steps assume" / the gotchas list below.
 
-### Step 0
+**Manual playwright-cli check gotchas (apply to every remaining manual-verify
+step - 7, 8, 9):**
 
-- **GPU fix, needed again at steps 7/10:** headless Playwright Chromium on this
-  Mac defaults to software SwiftShader even though a real GPU (Intel UHD 630 -
-  the chip spec.md's numbers were measured on) is present and used
-  automatically in headed mode. `chromium.launch({ args: ["--use-angle=metal"] })`
-  restores it in headless mode too. Already baked into `scripts/bench-render.ts`
-  as `GPU_ARGS` (Darwin only) - nothing to redo, just don't strip it out.
-- **Benchmark harness (needed at step 10):** `scripts/bench-render.ts` -
-  `npm run bench:webgl-check`, `npm run bench -- <dataFile> [--steps] [--warmup]
-[--port] [--headed]`. Reports mean/median/min/max frame time over synthetic
-  wheel-zoom.
-- **SVG baselines for step 10 to compare against:** openmrs ~572-577 ms/frame
-  mean, spring-projects ~1894 ms/frame mean (both headless, GPU fixed). Lower
-  than spec.md's 2222ms openmrs figure because this harness's wheel gesture
-  exposes less new area per frame than the original drag did - not chased
-  further, since the openmrs->spring-projects scaling ratio confirmed the
-  harness itself is sound. If step 10's WebGL number comes back suspiciously
-  low (sub-1ms), check the wheel delta isn't being clamped against
-  `scaleExtent` before trusting it.
-- **A/B worktree** at `../explorer-svg`, checked out at `fd71cf6` (detached
-  HEAD) - see "Plan-level decisions" §2 above for the full setup/recreate
-  recipe, including the data-file symlinks added in step 4.
+- Resize the viewport to comfortably contain the chart area (1024px tall)
+  before trusting any pan/zoom check - a mouse target computed from a
+  `getBoundingClientRect()` taller than the actual viewport silently fails
+  (`elementFromPoint` returns `null`, the event falls through to native page
+  scroll, and a `scrollY` change is easy to mistake for a working pan/zoom).
+- `playwright-cli`'s synthetic mouse commands (`mousedown`/`mouseup`/`mousemove`
+  issued as separate CLI invocations) are unreliable in this environment: only
+  the first one or two in a sequence reliably reach the page, then later ones
+  silently stop registering (not a timing issue - reproduced with gaps up to
+  0.4s). Dispatch real events directly instead:
+  `page.evaluate(() => el.dispatchEvent(new MouseEvent('click'/'mousemove', {clientX, clientY, bubbles: true})))`
+  worked reliably every time in both step 5 (click) and step 6 (hover) testing.
 
-### Step 1
+**Facts steps 7+ need that aren't (fully) in "Technical context" above:**
 
-- Camera math (fit, zoom composition, DPR, resize) verified pixel-precisely
-  against hand-computed expectations, on both a `circlePack` root
-  (`explorertest`) and a `nestedCircles` root (`omf.json`) - no drift between
-  canvas and SVG overlay through pan/zoom/resize.
-- **Gotcha for every future manual playwright-cli check on this app:** a mouse
-  target computed from a `getBoundingClientRect()` taller than the actual
-  viewport silently fails - `elementFromPoint` returns `null`, the event falls
-  through to native page scroll, and a `scrollY` change is easy to mistake for
-  a working pan/zoom. Resize the viewport to comfortably contain the chart
-  area (1024px tall) before trusting any pan/zoom check.
-
-### Step 2
-
-Landed as specced, with one correction: `assertConvex` tolerates a collinear
-vertex rather than throwing on it (see the step-2 checklist above and
-spec.md's "Fills" section for the reasoning - a real Voronoi cell can
-legitimately produce one, and it's not hand-fixable data).
-
-### Step 3
-
-Landed as specced, with the signature narrowed from the plan's literal
-`resolvePatternFallback(fill, state)` to `(fill, svgPatternIds)` - see the
-step-3 checklist above for why.
-
-### Step 4
-
-- **`camera.ts` gained `worldToClipTransform()`** (world -> WebGL clip space,
-  as a scale/translate pair for `a_pos * u_scale + u_translate`) - step 1's
-  checklist had named this but not written it, since there was no GL consumer
-  yet. Unit tested the same way as the rest of `camera.ts`, still gl-free.
-- **`visibleNodesRef`** (new ref on `Viz`) caches the depth-filtered node list
-  `draw()` computes, so `update()` doesn't rebuild the hierarchy filter on
-  every cheap config change. **Step 5 needs this too** - the picking index is
-  built from the same node list.
-- **`buildFillFn`** (in `Viz.tsx`) replaces `redrawPolygons` as the shared
-  colour-function builder: current visualisation's `fillFn` piped through
-  `resolvePatternFallback`. Used by both `draw()` and `update()`; step 8 and 9
-  will touch this again.
-- Manually verified pixel-parity against the `../explorer-svg` worktree on
-  `explorertest`, `omf.json` (nestedCircles, no `assertConvex` throws) and at
-  full scale on `openmrs.json` (34k nodes, one-time build+draw ~470ms,
-  including the still-SVG nesting/selection layers). `npm run e2e` behaved
-  exactly as plan-level decision 3 predicted: only shot 7 failed (fixed in
-  step 5), the other 9 came back with zero diffs. Baselines untouched.
-
-### Step 5
-
-- **`GlRenderer` owns the pick index, `picking.ts` stays pure.** `setGeometry`
-  calls `picking.buildIndex(nodes)` and stores the result privately;
-  `GlRenderer.pick(worldX, worldY)` just delegates to `picking.pick()`. This
-  matches the forward-reference comment step 4 already left on `setGeometry`
-  ("rebinds the picking index once it exists") - `picking.ts` itself never
-  imports `gl`, so it's still testable under Vitest.
-- **Manual verification used synthetic `MouseEvent` dispatch on the canvas,
-  not `playwright-cli`'s `mousedown`/`mouseup` pair** - those didn't reliably
-  register as a `click` in this environment (root cause not chased; dispatching
-  a real `click` event directly worked every time and is what the Playwright
-  test suite itself uses under the hood). Confirmed across `default.json`,
-  `openmrs.json` (circlePack, 34k nodes) and `omf.json` (nestedCircles): a
-  dozen-plus points scattered inside the root shape each resolved to a
-  distinct, correct file path, and points genuinely outside the root
-  shape/circle-pack gaps correctly returned no selection (background click).
-- **Directory-border clicks silently do nothing now**, rather than selecting
-  the directory (spec.md decision 3) - confirmed this doesn't regress
-  anything else: the `.nesting` layer still renders (SVG, unchanged), it just
-  has no click handler.
-- `npm run e2e`: all 10 shots pass with **zero diffs**, including shot 7 - its
-  baseline is the Inspector panel, not the canvas, and the reworked
-  `selectAFileNode` (a grid scan of canvas click points, since there's no DOM
-  element per cell any more) lands on a file node reliably. Baselines
-  untouched, nothing to re-baseline yet.
-
-### Step 6
-
-- **`VizTooltip.tsx` takes `ref` as a plain prop** (React 19 - no `forwardRef`
-  needed; this repo has no prior `forwardRef` component, so this sets the
-  convention going forward). Viz.tsx writes to the node directly - text,
-  `hidden`, `style.left`/`top` - on every rAF-throttled pick, the same
-  imperative-DOM pattern already used for the canvas/camera refs, rather than
-  routing hover state through a React re-render on every `mousemove`.
-- **Tooltip position is computed against `.Viz`'s own bounding rect** (a new
-  `vizContainerRef` on the outer `<aside>`), not `chart-stack`'s - `.viz-tooltip`
-  sits as `.Viz`'s direct child per spec.md's target architecture, so it's
-  positioned independently of chart-stack's internal layout. `.Viz` gained
-  `position: relative` to anchor it (harmless on a CSS grid item).
-- **Styling reused existing theme tokens** (`--color-modal-bg`,
-  `--color-text`, `--color-borders` from `variables.scss`) rather than adding
-  new ones - already theme-aware, so "visible in both themes" needed no new
-  CSS variables.
-- **Second confirmed case of `playwright-cli`'s synthetic mouse commands being
-  unreliable in this environment** (see step 5's note on `mousedown`/`mouseup`):
-  repeated separate `playwright-cli mousemove x y` invocations reliably fired
-  only the first one or two, then silently stopped reaching the page - not a
-  rendering-blocked/timing issue (waited up to 0.4s between moves). Dispatching
-  real `mousemove` `MouseEvent`s directly on the canvas via `page.evaluate`
-  worked every time and is what was used to verify: 6+ scattered in-shape
-  points on `openmrs.json` each produced a distinct, correct tooltip path;
-  a background point (outside the circle-packed root) correctly hid it; and
-  `mouseleave` correctly hid it too.
+- `buildFillFn` (in `Viz.tsx`) is the shared colour-function builder - current
+  visualisation's `fillFn` piped through `resolvePatternFallback`. Steps 8 and
+  9 both touch it again (8 to route it through `setColours` instead of always
+  `setGeometry`; 9 to add the pattern texture path).
+- `GlRenderer` owns the picking index and is the _only_ thing that calls into
+  `picking.ts`: `setGeometry()` rebuilds it via `picking.buildIndex()`,
+  `GlRenderer.pick()` delegates to `picking.pick()`. `Viz.tsx` never imports
+  `picking.ts` directly. (Now also documented in `spec.md`'s module layout.)
+- The step-0 benchmark harness (`scripts/bench-render.ts`,
+  `npm run bench -- <dataFile> [--steps] [--warmup] [--port] [--headed]`) is
+  what step 10 uses for the after numbers. SVG baselines already recorded to
+  compare against:
+  openmrs ~572-577 ms/frame mean, spring-projects ~1894 ms/frame mean (both
+  headless, with the Darwin GPU fix already baked in as `GPU_ARGS` - don't
+  strip it out, headless Chromium otherwise silently falls back to SwiftShader).
+- The A/B worktree is at `../explorer-svg`, checked out at `fd71cf6` (detached
+  HEAD) - see "Plan-level decisions" §2 above for the recreate recipe
+  (including data-file symlinks) if it's been removed since.
