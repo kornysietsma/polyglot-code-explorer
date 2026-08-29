@@ -1,6 +1,9 @@
 # Spec: replace the SVG visualisation renderer with WebGL
 
-Status: ready to implement. Branch `performance-improvements`.
+Status: in progress. Branch `performance-improvements`. Steps 0-4 of `plan.md` are
+done (camera math, `fanTriangulate`/`assertConvex`, colour helpers, and fills
+rendering through WebGL with the `.cell` SVG layer deleted); see `plan.md` for
+what's left.
 
 ## Problem
 
@@ -139,7 +142,9 @@ that the SVG transform cost is irrelevant there.
 
 ```
 src/webgl/
-  camera.ts       - fitTransform(), screenToWorld(), overlayGroupTransform(); pure, unit-tested
+  camera.ts       - fitTransform(), screenToWorld(), overlayGroupTransform(),
+                    worldToClipTransform() (world -> WebGL clip space, as a
+                    scale/translate pair for the vertex shader); pure, unit-tested
   GlRenderer.ts   - context, program, buffers, uniforms, draw(); the only stateful object
   geometry.ts     - buildFills(), buildOutlines(): TreeNode[] -> typed arrays
   triangulate.ts  - fanTriangulate() + assertConvex()
@@ -171,10 +176,18 @@ Measured on openmrs: 22,209 polygons -> 282,243 triangle vertices, 129 ms to
 build, 26 ms to upload, 5.6 MB. Extrapolating to spring-projects: ~470 ms and
 ~20 MB. Acceptable as a one-off.
 
-`assertConvex()` must run in development builds and throw on a concave polygon.
-Silent fan-triangulation of a concave polygon renders subtly wrong rather than
-failing, which is exactly the failure mode CLAUDE.md warns about for
-`nodeCircleAncestors`. Guard it the same way.
+`assertConvex()` must run in development builds and throw on a concave polygon -
+a genuine sign flip between consecutive edges. Silent fan-triangulation of a
+concave polygon renders subtly wrong rather than failing, which is exactly the
+failure mode CLAUDE.md warns about for `nodeCircleAncestors`. Guard it the same
+way.
+
+**Decision, revised after implementation:** a *collinear* vertex (zero cross
+product, no turn at all) is tolerated, not treated as a violation. The current
+Voronoi layout algorithm can legitimately produce one on an otherwise-valid
+cell, and that is bad geometry baked into the data file - not something an
+implementer can hand-fix - so blocking on it would make `assertConvex` a
+liability rather than a safety net. Only a real concave turn throws.
 
 ### Outlines
 

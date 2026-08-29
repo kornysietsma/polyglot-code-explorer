@@ -46,6 +46,21 @@ These are decisions about the _work_, not the design. The design decisions live 
    The xattr is per-inode, so it is lost if `node_modules` is ever deleted and
    reinstalled — re-run it if that happens.
 
+   **Git worktrees don't share untracked files**, and per CLAUDE.md only
+   `data/default.json` is tracked — so the worktree's `data/` starts with only
+   that one file and every other data file 404s. Symlink in whatever the
+   side-by-side needs from the main tree:
+
+   ```sh
+   ln -sf "$(pwd)/data/omf.json" ../explorer-svg/data/omf.json
+   ln -sf "$(pwd)/data/openmrs.json" ../explorer-svg/data/openmrs.json
+   ln -sf "$(pwd)/data/explorertest.json" ../explorer-svg/data/explorertest.json
+   ln -sf "$(pwd)/data/explorertest_state.json" ../explorer-svg/data/explorertest_state.json
+   ln -sf "$(pwd)/data/spring-projects.json" ../explorer-svg/data/spring-projects.json
+   ```
+
+   Done once already (step 4) — only needed again if the worktree is recreated.
+
    Do this at the start of step 4 and keep both tabs open through step 9. The
    worktree is removed in step 12 (`git worktree remove ../explorer-svg`).
 
@@ -102,11 +117,15 @@ These are decisions about the _work_, not the design. The design decisions live 
   inspector shows a file. Those elements cease to exist in step 4; the helper is
   reworked in step 5 to click canvas coordinates instead. Shot 7 is the only test
   that uses it.
-- **`update()` currently re-sets `.attr("d", …)` on every path for a pure colour
-  change** (`Viz.tsx` L55-57, L173-174). Steps 4–7 keep a deliberately naive
-  "rebuild everything on any change" routing; step 8 is where the three update
-  paths get separated and this inefficiency is actually fixed. Don't try to
-  optimise it earlier — correctness first, and step 8 has the measurement.
+- **Routing is deliberately naive from step 4 through step 7:** both `update()`
+  (cheap `config` change) and `draw()` (`expensiveConfig` change) call
+  `GlRenderer.setGeometry()` unconditionally, rebuilding positions _and_ colours
+  even for a pure colour change. Step 8 is where the three update paths
+  (`setTransform`/`setColours`/`setGeometry`) get separated and this is actually
+  fixed. Don't try to optimise it earlier — correctness first, and step 8 has the
+  measurement. `update()` also caches the depth-filtered node list in a new
+  `visibleNodesRef` (populated by `draw()`) so it doesn't need to rebuild the
+  hierarchy filter on every cheap change.
 - **`fillFn` returns `url(#patternN)` for `teamPattern` only.** Until step 9 that
   resolves to a flat fallback colour (step 3). `svgPatternDefs()` and the
   `<linearGradient>` defs stay in place, unused by the canvas, until step 9.
@@ -205,13 +224,16 @@ Pure, no GL, no app change.
       `(n-2) × 3` vertices for an n-gon, winding preserved from input order.
 - [x] `assertConvex(points, path)` — sign-consistency of the cross product across
       consecutive edge pairs. Throws with the node path in the message. Guarded to
-      development builds (`import.meta.env.DEV`), per `spec.md`.
+      development builds (`import.meta.env.DEV`), per `spec.md`. **Tolerates a
+      collinear vertex** (zero cross product) rather than throwing — the current
+      Voronoi layout algorithm can produce one on an otherwise-valid cell, and
+      that's bad data that can't be hand-fixed. Only a genuine sign flip throws.
 
 **Verify — unit:** vertex count for a triangle, quad and 12-gon; winding preserved;
 degenerate input (<3 points) rejected explicitly rather than silently emitting
-nothing; `assertConvex` accepts a real Voronoi cell lifted from `default.json` and
-a circle approximation, and throws on a hand-built concave polygon and on a
-collinear-points edge case.
+nothing; `assertConvex` accepts a real Voronoi cell lifted from `default.json`, a
+circle approximation, and a collinear-points case, and throws only on a
+hand-built concave polygon.
 
 **Done when:** tests pass, nothing else changed.
 
@@ -221,10 +243,13 @@ collinear-points edge case.
       `d3.color()` (already a dependency) rather than hand-rolling hex/rgb/named
       parsing. Throw on unparseable input — a silently-black cell is exactly the
       failure mode this repo avoids elsewhere.
-- [x] `resolvePatternFallback(fill, state)` — recognises `url(#patternN)`, looks
-      the id up in `state.calculated.svgPatterns`, and returns the **first** colour
-      of the triple. This is the `teamPattern` flat fallback that stands until
-      step 9. Everything else passes through untouched.
+- [x] `resolvePatternFallback(fill, svgPatternIds)` — recognises `url(#patternN)`,
+      looks the id up in `svgPatternIds` (i.e.
+      `state.calculated.svgPatterns.svgPatternIds`, narrower than a full `State`
+      so the module stays trivially testable), and returns the **first** colour of
+      the triple, via a reverse lookup cached per-Map in a `WeakMap`. This is the
+      `teamPattern` flat fallback that stands until step 9. Everything else passes
+      through untouched.
 
 **Verify — unit:** 3- and 6-digit hex, `rgb()`, `rgba()`, named colours, and the
 themed colours actually used in `state.ts` defaults; memoisation returns an equal
@@ -240,8 +265,10 @@ The cutover. This is the big one.
 - [x] `src/webgl/shaders.ts` — vertex/fragment source for flat-filled triangles.
 - [x] `src/webgl/geometry.ts` — `buildFills(nodes)` → positions `Float32Array` and
       a per-vertex colour array, using `fanTriangulate` and `assertConvex`. Same
-      node filter as today (`Viz.tsx` L391-395): `depth <= expensiveConfig.depth`
-      and (`children === undefined` || at the depth limit).
+      node filter as before (still computed inline in `Viz.tsx`'s `draw()`, now
+      cached in `visibleNodesRef` — see step 4's progress notes):
+      `depth <= expensiveConfig.depth` and (`children === undefined` || at the
+      depth limit).
 - [x] `src/webgl/GlRenderer.ts` — context (`antialias: true`, standard alpha
       blending), program compilation with real error reporting on failure, static
       position buffer, separate dynamic colour buffer, uniforms, `draw()`,
@@ -387,10 +414,11 @@ change" inefficiency. Split the naive routing from step 4.
       re-layout can change a polygon's vertex count.
 - [ ] Nesting colours and widths become **uniform updates with no buffer upload
       at all**, since level is a per-vertex attribute.
-- [ ] Route the existing `useEffect` (`Viz.tsx` L647-693) branches to the matching
-      method, keeping its `_.isEqual` shape: `expensiveConfig` → `setGeometry`;
-      `config` → `setColours` (or uniforms only for nesting colours/widths);
-      zoom → `setTransform`.
+- [ ] Route the existing `useEffect` in `Viz`'s component body (the one
+      diffing `prevState` against `state` with `_.isEqual` to choose between
+      `draw()` and `update()`) to the matching method, keeping its `_.isEqual`
+      shape: `expensiveConfig` → `setGeometry`; `config` → `setColours` (or
+      uniforms only for nesting colours/widths); zoom → `setTransform`.
 - [ ] `destroy()` called on unmount; buffers and program released.
 
 **Verify — manual, with `console.time` on each path, on `spring-projects.json`:**
@@ -502,149 +530,71 @@ open questions, anything that contradicts the spec. Fold the durable parts into
 
 ### Step 0
 
-- **GPU fix, needed again at steps 4/7/10:** headless Playwright Chromium on
-  this Mac defaults to software SwiftShader even though a real GPU (Intel UHD
-  630 - the chip spec.md's numbers were measured on) is present and used
+- **GPU fix, needed again at steps 7/10:** headless Playwright Chromium on this
+  Mac defaults to software SwiftShader even though a real GPU (Intel UHD 630 -
+  the chip spec.md's numbers were measured on) is present and used
   automatically in headed mode. `chromium.launch({ args: ["--use-angle=metal"] })`
-  restores it in headless mode too. Baked into `scripts/bench-render.ts` as
-  `GPU_ARGS` (Darwin only) - without it, every later benchmark and screenshot
-  run would silently measure SwiftShader instead.
-- **Benchmark harness:** `scripts/bench-render.ts` - `npm run bench:webgl-check`,
-  `npm run bench -- <dataFile> [--steps] [--warmup] [--port] [--headed]`. Spawns
-  its own `vite` server per data file (the data file is baked in via
-  `__EXPLORER_DATA__` at server-start time, not a query param),
-  then drives 30-40 synthetic zoom-wheel events in-page (`dispatchEvent`, not
-  Playwright's out-of-process mouse API - that adds IPC latency that would
-  swamp a 16ms/frame measurement) and reports mean/median/min/max frame time.
-  Wheel-only (no simulated drag): d3-zoom's wheel handler already changes
-  translate as well as scale, exercising the same transform-write a drag does.
+  restores it in headless mode too. Already baked into `scripts/bench-render.ts`
+  as `GPU_ARGS` (Darwin only) - nothing to redo, just don't strip it out.
+- **Benchmark harness (needed at step 10):** `scripts/bench-render.ts` -
+  `npm run bench:webgl-check`, `npm run bench -- <dataFile> [--steps] [--warmup]
+[--port] [--headed]`. Reports mean/median/min/max frame time over synthetic
+  wheel-zoom.
 - **SVG baselines for step 10 to compare against:** openmrs ~572-577 ms/frame
-  mean (repeatable within ~1%), spring-projects ~1894 ms/frame mean - both
-  headless, GPU fixed. Both are ~4x lower than spec.md's 2222ms figure for the
-  same openmrs case, most likely because this harness's small wheel-driven
-  zoom deltas expose less new area per frame than the original sweeping
-  drag gesture did; not chased further since openmrs->spring-projects scaling
-  (~3.3x, close to the ~3.6x node-count ratio) confirms the harness itself is
-  sound, and the qualitative finding (hundreds of ms vs. a 16.7ms target) is
-  unaffected either way. If step 10's WebGL number comes back suspiciously low
-  (sub-1ms, suggesting wheel deltas are being clamped against `scaleExtent`),
-  revisit the gesture size then.
-- **A/B worktree** at `../explorer-svg` (i.e.
-  `/Users/korny/Dropbox/prj/dev/polyglot/explorer-svg`), checked out at `fd71cf6`
-  (detached HEAD), `node_modules` dropbox-ignored before `npm install`. Not
-  currently running - start with `cd ../explorer-svg && npx vite --port 5174`
-  whenever a side-by-side is actually needed (step 4 onward).
+  mean, spring-projects ~1894 ms/frame mean (both headless, GPU fixed). Lower
+  than spec.md's 2222ms openmrs figure because this harness's wheel gesture
+  exposes less new area per frame than the original drag did - not chased
+  further, since the openmrs->spring-projects scaling ratio confirmed the
+  harness itself is sound. If step 10's WebGL number comes back suspiciously
+  low (sub-1ms), check the wheel delta isn't being clamped against
+  `scaleExtent` before trusting it.
+- **A/B worktree** at `../explorer-svg`, checked out at `fd71cf6` (detached
+  HEAD) - see "Plan-level decisions" §2 above for the full setup/recreate
+  recipe, including the data-file symlinks added in step 4.
 
 ### Step 1
 
-- **`d3.zoom` is attached to a new `.chart-stack` wrapper div, not to either
-  layer** - this changed spec.md's "Target architecture" section (now the
-  source of truth for the design and why); don't re-derive it here.
-- Verified pixel-precisely, not just by eye: read the debug canvas back via
-  `getImageData` and checked against hand-computed expectations from the
-  layout data (fit scale/centring, and the zoom transform's `k`/`x`/`y` after a
-  known wheel delta) - matched to the pixel. Confirmed on both `explorertest`
-  (circlePack root) and `omf.json` (nestedCircles, varying circle depth per
-  branch), through pan, zoom, and window resize, with no drift between the
-  canvas and the SVG overlay.
-- **Gotcha for future manual playwright-cli checks on this app:** a mouse
-  target computed from a `getBoundingClientRect()` that's taller than the
-  actual viewport silently fails - `elementFromPoint` returns `null`, the
-  event falls through to native page scroll, and a `scrollY` change is easy to
-  mistake for a working pan/zoom. Resize the viewport to comfortably contain
-  the chart area (1024px tall) before trusting any pan/zoom measurement.
-- No visual regression: SVG cell/nesting/selection rendering is byte-for-byte
-  the same code path as before, just inside a renamed `svg.chart-overlay`
-  sitting over the new (otherwise-empty-but-for-the-debug-quad) canvas.
+- Camera math (fit, zoom composition, DPR, resize) verified pixel-precisely
+  against hand-computed expectations, on both a `circlePack` root
+  (`explorertest`) and a `nestedCircles` root (`omf.json`) - no drift between
+  canvas and SVG overlay through pan/zoom/resize.
+- **Gotcha for every future manual playwright-cli check on this app:** a mouse
+  target computed from a `getBoundingClientRect()` taller than the actual
+  viewport silently fails - `elementFromPoint` returns `null`, the event falls
+  through to native page scroll, and a `scrollY` change is easy to mistake for
+  a working pan/zoom. Resize the viewport to comfortably contain the chart
+  area (1024px tall) before trusting any pan/zoom check.
 
 ### Step 2
 
-- **`assertConvex` self-guards on `import.meta.env.DEV`** rather than making
-  every call site check it - one `if` at the top, callers always call it
-  unconditionally. `import.meta.env.DEV` is `true` under Vitest, so the dev
-  behaviour is exactly what the tests exercise.
-- **Collinear consecutive points are tolerated, not thrown on** - a zero cross
-  product is treated as inconclusive rather than a sign mismatch. Deliberate:
-  the current Voronoi layout algorithm can produce a collinear vertex on an
-  otherwise-valid cell, and that's bad input in the data file that can't be
-  hand-fixed, so `assertConvex` must not block on it. Only a genuine sign
-  flip (an actual concave turn) throws.
-- Test fixture uses a real 15-point Voronoi cell lifted from
-  `data/default.json` (`package.json`'s node) for the "accepts real data"
-  case, and a generated regular polygon for the circle-approximation and
-  12-gon cases - no need to embed a real 128-point circlePack polygon.
-- **User correction after the first pass:** `assertConvex` was written to
-  throw on a collinear vertex, matching a literal reading of the plan's
-  verification bullet. Corrected to tolerate it (skip, don't flag as a sign
-  mismatch) — the current Voronoi layout algorithm can produce a collinear
-  vertex on an otherwise-valid cell, and that's bad input in the data file,
-  not something fixable by hand. Only a genuine concave turn throws.
+Landed as specced, with one correction: `assertConvex` tolerates a collinear
+vertex rather than throwing on it (see the step-2 checklist above and
+spec.md's "Fills" section for the reasoning - a real Voronoi cell can
+legitimately produce one, and it's not hand-fixable data).
 
 ### Step 3
 
-- `resolvePatternFallback`'s second parameter is narrower than the plan
-  text's literal `(fill, state)`: it takes
-  `svgPatternIds: ReadonlyMap<ColourKey, PatternId>` (i.e.
-  `state.calculated.svgPatterns.svgPatternIds`) rather than the whole `State`
-  object, since that's the only piece it needs and it keeps the module
-  trivially testable without constructing a full `State`. Step 4's call site
-  passes `state.calculated.svgPatterns.svgPatternIds`.
-- Reverse (`PatternId` -> first colour) lookup is built once per distinct
-  `svgPatternIds` Map and cached by object identity in a `WeakMap`, rather
-  than linear-scanning `svgPatternIds` on every call — this runs once per
-  node during a colour-buffer rebuild (spec.md's "three update paths"), so an
-  O(n) scan per call would be O(n\*m) across a whole tree. Same memoisation
-  spirit as `parseCssColour`'s cache, just keyed on object identity instead
-  of the string value.
-- `parseCssColour` built on `d3.color()` per spec.md, following the existing
-  `import * as d3 from "d3"` convention (`Viz.tsx`, `state.ts` already do
-  this) rather than a named import.
+Landed as specced, with the signature narrowed from the plan's literal
+`resolvePatternFallback(fill, state)` to `(fill, svgPatternIds)` - see the
+step-3 checklist above for why.
 
 ### Step 4
 
-- **`camera.ts` gained `worldToClipTransform()`** (world -> WebGL clip space
-  `[-1,1]`, as a scale/translate pair rather than a matrix, for
-  `a_pos * u_scale + u_translate` in the vertex shader). Step 1 had already
-  named this in its checklist ("the world -> clip matrix or scale/translate
-  uniforms") but hadn't actually written it - there was no GL consumer yet,
-  only the 2D-context debug quad, which needs device pixels, not clip space.
-  It composes `worldToDevice` with the standard device-pixel -> clip-space
-  mapping (Y flips: device pixels grow down, clip space grows up) - unit
-  tested the same way as the rest of `camera.ts` (corner-mapping and
-  round-trip-against-the-formula cases), fully gl-free.
-- **`GlRenderer.setGeometry`/`setTransform`/`draw`/`destroy` exist as the
-  three-method split spec.md asks for**, even though step 4's own routing is
-  naive (`update()` and `draw()` both call `setGeometry` for any change, per
-  plan decision - step 8 is what actually stops rebuilding positions on a
-  colour-only change). `destroy()` is implemented but not yet wired to an
-  unmount effect - that wiring is step 8's job, not step 4's.
-- **`visibleNodesRef`** (a new ref on `Viz`) caches the depth-filtered node
-  list `draw()` computes, so `update()` (cheap config-change path) doesn't
-  need to rebuild the tree filter just to re-run `setGeometry` on the same
-  node set - mirrors how the old SVG code reused the DOM's bound `.cell`
-  data across `redrawPolygons` calls without re-walking the hierarchy.
-- **`buildFillFn`** replaces `redrawPolygons` as the shared colour-function
-  builder: current visualisation's `fillFn`, piped through step 3's
-  `resolvePatternFallback` for the `teamPattern` flat fallback. Used by both
-  `draw()` and `update()`.
-- **Manual verification, side-by-side with the `../explorer-svg` worktree**
-  (`playwright-cli`, both on port 5173 new / 5174 old): fills matched the
-  SVG renderer pixel-for-pixel on `explorertest` (default data), `omf.json`
-  (nestedCircles, varying circle depth per branch - no `assertConvex`
-  throws), and visually correct (not diffed against the worktree, but no
-  triangulation artefacts) at full scale on `openmrs.json` (34k nodes,
-  one-time geometry build+draw ~470ms including the still-SVG nesting/
-  selection layers). Checked both themes, several visualisations including
-  `teamPattern` (confirmed flat-fallback colour, not a gradient), and
-  zoom/pan tracking (canvas fills stayed welded to the SVG nesting overlay
-  through wheel-zoom, no drift).
-- **Worktree gotcha:** `../explorer-svg`'s `data/` only had `default.json` -
-  git worktrees don't share untracked files, and per CLAUDE.md only
-  `default.json` is tracked. Symlinked `omf.json`, `openmrs.json`,
-  `explorertest.json`/`_state.json` and `spring-projects.json` from the main
-  tree's `data/` into the worktree's so steps 7/9/10's side-by-sides don't
-  hit this again.
-- **`npm run e2e` behaved exactly as plan.md decision 3 predicted:** only
-  shot 7 fails (`selectAFileNode`'s `path.cell` selector matches nothing -
-  fixed in step 5); all 9 other shots passed with **zero** diffs, not just
-  explicable ones. Baselines untouched, per decision 3.
+- **`camera.ts` gained `worldToClipTransform()`** (world -> WebGL clip space,
+  as a scale/translate pair for `a_pos * u_scale + u_translate`) - step 1's
+  checklist had named this but not written it, since there was no GL consumer
+  yet. Unit tested the same way as the rest of `camera.ts`, still gl-free.
+- **`visibleNodesRef`** (new ref on `Viz`) caches the depth-filtered node list
+  `draw()` computes, so `update()` doesn't rebuild the hierarchy filter on
+  every cheap config change. **Step 5 needs this too** - the picking index is
+  built from the same node list.
+- **`buildFillFn`** (in `Viz.tsx`) replaces `redrawPolygons` as the shared
+  colour-function builder: current visualisation's `fillFn` piped through
+  `resolvePatternFallback`. Used by both `draw()` and `update()`; step 8 and 9
+  will touch this again.
+- Manually verified pixel-parity against the `../explorer-svg` worktree on
+  `explorertest`, `omf.json` (nestedCircles, no `assertConvex` throws) and at
+  full scale on `openmrs.json` (34k nodes, one-time build+draw ~470ms,
+  including the still-SVG nesting/selection layers). `npm run e2e` behaved
+  exactly as plan-level decision 3 predicted: only shot 7 failed (fixed in
+  step 5), the other 9 came back with zero diffs. Baselines untouched.
