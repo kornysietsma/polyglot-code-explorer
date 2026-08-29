@@ -470,22 +470,30 @@ is independent of it.
 
 **Verify — automated:** `npm run check`.
 
-### Step 10 — Perf verification and doc update
+### Step 10 — Perf verification and doc update — done
 
-- [ ] Run the step-0 harness against the new renderer on `openmrs.json` and
+- [x] Run the step-0 harness against the new renderer on `openmrs.json` and
       `spring-projects.json`, same machine, same conditions as the before numbers.
-- [ ] Record: mean ms/frame pan and zoom; one-time geometry build time; buffer
+- [x] Record: mean ms/frame pan and zoom; one-time geometry build time; buffer
       sizes (fills and outlines separately); visualisation-switch time.
-- [ ] Check against `spec.md`'s success criteria: ≤ 16.7 ms/frame on
+- [x] Check against `spec.md`'s success criteria: ≤ 16.7 ms/frame on
       spring-projects; geometry build under ~1 s at 80k; viz switch < 50 ms.
-- [ ] Open question 1 was already answered in step 7 (spec.md's "Outlines" —
+- [x] Open question 1 was already answered in step 7 (spec.md's "Outlines" —
       ~59 MB combined buffers on spring-projects, no packing needed) — this step
       just needs to confirm that still holds, not re-derive it.
-- [ ] Update `docs/rendering-performance.md` with an "after" section: the new
+- [x] Update `docs/rendering-performance.md` with an "after" section: the new
       numbers beside the old table, and a pointer to the checked-in harness.
 
 **Verify:** two runs agree; the numbers meet the criteria, or the shortfall is
 written down explicitly rather than rounded away.
+
+**Result:** pan/zoom on both files is vsync-capped at 16.7 ms/frame — the
+frame-time criterion is met, with the GPU idle between frames. Geometry build
+(455 ms) and buffer sizes (~59 MB combined) are unchanged since step 7 and both
+meet target. **Visualisation-switch time misses its <50 ms target** — 83 ms and
+244 ms, matching step 8's 87 ms / 247 ms — recorded explicitly in
+`docs/rendering-performance.md`'s new "After" section rather than rounded away,
+per plan-level decision 4. Full numbers and method there; not duplicated here.
 
 ### Step 11 — Screenshot review and the single deliberate re-baseline
 
