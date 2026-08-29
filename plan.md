@@ -407,25 +407,25 @@ and diagonal edge, and that the two triangles cover the quad.
 **Done when:** the WebGL rendering is a faithful reproduction of the SVG one, and
 `Viz.tsx` contains no polygon-drawing code at all.
 
-### Step 8 — The three update paths
+### Step 8 — The three update paths — done
 
 The design's core, and the fix for the "re-sets `d` on every path for a colour
 change" inefficiency. Split the naive routing from step 4.
 
-- [ ] `GlRenderer` exposes three distinct methods, not one `render()`:
+- [x] `GlRenderer` exposes three distinct methods, not one `render()`:
       `setTransform()` (uniforms only), `setColours(fillFn)` (colour buffer only —
       positions untouched), `setGeometry(nodes)` (re-triangulate, reallocate both
       buffers, rebuild the picking index).
-- [ ] `setGeometry` **reallocates** rather than patching in place — a future
+- [x] `setGeometry` **reallocates** rather than patching in place — a future
       re-layout can change a polygon's vertex count.
-- [ ] Nesting colours and widths become **uniform updates with no buffer upload
+- [x] Nesting colours and widths become **uniform updates with no buffer upload
       at all**, since level is a per-vertex attribute.
-- [ ] Route the existing `useEffect` in `Viz`'s component body (the one
+- [x] Route the existing `useEffect` in `Viz`'s component body (the one
       diffing `prevState` against `state` with `_.isEqual` to choose between
       `draw()` and `update()`) to the matching method, keeping its `_.isEqual`
       shape: `expensiveConfig` → `setGeometry`; `config` → `setColours` (or
       uniforms only for nesting colours/widths); zoom → `setTransform`.
-- [ ] `destroy()` called on unmount; buffers and program released.
+- [x] `destroy()` called on unmount; buffers and program released.
 
 **Verify — manual, with `console.time` on each path, on `spring-projects.json`:**
 
@@ -585,3 +585,61 @@ step - 8, 9):**
   `WebGLRenderingContext.prototype.bufferData` and log each call's target/byte
   length before navigating. Useful again in step 10 if the bench harness needs
   a similar breakdown.
+
+**Step 8 findings:**
+
+- `geometry.ts` gained `buildFillColours(nodes, fillFn)`, factored out of
+  `buildFills` so `GlRenderer.setColours()` can rebuild just the colour array
+  without re-triangulating (`fanTriangulate`/`assertConvex` skipped entirely -
+  positions are untouched on this path). `buildFills` now calls it internally
+  instead of duplicating the per-vertex colour loop.
+- `GlRenderer.setNestingStyle()` is now public (was a private helper called
+  only from inside `setGeometry`); `setColours(fillNodes, fillFn)` is new.
+  `setGeometry` is unchanged apart from the doc comment - it's now explicitly
+  the `expensiveConfig`-only path.
+- `Viz.tsx`'s `update()` takes a new `nestingOnlyChange: boolean` computed by
+  the caller (the routing `useEffect`, which already has both `prevState` and
+  `state` in scope) rather than by threading `prevState` through `update()`
+  itself. `isNestingOnlyChange(prevConfig, nextConfig)` detects it: nesting
+  fields differ (`config.nesting`, or `themedColours(config).nestedStrokes` /
+  `.defaultStroke`) **and** everything else in `config` is unchanged
+  (`withoutNestingStyle()` blanks the nesting fields before `_.isEqual`). This
+  is deliberately exact rather than a coarse heuristic, because `setLines` (the
+  only action that moves those fields - `state.ts`) touches nothing else, and a
+  theme switch moves `nestedStrokes`/`defaultStroke` too but also moves
+  everything else, so it correctly falls through to `setColours()` instead of
+  being mistaken for a nesting-only edit.
+- The non-nesting branch always calls `setNestingStyle()` too (cheap - a
+  handful of uniforms), because a theme switch changes the current theme's
+  `nestedStrokes`/`defaultStroke` alongside every other themed colour, and
+  skipping it there would leave stale outline colours after a theme toggle.
+- `destroy()` is wired to a dedicated `useEffect(() => () => { ... }, [])` -
+  empty deps so the cleanup fires only on unmount, not after every render.
+  `glRendererRef.current` is read inside the cleanup itself (not hoisted to a
+  variable at effect-setup time), since it's set imperatively by `draw()`
+  outside React's render cycle - a plain `eslint-disable-next-line
+  react-hooks/exhaustive-deps` on that line covers the stale-ref warning
+  the lint rule raises for that pattern (same rationale as CLAUDE.md's
+  repo-wide `react-hooks/refs: off`).
+- Verified manually (playwright-cli, `spring-projects.json`, 80,691 nodes,
+  headed, `console.time` around `update()`/`draw()`):
+  - Nesting-only edit (width slider): **0.2 ms**, logged as "nesting-only
+    change - uniform update" - confirms no buffer upload, matches spec.
+  - Depth change (17 -> 6): **100 ms** geometry rebuild (well inside the
+    100-500 ms target); click-to-select confirmed working immediately after,
+    on a node that only exists at the new depth - the picking index rebuild
+    is not stale.
+  - Theme switch (dark -> light): **275 ms**, correctly routed through
+    `setColours` (not the nesting-only path) - screenshot confirmed fill
+    colours, background and outline colours all repainted correctly.
+  - Visualisation switch: **87 ms** (Programming Language -> Lines of Code),
+    **247 ms** (-> Churn). Both are a large improvement over the pre-step-8
+    naive full rebuild (448-587 ms, spec.md), but **miss the spec's <50 ms
+    target** - recorded here rather than rounded away, per plan-level decision
+    4. The remaining cost is in `buildFillFn`/`fillFn` evaluation per node
+    (visualisation-specific scale lookups) and `buildFillColours`'s per-vertex
+    fan-out, not in the GPU upload itself; profiling that further is out of
+    scope for this step, which was specifically about eliminating the
+    geometry/picking-index rebuild, not the colour computation cost. Worth
+    revisiting in step 10's perf pass if the shortfall still matters once the
+    full picture (including pan/zoom fps) is in.

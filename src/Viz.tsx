@@ -27,7 +27,13 @@ import {
 } from "./nodeData";
 import { FeatureFlags, Point, TreeNode } from "./polyglot_data.types";
 import { TimescaleIntervalData } from "./preprocess";
-import { Action, colourKeyToColours, State, themedColours } from "./state";
+import {
+  Action,
+  colourKeyToColours,
+  Config,
+  State,
+  themedColours,
+} from "./state";
 import { getCurrentVis } from "./VisualizationData";
 import { VizMetadata } from "./viz.types";
 import VizTooltip from "./VizTooltip";
@@ -71,6 +77,43 @@ function buildNestingStyle(state: State): NestingStyle {
     widths: [...config.nesting.nestedWidths, config.nesting.defaultWidth],
     strokeColours: [...theme.nestedStrokes, theme.defaultStroke],
   };
+}
+
+// `config` with the nesting-relevant fields (`config.nesting` and the current theme's
+// `nestedStrokes`/`defaultStroke`) blanked out, so isNestingOnlyChange below can isEqual the rest
+// of `config` without those fields' own changes masking the comparison.
+function withoutNestingStyle(config: Config): unknown {
+  const theme = config.colours.currentTheme;
+  return {
+    ...config,
+    nesting: undefined,
+    colours: {
+      ...config.colours,
+      [theme]: {
+        ...config.colours[theme],
+        nestedStrokes: undefined,
+        defaultStroke: undefined,
+      },
+    },
+  };
+}
+
+// True when a `config` change touches only nesting colours/widths (the `setLines` action - see
+// state.ts) and nothing else - the one case GlRenderer.setNestingStyle() can handle as a pure
+// uniform update with no colour-buffer upload (spec.md, "The three update paths"). A theme switch
+// also moves `nestedStrokes`/`defaultStroke`, but it moves everything else too, so it correctly
+// falls through to setColours() instead.
+function isNestingOnlyChange(prevConfig: Config, nextConfig: Config): boolean {
+  const prevTheme = themedColours(prevConfig);
+  const nextTheme = themedColours(nextConfig);
+  const nestingChanged =
+    !_.isEqual(prevConfig.nesting, nextConfig.nesting) ||
+    !_.isEqual(prevTheme.nestedStrokes, nextTheme.nestedStrokes) ||
+    prevTheme.defaultStroke !== nextTheme.defaultStroke;
+  return (
+    nestingChanged &&
+    _.isEqual(withoutNestingStyle(prevConfig), withoutNestingStyle(nextConfig))
+  );
 }
 
 const redrawSelection = (
@@ -139,7 +182,8 @@ const update = (
   outlineNodesRef: React.RefObject<HierarchyNode<TreeNode>[] | null>,
   metadata: VizMetadata,
   features: FeatureFlags,
-  state: State
+  state: State,
+  nestingOnlyChange: boolean
 ) => {
   if (!d3Container.current) {
     throw new Error("No current container");
@@ -159,15 +203,19 @@ const update = (
       "update called before draw, so the WebGL renderer is not ready"
     );
   }
-  // Naive routing (plan.md step 4-7): any config change rebuilds every buffer, even though only
-  // colours (or, for the outline layer, only widths/colours) changed here. Fixed in step 8, once
-  // GlRenderer exposes setColours() separately.
-  glRenderer.setGeometry(
-    visibleNodes,
-    outlineNodes,
-    buildFillFn(metadata, features, state),
-    buildNestingStyle(state)
-  );
+  // A cheap `config` change never touches geometry or the picking index (spec.md, "The three
+  // update paths") - `outlineNodes` is unused here but kept in the signature for symmetry with
+  // draw()/setGeometry(). Nesting colour/width edits (the `setLines` action) are the cheapest of
+  // the two remaining paths: a uniform-only update with no buffer upload at all, since level is a
+  // per-vertex attribute. Anything else that can move fill colour (visualisation, date range,
+  // teams, theme) rewrites the colour buffer via setColours() - and, in the theme-switch case,
+  // also refreshes the nesting uniforms, since nestedStrokes/defaultStroke are themed too.
+  if (nestingOnlyChange) {
+    glRenderer.setNestingStyle(buildNestingStyle(state));
+  } else {
+    glRenderer.setColours(visibleNodes, buildFillFn(metadata, features, state));
+    glRenderer.setNestingStyle(buildNestingStyle(state));
+  }
   glRenderer.setTransform(camera, glCanvas.width, glCanvas.height);
   glRenderer.draw();
 
@@ -695,6 +743,19 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
 
   const prevState = usePrevious(state);
 
+  // Releases the GL context's buffers and programs on unmount (plan.md step 8) - `draw()` creates
+  // the renderer lazily on the ref, so there's nothing to clean up if it was never mounted. Empty
+  // deps: this must run its cleanup exactly once, on unmount, not after every render.
+  useEffect(() => {
+    return () => {
+      // glRendererRef.current is set imperatively by draw() outside React's render cycle
+      // (CLAUDE.md: react-hooks/refs is off repo-wide for the same reason), so reading it fresh
+      // at unmount is correct, not stale.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      glRendererRef.current?.destroy();
+    };
+  }, []);
+
   useEffect(() => {
     const {
       metadata: { timescaleData },
@@ -736,7 +797,12 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
       updateBodyTheme(state.config.colours.currentTheme);
     } else {
       if (!_.isEqual(prevState.config, config)) {
-        console.log("cheap config change - just redraw");
+        const nestingOnlyChange = isNestingOnlyChange(prevState.config, config);
+        console.log(
+          nestingOnlyChange
+            ? "nesting-only change - uniform update"
+            : "cheap config change - just redraw"
+        );
         console.time("update");
         update(
           d3Container,
@@ -747,7 +813,8 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
           outlineNodesRef,
           metadata,
           features,
-          state
+          state,
+          nestingOnlyChange
         );
         console.timeEnd("update");
         if (

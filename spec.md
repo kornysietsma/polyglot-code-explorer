@@ -1,10 +1,11 @@
 # Spec: replace the SVG visualisation renderer with WebGL
 
-Status: in progress. Branch `performance-improvements`. Steps 0-7 of `plan.md` are
-done (camera math, `fanTriangulate`/`assertConvex`, colour helpers, fills and now
+Status: in progress. Branch `performance-improvements`. Steps 0-8 of `plan.md` are
+done (camera math, `fanTriangulate`/`assertConvex`, colour helpers, fills and
 outlines rendering through WebGL with both the `.cell` and `.nesting` SVG layers
-deleted, quadtree picking/click-select, and the HTML hover tooltip); see `plan.md`
-for what's left.
+deleted, quadtree picking/click-select, the HTML hover tooltip, and now the three
+separate update paths - `setTransform`/`setColours`/`setGeometry` - replacing the
+naive full-rebuild routing); see `plan.md` for what's left.
 
 ## Problem
 

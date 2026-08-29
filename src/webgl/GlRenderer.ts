@@ -7,7 +7,7 @@ import { HierarchyNode } from "d3";
 import { TreeNode } from "../polyglot_data.types";
 import { Camera, worldToClipTransform, worldToDeviceScale } from "./camera";
 import { parseCssColour } from "./colours";
-import { buildFills, buildOutlines } from "./geometry";
+import { buildFillColours, buildFills, buildOutlines } from "./geometry";
 import { buildIndex, pick as pickInIndex, PickIndex } from "./picking";
 import {
   FILL_FRAGMENT_SHADER,
@@ -90,11 +90,10 @@ function mustGetUniformLocation(
 }
 
 // Owns the GL context and both programs' buffers. Fill positions/colours live in separate
-// buffers from the start (spec.md, "The three update paths") even though step 4 rewrote both
-// together on every change - step 8 depends on the split and retrofitting it later would be a
-// rewrite. Outline positions/normals/levels are static per setGeometry() call; only the
-// u_widths/u_strokeColours uniforms need to change for a nesting colour or width edit, which is
-// what step 8 will wire up as a uniform-only path.
+// buffers (spec.md, "The three update paths"): setColours() rewrites only the colour buffer,
+// leaving positions and the picking index untouched. Outline positions/normals/levels are static
+// per setGeometry() call; only the u_widths/u_strokeColours uniforms change for a nesting colour
+// or width edit, via the standalone setNestingStyle().
 export class GlRenderer {
   private readonly gl: WebGLRenderingContext;
 
@@ -201,11 +200,10 @@ export class GlRenderer {
   }
 
   // Rebuilds and re-uploads the fill buffers, the outline buffers, and the nesting-style
-  // uniforms, and rebinds the picking index - all in one naive pass (plan.md's step 4-7 routing
-  // decision: any config or expensiveConfig change goes through here regardless of what actually
-  // changed; step 8 splits this into setColours()/uniform-only paths). Reallocates rather than
-  // patching in place - a future re-layout can change a polygon's vertex count (spec.md, "The
-  // three update paths").
+  // uniforms, and rebinds the picking index - the `expensiveConfig` (depth) path, the most
+  // expensive of the three update paths (spec.md). A cheap `config` change goes through
+  // setColours()/setNestingStyle() instead (Viz.tsx routes on this). Reallocates rather than
+  // patching in place - a future re-layout can change a polygon's vertex count.
   //
   // `fillNodes` and `outlineNodes` are deliberately different lists, not one shared list narrowed
   // internally: `fillNodes` is the leaf/depth-limit "cell" set (also what the picking index is
@@ -254,10 +252,26 @@ export class GlRenderer {
     this.setNestingStyle(nestingStyle);
   }
 
+  // Colour-only update for a cheap `config` change that isn't a nesting colour/width edit
+  // (visualisation switch, date range, teams, theme) - rewrites the fill colour buffer, leaves
+  // the position buffer and the picking index untouched (spec.md, "The three update paths").
+  // `fillNodes` must be the same list `setGeometry()` was last called with, or the colour buffer's
+  // vertex count won't match the position buffer's.
+  setColours(
+    fillNodes: readonly HierarchyNode<TreeNode>[],
+    fillFn: (d: HierarchyNode<TreeNode>) => string
+  ): void {
+    const { gl } = this;
+    const colours = buildFillColours(fillNodes, fillFn);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.fillColourBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, colours, gl.DYNAMIC_DRAW);
+  }
+
   // Uniform-only update for nesting colours/widths - no buffer touched, since level is a
-  // per-vertex attribute (spec.md, "Outlines"). Called from setGeometry() today; step 8 exposes
-  // this as its own path for a colour-picker/width-slider drag.
-  private setNestingStyle(nestingStyle: NestingStyle): void {
+  // per-vertex attribute (spec.md, "Outlines"). Called from setGeometry() to establish the
+  // uniforms on a full rebuild, and directly by callers (Viz.tsx) for a colour-picker/width-slider
+  // drag - the cheapest of the three update paths.
+  setNestingStyle(nestingStyle: NestingStyle): void {
     const { widths, strokeColours } = nestingStyle;
     if (widths.length !== 5 || strokeColours.length !== 5) {
       throw new Error(

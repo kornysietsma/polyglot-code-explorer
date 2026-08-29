@@ -15,6 +15,41 @@ export interface FillGeometry {
   colours: Float32Array;
 }
 
+// A convex n-gon fans into (n-2) triangles, i.e. (n-2)*3 vertices - shared by buildFills (which
+// also needs the triangulated positions) and buildFillColours (which doesn't) so the two agree on
+// vertex count without buildFillColours re-triangulating.
+function fanVertexCount(polygonPointCount: number): number {
+  return Math.max(polygonPointCount - 2, 0) * 3;
+}
+
+// Per-vertex colour buffer only, matching the vertex layout buildFills would produce for the same
+// `nodes` - the colour-only counterpart used by GlRenderer.setColours() for a cheap `config`
+// change (spec.md, "The three update paths"): positions are untouched, so this skips
+// fanTriangulate/assertConvex entirely rather than re-deriving geometry it won't use.
+export function buildFillColours(
+  nodes: readonly HierarchyNode<TreeNode>[],
+  fillFn: (d: HierarchyNode<TreeNode>) => string
+): Float32Array {
+  let totalVertices = 0;
+  for (const node of nodes) {
+    totalVertices += fanVertexCount(node.data.layout.polygon.length);
+  }
+
+  const colours = new Float32Array(totalVertices * 3);
+  let offset = 0;
+  for (const node of nodes) {
+    const vertexCount = fanVertexCount(node.data.layout.polygon.length);
+    const [r, g, b] = parseCssColour(fillFn(node));
+    for (let i = 0; i < vertexCount; i++) {
+      colours[offset] = r;
+      colours[offset + 1] = g;
+      colours[offset + 2] = b;
+      offset += 3;
+    }
+  }
+  return colours;
+}
+
 // One triangle fan per node's polygon (spec.md, "Fills"): Voronoi cells and circle
 // approximations are both convex, so the fan is an exact triangulation. `fillFn` must already be
 // resolved to a real CSS colour string - `url(#patternN)` fallback resolution
@@ -25,7 +60,6 @@ export function buildFills(
   fillFn: (d: HierarchyNode<TreeNode>) => string
 ): FillGeometry {
   const positionChunks: Float32Array[] = [];
-  const colourChunks: Float32Array[] = [];
   let totalVertices = 0;
 
   for (const node of nodes) {
@@ -33,23 +67,12 @@ export function buildFills(
     assertConvex(polygon, node.data.path);
     const triangles = fanTriangulate(polygon);
     positionChunks.push(triangles);
-
-    const vertexCount = triangles.length / 2;
-    totalVertices += vertexCount;
-
-    const [r, g, b] = parseCssColour(fillFn(node));
-    const colours = new Float32Array(vertexCount * 3);
-    for (let i = 0; i < vertexCount; i++) {
-      colours[i * 3] = r;
-      colours[i * 3 + 1] = g;
-      colours[i * 3 + 2] = b;
-    }
-    colourChunks.push(colours);
+    totalVertices += triangles.length / 2;
   }
 
   return {
     positions: concatFloat32(positionChunks, totalVertices * 2),
-    colours: concatFloat32(colourChunks, totalVertices * 3),
+    colours: buildFillColours(nodes, fillFn),
   };
 }
 
