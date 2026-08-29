@@ -53,7 +53,7 @@ export default defineConfig([
   },
   {
     // Build and test tooling: Node rather than browser, and no React rules.
-    files: ["tests/**/*.ts", "*.config.ts"],
+    files: ["tests/**/*.ts", "scripts/**/*.ts", "*.config.ts"],
     extends: [js.configs.recommended, tseslint.configs.recommended],
     languageOptions: {
       ecmaVersion: "latest",

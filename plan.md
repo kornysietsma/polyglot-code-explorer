@@ -142,20 +142,20 @@ mean `npm run check` (typecheck + lint + format + vitest). Manual checks use the
 No production code. Two unknowns that would invalidate large parts of the plan if
 they went the wrong way, plus the measurement tool that steps 7 and 10 need.
 
-- [ ] Confirm Playwright's Chromium gives a working WebGL context: a throwaway
+- [x] Confirm Playwright's Chromium gives a working WebGL context: a throwaway
       `page.evaluate` that creates a canvas, gets `webgl`, and reports
       `UNMASKED_RENDERER_WEBGL`. Record whether it is GPU or SwiftShader.
-- [ ] Build a checked-in benchmark harness (`scripts/bench-render.ts` or similar,
+- [x] Build a checked-in benchmark harness (`scripts/bench-render.ts` or similar,
       driven by Playwright) that loads a named data file, drives a synthetic
       pan+zoom across N frames, and reports mean `requestAnimationFrame` delta.
       The previous one was throwaway (`docs/rendering-performance.md`,
       "Reproducing it") — this time keep it, so the before and after numbers come
       from identical code.
-- [ ] Run it against the **current SVG renderer** on `openmrs.json` and
+- [x] Run it against the **current SVG renderer** on `openmrs.json` and
       `spring-projects.json`. These are the before numbers step 10 compares to.
       Expect roughly 2222 ms/frame on openmrs; if it differs wildly, work out why
       before continuing.
-- [ ] Set up the A/B worktree (decision 2 above).
+- [x] Set up the A/B worktree (decision 2 above).
 
 **Verify:** the harness produces stable, repeatable numbers across two runs on the
 same file. Numbers recorded in the step-10 section of this file as you go.
@@ -502,6 +502,60 @@ open questions, anything that contradicts the spec. Fold the durable parts into
 
 ### Step 0
 
-- WebGL in Playwright Chromium: _(renderer string, GPU or SwiftShader)_
-- SVG baseline, openmrs: _ms/frame_
-- SVG baseline, spring-projects: _ms/frame_
+- **WebGL in Playwright Chromium: real GPU, but only after a fix.** Headless
+  Chromium on this Mac defaults to the SwiftShader software backend even though a
+  real GPU (Intel UHD Graphics 630 - the same chip spec.md's numbers were measured
+  on) is present and is picked up automatically in headed mode with no extra
+  flags. Passing `--use-angle=metal` to `chromium.launch()` restores the real GPU
+  in headless mode too (confirmed via `UNMASKED_RENDERER_WEBGL`:
+  `ANGLE (Intel, ANGLE Metal Renderer: Intel(R) UHD Graphics 630, ...)`). Baked
+  into `scripts/bench-render.ts` as `GPU_ARGS`, applied on Darwin only, and used
+  for both `webgl-check` and `bench`. Without it every later WebGL benchmark and
+  screenshot run would silently measure SwiftShader instead of the GPU path the
+  whole plan is designed around - worth knowing before step 4, not after.
+- **Benchmark harness:** `scripts/bench-render.ts` (`npm run bench:webgl-check`,
+  `npm run bench -- <dataFile> [--steps] [--warmup] [--port] [--headed]`). Spawns
+  its own `vite --port 5183` (data file is baked in via `__EXPLORER_DATA__` at
+  server-start time, so switching files means a new server, not a query param),
+  waits for either `.Viz` or the Loader's error screen, then drives 30-40
+  synthetic zoom-wheel events at the viz's centre point entirely inside
+  `page.evaluate` (in-page `dispatchEvent`, not Playwright's out-of-process mouse
+  API - that adds IPC latency per event that would swamp a 16ms/frame WebGL
+  measurement) and reports mean/median/min/max frame time from a passive
+  `requestAnimationFrame` sampler. Verified the wheel events actually move
+  `.topGroup`'s `transform` (not just sampling idle vsync) by hand before trusting
+  the numbers.
+  - **Simplification from the original methodology:** wheel-only, no simulated
+    drag-pan. d3-zoom's wheel handler already changes translate as well as scale
+    (to hold the point under the cursor fixed), so it exercises the same
+    `zoomed()` transform-write `Viz.tsx` measures; a real drag would need
+    simulating d3-zoom's window-level mousemove/mouseup rebinding for no benefit
+    to what's being measured (the cost of writing a new transform), so it wasn't
+    worth the complexity.
+- **SVG baseline, openmrs: ~572-577 ms/frame mean** (two runs, headless, GPU
+  fixed: 576.6 and 571.9; median ~590, range 317-783). Repeatable within ~1%
+  across runs - the stability check passes.
+- **SVG baseline, spring-projects: ~1894 ms/frame mean** (headless, GPU fixed;
+  median 1983, range 1167-2400). Scales ~3.3x over openmrs, close to the ~3.6x
+  node-count ratio spec.md predicts - the harness's node-count scaling is
+  sane even though the absolute number differs from the historical one (below).
+- **These numbers are noticeably lower than spec.md's 2222 ms/frame** for the
+  "current SVG" openmrs case (~4x lower) despite using the same real GPU. Most
+  likely explanation: spec.md's number came from a throwaway script driving a
+  larger sweeping pan+zoom gesture, where this harness alternates small
+  zoom-in/zoom-out wheel ticks around one point - smaller transform deltas per
+  step, so less newly-exposed/re-rasterised area per frame. Not chasing this
+  further: per plan-level decision 1, what matters is that this harness's own
+  before/after comparison (steps 0 -> 7 -> 10) is internally consistent, and the
+  qualitative finding is unchanged either way - hundreds of ms/frame is nowhere
+  near the 16.7 ms target, and openmrs->spring-projects scaling matches
+  expectations. If step 10's WebGL number comes back suspiciously low as well
+  (e.g. sub-1ms, suggesting the wheel deltas are being clamped/no-opped against
+  `scaleExtent`), revisit the gesture size then.
+- **A/B worktree:** created at `../explorer-svg` (i.e.
+  `/Users/korny/Dropbox/prj/dev/polyglot/explorer-svg`), checked out at `fd71cf6`
+  (detached HEAD), `node_modules` created and marked
+  `com.dropbox.ignored` before `npm install` (376 packages, clean). Verified
+  `npx vite --port 5174` serves the pre-WebGL renderer, then stopped it - start it
+  again whenever a side-by-side is actually needed (step 4 onward), no need to
+  leave it running between sessions.

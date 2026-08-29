@@ -28,6 +28,8 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "e2e:update": "playwright test --update-snapshots",
+    "bench": "node scripts/bench-render.ts",
+    "bench:webgl-check": "node scripts/bench-render.ts webgl-check",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
