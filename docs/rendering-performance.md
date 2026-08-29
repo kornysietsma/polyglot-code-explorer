@@ -145,9 +145,9 @@ printf '5' | dd of=data/openmrs.json bs=1 seek=16 conv=notrunc
 
 ## Where this went
 
-See `spec.md` for the resulting design: raw WebGL, positions and colours in
-separate buffers, `d3-quadtree` picking, SVG kept as a thin overlay for selection
-outlines and coupling arcs.
+See CLAUDE.md's "WebGL rendering" section for the resulting design: raw WebGL,
+positions and colours in separate buffers, `d3-quadtree` picking, SVG kept as a
+thin overlay for selection outlines and coupling arcs.
 
 One design point worth surfacing here because it is not obvious: the reason to
 separate the position buffer from the colour buffer is that it gives three update
@@ -160,43 +160,40 @@ runtime re-layout cheap rather than a rewrite.
 
 ## After: the WebGL renderer, measured (2026-08-29)
 
-`plan.md` step 10. Same machine (Intel UHD 630, ANGLE Metal backend, confirmed
-GPU not SwiftShader), same checked-in harness (`npm run bench --
-<openmrs|spring-projects>`), headless Chromium with the Darwin GPU fix. Numbers
-are directly comparable to the "before" table above - same synthetic wheel-driven
-pan/zoom, mean of 35 sampled frames after 5 warm-up.
+Same machine (Intel UHD 630, ANGLE Metal backend, confirmed GPU not SwiftShader),
+same checked-in harness (`npm run bench -- <openmrs|spring-projects>`), headless
+Chromium with the Darwin GPU fix. Numbers are directly comparable to the "before"
+table above - same synthetic wheel-driven pan/zoom, mean of 35 sampled frames
+after 5 warm-up.
 
 | File                 | Before (SVG) | After (WebGL)              | Target    |
 | -------------------- | ------------ | -------------------------- | --------- |
 | openmrs.json         | ~572-577 ms  | **16.7 ms** (vsync-capped) | <=16.7 ms |
 | spring-projects.json | ~1894 ms     | **16.7 ms** (vsync-capped) | <=16.7 ms |
 
-Both meet the success criterion in `spec.md` with the GPU sitting idle between
-frames - pan/zoom is no longer the bottleneck at either scale, and the mean/median/
-min/max spread is under 0.2 ms on both runs (see the raw harness output), i.e. no
-frame is anywhere close to dropping below 60 fps.
+Both meet the 60 fps target with the GPU sitting idle between frames - pan/zoom
+is no longer the bottleneck at either scale, and the mean/median/min/max spread
+is under 0.2 ms on both runs (see the raw harness output), i.e. no frame is
+anywhere close to dropping below 60 fps.
 
 **One-time geometry build** (`spring-projects.json`, 80,691 nodes, first load,
-`console.time("redraw")` in `Viz.tsx`): **455 ms**, inside the 448-587 ms range
-already measured at plan.md step 7 and well under the <1 s target. Confirms that
-number still holds unchanged since step 7 - no re-derivation needed.
+`console.time("redraw")` in `Viz.tsx`): **455 ms**, comfortably under the <1 s
+target.
 
-**Buffer sizes** (`spring-projects.json`): unchanged since step 7 - ~10.7 MB fills
-
-- ~48.4 MB outlines, ~59 MB combined. No packing applied; not needed. See
-  `spec.md`'s "Outlines" section for the measurement method.
+**Buffer sizes** (`spring-projects.json`): ~10.7 MB fills + ~48.4 MB outlines,
+~59 MB combined. No packing applied; not needed - see CLAUDE.md's "WebGL
+rendering" section for the geometry pipeline.
 
 **Visualisation-switch time** (`spring-projects.json`, `console.time("update")` in
 `Viz.tsx`, routed through `setColours()` alone - no geometry rebuild, confirmed by
 the console log): **83 ms** (Programming Language -> Lines of Code), **244 ms**
-(Lines of Code -> Churn). Both **miss** the <50 ms target in `spec.md`, consistent
-with the same measurement at step 8 (87 ms / 247 ms) - i.e. this is a stable,
-repeatable shortfall, not noise. The geometry/picking-index rebuild that step 8
-set out to eliminate is confirmed gone (no `setGeometry` log line on a colour-only
+(Lines of Code -> Churn). Both **miss** the <50 ms target, and repeatably so -
+this is a stable shortfall, not noise. The geometry/picking-index rebuild is
+confirmed not happening on this path (no `setGeometry` log line on a colour-only
 change); the remaining cost is the per-node `fillFn` evaluation and colour
 fan-out in `geometry.ts`'s `buildFillAttributes` over ~23k+ visible nodes on this
 file. Not investigated further - recorded here as an explicit, known shortfall
-rather than rounded away, per plan.md's decision to write down anything that
-doesn't meet target instead of hiding it. A candidate follow-up (not attempted):
+rather than rounded away (see CLAUDE.md's "Known follow-ups"). A candidate
+follow-up (not attempted):
 memoising `fillFn` results per distinct value rather than per node, since many
 nodes share a colour.

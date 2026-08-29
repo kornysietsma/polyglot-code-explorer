@@ -1,7 +1,7 @@
 // Checked-in benchmark harness for the pan/zoom frame-time investigation in
-// docs/rendering-performance.md and spec.md. Unlike the throwaway scripts used for the
-// initial investigation, this is meant to be re-run unchanged before and after the WebGL
-// rewrite (plan.md step 0, 7 and 10), so the before/after numbers come from identical code.
+// docs/rendering-performance.md. Unlike the throwaway scripts used for the initial
+// investigation, this is meant to be re-run unchanged before and after a rendering
+// change, so the before/after numbers come from identical code.
 //
 // Usage:
 //   node scripts/bench-render.ts webgl-check
