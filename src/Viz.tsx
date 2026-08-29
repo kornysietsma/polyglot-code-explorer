@@ -39,7 +39,7 @@ import {
   screenToWorld,
 } from "./webgl/camera";
 import { resolvePatternFallback } from "./webgl/colours";
-import { GlRenderer } from "./webgl/GlRenderer";
+import { GlRenderer, NestingStyle } from "./webgl/GlRenderer";
 
 // Builds the per-node fill-colour function the WebGL renderer uploads as its colour buffer:
 // the current visualisation's own fillFn, with `url(#patternN)` (TeamPatternVisualization)
@@ -60,43 +60,18 @@ function buildFillFn(
   return (d) => resolvePatternFallback(visualization.fillFn(d), svgPatternIds);
 }
 
-const redrawNesting = (
-  svgSelection: Selection<
-    SVGPathElement,
-    HierarchyNode<TreeNode>,
-    SVGGElement,
-    unknown
-  >,
-  state: State
-) => {
+// Builds the nesting stroke style GlRenderer.setGeometry() needs, from the same config/theme
+// values the old `redrawNesting` read - kept here rather than in webgl/ so that module stays
+// decoupled from the State type (spec.md's module layout). Index 4 is the shared
+// defaultStroke/defaultWidth slot (geometry.ts's `outlineLevel`).
+function buildNestingStyle(state: State): NestingStyle {
   const { config } = state;
-
-  const strokeWidthFn = (d: HierarchyNode<TreeNode>) => {
-    const nesting = d.depth - (nodeCircleAncestors(d.data) + 1);
-    if (nesting < 0) return 0;
-    if (nesting >= config.nesting.nestedWidths.length)
-      return config.nesting.defaultWidth;
-    return config.nesting.nestedWidths[nesting] || config.nesting.defaultWidth;
+  const theme = themedColours(config);
+  return {
+    widths: [...config.nesting.nestedWidths, config.nesting.defaultWidth],
+    strokeColours: [...theme.nestedStrokes, theme.defaultStroke],
   };
-
-  const strokeColourFn = (d: HierarchyNode<TreeNode>) => {
-    const nesting = d.depth - (nodeCircleAncestors(d.data) + 1);
-    const theme = themedColours(config);
-
-    if (nesting < 0) return 0;
-    if (nesting >= theme.nestedStrokes.length) return theme.defaultStroke;
-    return theme.nestedStrokes[nesting] || theme.defaultStroke;
-  };
-
-  return svgSelection
-    .attr("d", (d) => {
-      return `${d3.line()(d.data.layout.polygon)}z`;
-    })
-    .style("fill", "none")
-    .style("stroke", strokeColourFn)
-    .style("stroke-width", strokeWidthFn)
-    .style("vector-effect", "non-scaling-stroke"); // so zooming doesn't make thick lines
-};
+}
 
 const redrawSelection = (
   svgSelection: Selection<
@@ -161,6 +136,7 @@ const update = (
   cameraRef: React.RefObject<Camera | null>,
   glRendererRef: React.RefObject<GlRenderer | null>,
   visibleNodesRef: React.RefObject<HierarchyNode<TreeNode>[] | null>,
+  outlineNodesRef: React.RefObject<HierarchyNode<TreeNode>[] | null>,
   metadata: VizMetadata,
   features: FeatureFlags,
   state: State
@@ -177,18 +153,23 @@ const update = (
   const camera = cameraRef.current;
   const glRenderer = glRendererRef.current;
   const visibleNodes = visibleNodesRef.current;
-  if (!glCanvas || !camera || !glRenderer || !visibleNodes) {
+  const outlineNodes = outlineNodesRef.current;
+  if (!glCanvas || !camera || !glRenderer || !visibleNodes || !outlineNodes) {
     throw new Error(
       "update called before draw, so the WebGL renderer is not ready"
     );
   }
-  // Naive routing (plan.md step 4): any config change rebuilds both buffers, even though only
-  // colours changed here. Fixed in step 8, once GlRenderer exposes setColours() separately.
-  glRenderer.setGeometry(visibleNodes, buildFillFn(metadata, features, state));
+  // Naive routing (plan.md step 4-7): any config change rebuilds every buffer, even though only
+  // colours (or, for the outline layer, only widths/colours) changed here. Fixed in step 8, once
+  // GlRenderer exposes setColours() separately.
+  glRenderer.setGeometry(
+    visibleNodes,
+    outlineNodes,
+    buildFillFn(metadata, features, state),
+    buildNestingStyle(state)
+  );
   glRenderer.setTransform(camera, glCanvas.width, glCanvas.height);
   glRenderer.draw();
-
-  redrawNesting(svg.selectAll(".nesting"), state);
 
   // TODO: DRY this up - or should selecting just be expensive config?
   if (!metadata.hierarchyNodesByPath) {
@@ -371,6 +352,7 @@ const draw = (
   cameraRef: React.RefObject<Camera | null>,
   glRendererRef: React.RefObject<GlRenderer | null>,
   visibleNodesRef: React.RefObject<HierarchyNode<TreeNode>[] | null>,
+  outlineNodesRef: React.RefObject<HierarchyNode<TreeNode>[] | null>,
   files: TreeNode,
   metadata: VizMetadata,
   features: FeatureFlags,
@@ -435,43 +417,44 @@ const draw = (
   metadata.hierarchyNodesByPath = hierarchyNodesByPath;
 
   // note we filter out nodes that are parents who will be hidden by their children, for speed
-  // so only show parent nodes at the clipping level.
+  // so only show parent nodes at the clipping level. This is the "cell set" (spec.md,
+  // "Outlines") - also what the picking index is built from, so a pick can never return a node
+  // with no fill.
   const allNodes = rootNode
     .descendants()
     .filter((d) => d.depth <= expensiveConfig.depth)
     .filter(
       (d) => d.children === undefined || d.depth === expensiveConfig.depth
     );
-
   visibleNodesRef.current = allNodes;
-  glRenderer.setGeometry(allNodes, buildFillFn(metadata, features, state));
-  glRenderer.setTransform(camera, glCanvas.width, glCanvas.height);
-  glRenderer.draw();
 
-  const nestingNodes = rootNode
+  // The outline set is the union of that cell set with the old "nesting" set (every node from
+  // the first circle-ancestor level down to the depth limit, regardless of whether it has a fill)
+  // - spec.md, "Outlines". A node can qualify via either condition; `outlineLevel` (geometry.ts)
+  // then falls back to the shared default stroke for whichever one it didn't qualify through, so
+  // this reproduces both the old `.cell` layer's unconditional default stroke and the old
+  // `redrawNesting`'s own level-overflow fallback. Sorted depth-descending, same as the old
+  // `.nesting` sort, so shallower/wider outlines paint over deeper ones (no depth buffer).
+  const outlineNodes = rootNode
     .descendants()
     .filter(
       (d) =>
-        d.depth >= 1 + nodeCircleAncestors(d.data) &&
-        d.depth <= state.expensiveConfig.depth
+        d.depth <= expensiveConfig.depth &&
+        (d.children === undefined ||
+          d.depth === expensiveConfig.depth ||
+          d.depth >= 1 + nodeCircleAncestors(d.data))
     )
     .sort((left, right) => right.depth - left.depth);
+  outlineNodesRef.current = outlineNodes;
 
-  const nestingNodesSelection = group
-    .selectAll<SVGPathElement, HierarchyNode<TreeNode>>(".nesting")
-    .data(nestingNodes, function (node) {
-      return node.data.path;
-    });
-  const newNestingNodes = nestingNodesSelection
-    .enter()
-    .append("path")
-    .classed("nesting", true);
-  // No click handler here (plan.md step 5): the overlay is pointer-events: none now that the
-  // canvas does picking, and directory-border clicks are dropped deliberately (spec.md
-  // decision 3) rather than replaced with an equivalent on the canvas.
-  redrawNesting(nestingNodesSelection.merge(newNestingNodes), state);
-
-  nestingNodesSelection.exit().remove();
+  glRenderer.setGeometry(
+    allNodes,
+    outlineNodes,
+    buildFillFn(metadata, features, state),
+    buildNestingStyle(state)
+  );
+  glRenderer.setTransform(camera, glCanvas.width, glCanvas.height);
+  glRenderer.draw();
 
   // TODO
 
@@ -697,6 +680,9 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
   const visibleNodesRef: RefObject<HierarchyNode<TreeNode>[] | null> = useRef<
     HierarchyNode<TreeNode>[] | null
   >(null);
+  const outlineNodesRef: RefObject<HierarchyNode<TreeNode>[] | null> = useRef<
+    HierarchyNode<TreeNode>[] | null
+  >(null);
   const vizContainerRef: RefObject<HTMLElement | null> =
     useRef<HTMLElement | null>(null);
   const vizTooltipRef: RefObject<HTMLDivElement | null> =
@@ -730,6 +716,7 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
         cameraRef,
         glRendererRef,
         visibleNodesRef,
+        outlineNodesRef,
         data.tree,
         metadata,
         features,
@@ -757,6 +744,7 @@ const Viz = ({ dataRef, state, dispatch }: DefaultProps) => {
           cameraRef,
           glRendererRef,
           visibleNodesRef,
+          outlineNodesRef,
           metadata,
           features,
           state

@@ -8,7 +8,7 @@ import {
   Point,
   TreeNode,
 } from "../polyglot_data.types";
-import { buildFills } from "./geometry";
+import { buildFills, buildOutlines, outlineLevel } from "./geometry";
 
 // Same minimal-fixture convention as nodeData.test.ts's minimalFileNode.
 const DUMMY_LOC: LocData = {
@@ -25,14 +25,26 @@ function layoutFor(polygon: Point[]): NodeLayout {
   return { algorithm: "voronoi", center: [0, 0], polygon };
 }
 
-function fileNode(path: string, polygon: Point[]): FileNode {
+function fileNode(
+  path: string,
+  polygon: Point[],
+  circleAncestors = 0
+): FileNode {
   return {
     name: path,
     path,
     layout: layoutFor(polygon),
     value: 0,
+    circleAncestors,
     data: { loc: DUMMY_LOC },
   };
+}
+
+// `depth` is readonly in d3's HierarchyNode type (it's normally computed by walking a real
+// tree), but buildOutlines only ever reads it as a plain number - overriding it here is a much
+// smaller fixture than building a real chain of nested directories just to reach a given depth.
+function atDepth<T>(node: HierarchyNode<T>, depth: number): HierarchyNode<T> {
+  return Object.assign(node, { depth });
 }
 
 const TRIANGLE: Point[] = [
@@ -101,5 +113,97 @@ describe("buildFills", () => {
       hierarchy<TreeNode>(fileNode("c", concave)),
     ];
     expect(() => buildFills(nodes, () => "#000000")).toThrow(/not convex/);
+  });
+});
+
+describe("outlineLevel", () => {
+  it.each([
+    // depth, circleAncestors, expected level
+    [0, 0, 4], // level -1: above the first circle-ancestor level -> default
+    [1, 0, 0],
+    [2, 0, 1],
+    [3, 0, 2],
+    [4, 0, 3],
+    [5, 0, 4], // level 4: past the 4 nested colours -> default
+    [8, 0, 4],
+    // omf.json's varying-circle-depth case: the same tree depth maps to a different level
+    // depending on how many circle-packed ancestors this particular branch has.
+    [2, 1, 0],
+    [3, 1, 1],
+    [3, 2, 0],
+    [2, 2, 4], // level -1 again, just reached via a higher circleAncestors this time
+  ])(
+    "depth %d, circleAncestors %d -> level %d",
+    (depth, circleAncestors, expected) => {
+      expect(outlineLevel(depth, circleAncestors)).toBe(expected);
+    }
+  );
+});
+
+describe("buildOutlines", () => {
+  it("expands a unit quad's 4 edges into 4 constant-width quads sharing the polygon's level", () => {
+    const node = atDepth(hierarchy<TreeNode>(fileNode("a", QUAD, 0)), 2);
+    const { positions, normals, levels, indices } = buildOutlines([node]);
+
+    // 4 edges * 4 vertices each
+    expect(positions.length).toBe(4 * 4 * 2);
+    expect(normals.length).toBe(4 * 4 * 2);
+    expect(levels.length).toBe(4 * 4);
+    expect(indices.length).toBe(4 * 6);
+
+    const expectedLevel = outlineLevel(2, 0); // depth 2, circleAncestors 0 -> 1
+    expect(expectedLevel).toBe(1);
+    expect([...levels]).toEqual(new Array(16).fill(expectedLevel));
+
+    // `+0` folds any -0 the perpendicular computation produces (e.g. -dy where dy is 0) back to
+    // 0 for comparison purposes - same value, distinct only under toEqual's Object.is semantics.
+    const noNegZero = (arr: Float32Array) =>
+      Float32Array.from(arr, (v) => v + 0);
+
+    // Edge 0: (0,0) -> (1,0), a horizontal edge - normal must be vertical (perpendicular),
+    // unit length, and the two straddling vertices sit at +-normal around each endpoint.
+    expect(positions.slice(0, 8)).toEqual(
+      Float32Array.from([0, 0, 0, 0, 1, 0, 1, 0])
+    );
+    expect(noNegZero(normals.slice(0, 8))).toEqual(
+      Float32Array.from([0, 1, 0, -1, 0, 1, 0, -1])
+    );
+    // Edge 1: (1,0) -> (1,1), a vertical edge - normal must be horizontal.
+    expect(noNegZero(normals.slice(8, 16))).toEqual(
+      Float32Array.from([-1, 0, 1, 0, -1, 0, 1, 0])
+    );
+
+    // The two triangles per edge (base,base+1,base+2) and (base+2,base+1,base+3) share the
+    // (base+1, base+2) edge - together covering the full expanded quad for that polygon edge.
+    expect(indices.slice(0, 6)).toEqual(Uint32Array.from([0, 1, 2, 2, 1, 3]));
+    expect(indices.slice(6, 12)).toEqual(Uint32Array.from([4, 5, 6, 6, 5, 7]));
+  });
+
+  it("normalises a diagonal edge to unit length", () => {
+    // A 3-4-5 triangle so the hypotenuse has an exactly-representable length.
+    const triangle: Point[] = [
+      [0, 0],
+      [3, 0],
+      [0, 4],
+    ];
+    const node = atDepth(hierarchy<TreeNode>(fileNode("b", triangle, 0)), 1);
+    const { normals } = buildOutlines([node]);
+
+    // Edge 2 is (0,4) -> (0,0) in this fixture... instead just check every normal in the
+    // buffer is unit length, which covers the diagonal edge (3,0)->(0,4) along with the two
+    // axis-aligned ones.
+    for (let i = 0; i < normals.length; i += 2) {
+      const nx = normals[i]!;
+      const ny = normals[i + 1]!;
+      expect(Math.hypot(nx, ny)).toBeCloseTo(1, 6);
+    }
+  });
+
+  it("returns empty arrays for an empty node list", () => {
+    const { positions, normals, levels, indices } = buildOutlines([]);
+    expect(positions.length).toBe(0);
+    expect(normals.length).toBe(0);
+    expect(levels.length).toBe(0);
+    expect(indices.length).toBe(0);
   });
 });

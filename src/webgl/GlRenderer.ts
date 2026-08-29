@@ -5,10 +5,25 @@
 import { HierarchyNode } from "d3";
 
 import { TreeNode } from "../polyglot_data.types";
-import { Camera, worldToClipTransform } from "./camera";
-import { buildFills } from "./geometry";
+import { Camera, worldToClipTransform, worldToDeviceScale } from "./camera";
+import { parseCssColour } from "./colours";
+import { buildFills, buildOutlines } from "./geometry";
 import { buildIndex, pick as pickInIndex, PickIndex } from "./picking";
-import { FILL_FRAGMENT_SHADER, FILL_VERTEX_SHADER } from "./shaders";
+import {
+  FILL_FRAGMENT_SHADER,
+  FILL_VERTEX_SHADER,
+  OUTLINE_FRAGMENT_SHADER,
+  OUTLINE_VERTEX_SHADER,
+} from "./shaders";
+
+// The nesting stroke style, resolved from `state.config.nesting` / `themedColours(state.config)`
+// by the caller (Viz.tsx) rather than imported here, so this module stays decoupled from the
+// State type. Index 4 is the shared defaultStroke/defaultWidth slot - see geometry.ts's
+// `outlineLevel`.
+export interface NestingStyle {
+  widths: readonly number[]; // length 5: 4 nested levels + 1 default
+  strokeColours: readonly string[]; // length 5: 4 nested levels + 1 default
+}
 
 function compileShader(
   gl: WebGLRenderingContext,
@@ -74,20 +89,40 @@ function mustGetUniformLocation(
   return location;
 }
 
-// Owns the GL context, the fill program, and the fill geometry buffers. Positions and colours
-// live in separate buffers from the start (spec.md, "The three update paths") even though step 4
-// rewrites both together on every change - step 8 depends on the split and retrofitting it later
-// would be a rewrite.
+// Owns the GL context and both programs' buffers. Fill positions/colours live in separate
+// buffers from the start (spec.md, "The three update paths") even though step 4 rewrote both
+// together on every change - step 8 depends on the split and retrofitting it later would be a
+// rewrite. Outline positions/normals/levels are static per setGeometry() call; only the
+// u_widths/u_strokeColours uniforms need to change for a nesting colour or width edit, which is
+// what step 8 will wire up as a uniform-only path.
 export class GlRenderer {
   private readonly gl: WebGLRenderingContext;
+
   private readonly fillProgram: WebGLProgram;
-  private readonly positionBuffer: WebGLBuffer;
-  private readonly colourBuffer: WebGLBuffer;
+  private readonly fillPositionBuffer: WebGLBuffer;
+  private readonly fillColourBuffer: WebGLBuffer;
   private readonly aPos: number;
   private readonly aColour: number;
-  private readonly uScale: WebGLUniformLocation;
-  private readonly uTranslate: WebGLUniformLocation;
+  private readonly uFillScale: WebGLUniformLocation;
+  private readonly uFillTranslate: WebGLUniformLocation;
   private fillVertexCount = 0;
+
+  private readonly outlineProgram: WebGLProgram;
+  private readonly outlinePositionBuffer: WebGLBuffer;
+  private readonly outlineNormalBuffer: WebGLBuffer;
+  private readonly outlineLevelBuffer: WebGLBuffer;
+  private readonly outlineIndexBuffer: WebGLBuffer;
+  private readonly aOutlinePos: number;
+  private readonly aNormal: number;
+  private readonly aLevel: number;
+  private readonly uOutlineScale: WebGLUniformLocation;
+  private readonly uOutlineTranslate: WebGLUniformLocation;
+  private readonly uWorldScale: WebGLUniformLocation;
+  private readonly uDpr: WebGLUniformLocation;
+  private readonly uWidths: WebGLUniformLocation;
+  private readonly uStrokeColours: WebGLUniformLocation;
+  private outlineIndexCount = 0;
+
   private pickIndex: PickIndex | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -97,20 +132,66 @@ export class GlRenderer {
     }
     this.gl = gl;
 
+    // The outline index buffer easily exceeds 65,535 vertices at openmrs/spring-projects scale
+    // (spec.md, "Outlines" budget) - WebGL1's native ELEMENT_ARRAY_BUFFER index type without this
+    // extension. Universally supported on desktop/ANGLE; throw loudly rather than silently
+    // falling back to a chunked-draw scheme nobody asked for (CLAUDE.md's convention on missing
+    // data: fail loud, not subtly wrong).
+    if (!gl.getExtension("OES_element_index_uint")) {
+      throw new Error(
+        "GlRenderer: OES_element_index_uint unavailable - required for outline index buffers at this scale"
+      );
+    }
+
     this.fillProgram = createProgram(
       gl,
       FILL_VERTEX_SHADER,
       FILL_FRAGMENT_SHADER
     );
-    this.positionBuffer = mustCreateBuffer(gl);
-    this.colourBuffer = mustCreateBuffer(gl);
+    this.fillPositionBuffer = mustCreateBuffer(gl);
+    this.fillColourBuffer = mustCreateBuffer(gl);
     this.aPos = gl.getAttribLocation(this.fillProgram, "a_pos");
     this.aColour = gl.getAttribLocation(this.fillProgram, "a_colour");
-    this.uScale = mustGetUniformLocation(gl, this.fillProgram, "u_scale");
-    this.uTranslate = mustGetUniformLocation(
+    this.uFillScale = mustGetUniformLocation(gl, this.fillProgram, "u_scale");
+    this.uFillTranslate = mustGetUniformLocation(
       gl,
       this.fillProgram,
       "u_translate"
+    );
+
+    this.outlineProgram = createProgram(
+      gl,
+      OUTLINE_VERTEX_SHADER,
+      OUTLINE_FRAGMENT_SHADER
+    );
+    this.outlinePositionBuffer = mustCreateBuffer(gl);
+    this.outlineNormalBuffer = mustCreateBuffer(gl);
+    this.outlineLevelBuffer = mustCreateBuffer(gl);
+    this.outlineIndexBuffer = mustCreateBuffer(gl);
+    this.aOutlinePos = gl.getAttribLocation(this.outlineProgram, "a_pos");
+    this.aNormal = gl.getAttribLocation(this.outlineProgram, "a_normal");
+    this.aLevel = gl.getAttribLocation(this.outlineProgram, "a_level");
+    this.uOutlineScale = mustGetUniformLocation(
+      gl,
+      this.outlineProgram,
+      "u_scale"
+    );
+    this.uOutlineTranslate = mustGetUniformLocation(
+      gl,
+      this.outlineProgram,
+      "u_translate"
+    );
+    this.uWorldScale = mustGetUniformLocation(
+      gl,
+      this.outlineProgram,
+      "u_worldScale"
+    );
+    this.uDpr = mustGetUniformLocation(gl, this.outlineProgram, "u_dpr");
+    this.uWidths = mustGetUniformLocation(gl, this.outlineProgram, "u_widths");
+    this.uStrokeColours = mustGetUniformLocation(
+      gl,
+      this.outlineProgram,
+      "u_strokeColours"
     );
 
     // Standard alpha blending (spec.md, "Draw order") - all current colours are opaque, but
@@ -119,27 +200,85 @@ export class GlRenderer {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   }
 
-  // Rebuilds and re-uploads both the position and colour buffers, and rebinds the picking index
-  // once it exists (plan.md step 5). Reallocates rather than patching in place - a future
-  // re-layout can change a polygon's vertex count (spec.md, "The three update paths").
+  // Rebuilds and re-uploads the fill buffers, the outline buffers, and the nesting-style
+  // uniforms, and rebinds the picking index - all in one naive pass (plan.md's step 4-7 routing
+  // decision: any config or expensiveConfig change goes through here regardless of what actually
+  // changed; step 8 splits this into setColours()/uniform-only paths). Reallocates rather than
+  // patching in place - a future re-layout can change a polygon's vertex count (spec.md, "The
+  // three update paths").
+  //
+  // `fillNodes` and `outlineNodes` are deliberately different lists, not one shared list narrowed
+  // internally: `fillNodes` is the leaf/depth-limit "cell" set (also what the picking index is
+  // built from - a pick must never return a node with no fill), `outlineNodes` is the wider union
+  // of that same cell set with the "nesting" set (every visible node from the first
+  // circle-ancestor level down to the depth limit) - see spec.md's "Outlines". Both are cached
+  // once per draw() in Viz.tsx (`visibleNodesRef` / `outlineNodesRef`) rather than rebuilt here.
   setGeometry(
-    nodes: readonly HierarchyNode<TreeNode>[],
-    fillFn: (d: HierarchyNode<TreeNode>) => string
+    fillNodes: readonly HierarchyNode<TreeNode>[],
+    outlineNodes: readonly HierarchyNode<TreeNode>[],
+    fillFn: (d: HierarchyNode<TreeNode>) => string,
+    nestingStyle: NestingStyle
   ): void {
     const { gl } = this;
-    const { positions, colours } = buildFills(nodes, fillFn);
+    const { positions, colours } = buildFills(fillNodes, fillFn);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.fillPositionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.colourBuffer);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.fillColourBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, colours, gl.DYNAMIC_DRAW);
 
     this.fillVertexCount = positions.length / 2;
-    this.pickIndex = buildIndex(nodes);
+    this.pickIndex = buildIndex(fillNodes);
+
+    const outlineGeometry = buildOutlines(outlineNodes);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.outlinePositionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, outlineGeometry.positions, gl.STATIC_DRAW);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.outlineNormalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, outlineGeometry.normals, gl.STATIC_DRAW);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.outlineLevelBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, outlineGeometry.levels, gl.STATIC_DRAW);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.outlineIndexBuffer);
+    gl.bufferData(
+      gl.ELEMENT_ARRAY_BUFFER,
+      outlineGeometry.indices,
+      gl.STATIC_DRAW
+    );
+
+    this.outlineIndexCount = outlineGeometry.indices.length;
+
+    this.setNestingStyle(nestingStyle);
   }
 
-  // Hit-tests a world-space point against the current geometry (plan.md step 5). `picking.ts`
+  // Uniform-only update for nesting colours/widths - no buffer touched, since level is a
+  // per-vertex attribute (spec.md, "Outlines"). Called from setGeometry() today; step 8 exposes
+  // this as its own path for a colour-picker/width-slider drag.
+  private setNestingStyle(nestingStyle: NestingStyle): void {
+    const { widths, strokeColours } = nestingStyle;
+    if (widths.length !== 5 || strokeColours.length !== 5) {
+      throw new Error(
+        `GlRenderer: nestingStyle must have exactly 5 widths/colours (4 nested levels + default), got ${widths.length}/${strokeColours.length}`
+      );
+    }
+    const { gl } = this;
+    const rgb = new Float32Array(15);
+    for (let i = 0; i < 5; i++) {
+      const [r, g, b] = parseCssColour(strokeColours[i]!);
+      rgb[i * 3] = r;
+      rgb[i * 3 + 1] = g;
+      rgb[i * 3 + 2] = b;
+    }
+
+    gl.useProgram(this.outlineProgram);
+    gl.uniform1fv(this.uWidths, Float32Array.from(widths));
+    gl.uniform3fv(this.uStrokeColours, rgb);
+  }
+
+  // Hit-tests a world-space point against the current fill geometry (plan.md step 5). `picking.ts`
   // stays gl-free and independently testable; this just delegates to it against whichever index
   // setGeometry() last built. `null` before the first setGeometry() call, or for a background
   // click - identical to today's directory-border-click drop (spec.md decision 3).
@@ -148,9 +287,9 @@ export class GlRenderer {
     return pickInIndex(this.pickIndex, worldX, worldY);
   }
 
-  // Camera-only update: writes the transform uniforms, touches no buffer. `canvasWidthPx` /
-  // `canvasHeightPx` are the canvas's device-pixel backing-store size (post-DPR), not its CSS
-  // size.
+  // Camera-only update: writes the transform uniforms on both programs, touches no buffer.
+  // `canvasWidthPx` / `canvasHeightPx` are the canvas's device-pixel backing-store size (post-DPR),
+  // not its CSS size.
   setTransform(
     camera: Camera,
     canvasWidthPx: number,
@@ -162,38 +301,68 @@ export class GlRenderer {
       canvasWidthPx,
       canvasHeightPx
     );
+
     gl.useProgram(this.fillProgram);
-    gl.uniform2f(this.uScale, scaleX, scaleY);
-    gl.uniform2f(this.uTranslate, translateX, translateY);
+    gl.uniform2f(this.uFillScale, scaleX, scaleY);
+    gl.uniform2f(this.uFillTranslate, translateX, translateY);
+
+    gl.useProgram(this.outlineProgram);
+    gl.uniform2f(this.uOutlineScale, scaleX, scaleY);
+    gl.uniform2f(this.uOutlineTranslate, translateX, translateY);
+    gl.uniform1f(this.uWorldScale, worldToDeviceScale(camera));
+    gl.uniform1f(this.uDpr, camera.dpr);
   }
 
-  // Painter's algorithm, no depth buffer (spec.md, "Draw order") - fills only until outlines
-  // land in plan.md step 7.
+  // Painter's algorithm, no depth buffer (spec.md, "Draw order"): all fills, then all outlines.
   draw(): void {
     const { gl } = this;
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    if (this.fillVertexCount === 0) return;
+    if (this.fillVertexCount > 0) {
+      gl.useProgram(this.fillProgram);
 
-    gl.useProgram(this.fillProgram);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.fillPositionBuffer);
+      gl.enableVertexAttribArray(this.aPos);
+      gl.vertexAttribPointer(this.aPos, 2, gl.FLOAT, false, 0, 0);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-    gl.enableVertexAttribArray(this.aPos);
-    gl.vertexAttribPointer(this.aPos, 2, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.fillColourBuffer);
+      gl.enableVertexAttribArray(this.aColour);
+      gl.vertexAttribPointer(this.aColour, 3, gl.FLOAT, false, 0, 0);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.colourBuffer);
-    gl.enableVertexAttribArray(this.aColour);
-    gl.vertexAttribPointer(this.aColour, 3, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, this.fillVertexCount);
+    }
 
-    gl.drawArrays(gl.TRIANGLES, 0, this.fillVertexCount);
+    if (this.outlineIndexCount > 0) {
+      gl.useProgram(this.outlineProgram);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.outlinePositionBuffer);
+      gl.enableVertexAttribArray(this.aOutlinePos);
+      gl.vertexAttribPointer(this.aOutlinePos, 2, gl.FLOAT, false, 0, 0);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.outlineNormalBuffer);
+      gl.enableVertexAttribArray(this.aNormal);
+      gl.vertexAttribPointer(this.aNormal, 2, gl.FLOAT, false, 0, 0);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.outlineLevelBuffer);
+      gl.enableVertexAttribArray(this.aLevel);
+      gl.vertexAttribPointer(this.aLevel, 1, gl.FLOAT, false, 0, 0);
+
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.outlineIndexBuffer);
+      gl.drawElements(gl.TRIANGLES, this.outlineIndexCount, gl.UNSIGNED_INT, 0);
+    }
   }
 
   destroy(): void {
     const { gl } = this;
-    gl.deleteBuffer(this.positionBuffer);
-    gl.deleteBuffer(this.colourBuffer);
+    gl.deleteBuffer(this.fillPositionBuffer);
+    gl.deleteBuffer(this.fillColourBuffer);
     gl.deleteProgram(this.fillProgram);
+    gl.deleteBuffer(this.outlinePositionBuffer);
+    gl.deleteBuffer(this.outlineNormalBuffer);
+    gl.deleteBuffer(this.outlineLevelBuffer);
+    gl.deleteBuffer(this.outlineIndexBuffer);
+    gl.deleteProgram(this.outlineProgram);
   }
 }

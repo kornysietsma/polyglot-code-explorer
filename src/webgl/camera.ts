@@ -102,6 +102,15 @@ export function worldToDevice(
   return [cssX * camera.dpr, cssY * camera.dpr];
 }
 
+// World units -> device pixels, isotropic (the same factor for both axes) - unlike
+// worldToClipTransform's scaleX/scaleY, which additionally divide by the canvas's own
+// width/height to land in clip space and so differ from each other on a non-square canvas. This
+// is the scale the outline shader needs to turn a CSS-pixel stroke width into a world-space
+// offset that reads as the same width on screen regardless of aspect ratio (spec.md, "Outlines").
+export function worldToDeviceScale(camera: Camera): number {
+  return camera.fit.scale * camera.zoom.k * camera.dpr;
+}
+
 export interface ClipTransform {
   scaleX: number;
   scaleY: number;

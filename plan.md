@@ -357,26 +357,26 @@ mouse — if hover picking is visible in the frame rate, the rAF throttle is wro
 
 **Verify — automated:** `npm run check`.
 
-### Step 7 — Outlines; delete the `.nesting` layer
+### Step 7 — Outlines; delete the `.nesting` layer — done
 
 Visual parity is reached here. The largest single quality risk in the plan.
 
-- [ ] `geometry.buildOutlines(nodes)` — for each edge, 4 vertices (`a_pos`,
+- [x] `geometry.buildOutlines(nodes)` — for each edge, 4 vertices (`a_pos`,
       signed `a_normal`, `a_level`) and 6 indices. The outline set is the **union**
       of the cell set and the nesting set, **one outline per node** — this is what
       removes the 19,101 redundant paths.
-- [ ] Level assignment as its own exported pure function:
+- [x] Level assignment as its own exported pure function:
       `level = depth - (circleAncestors + 1)`; `< 0` or `>= 4` → index 4
       (`defaultStroke`/`defaultWidth`); otherwise index `level`.
-- [ ] **Preserve the depth-descending sort** when writing the index buffer, so
+- [x] **Preserve the depth-descending sort** when writing the index buffer, so
       shallower/wider outlines paint over deeper ones exactly as today.
-- [ ] Vertex shader offsets by `a_normal * (u_widths[level] * 0.5 * u_dpr) / u_scale`
+- [x] Vertex shader offsets by `a_normal * (u_widths[level] * 0.5 * u_dpr) / u_scale`
       — constant screen-space width, reproducing `non-scaling-stroke` at zero
       per-frame cost. Colour from `u_strokeColours[5]`.
-- [ ] Draw order: all fills, then all outlines. No depth buffer.
-- [ ] **Delete** `redrawNesting` and the `.nesting` selection, and its call in
+- [x] Draw order: all fills, then all outlines. No depth buffer.
+- [x] **Delete** `redrawNesting` and the `.nesting` selection, and its call in
       `update()`.
-- [ ] Record the actual outline buffer size at openmrs scale and extrapolate
+- [x] Record the actual outline buffer size at openmrs scale and extrapolate
       (open question 1). Do not pre-emptively pack — measure first.
 
 **Verify — unit:** level assignment against the formula for depth 0..8 with
@@ -569,3 +569,57 @@ step - 7, 8, 9):**
 - The A/B worktree is at `../explorer-svg`, checked out at `fd71cf6` (detached
   HEAD) - see "Plan-level decisions" §2 above for the recreate recipe
   (including data-file symlinks) if it's been removed since.
+
+**Step 7 notes:**
+
+- `buildOutlines(nodes)`'s `nodes` is **not** `visibleNodesRef` (the fill/cell-set list) - it's a
+  new, wider `outlineNodesRef`, computed once per `draw()` alongside it and reused by `update()`
+  for the same caching reason. Necessarily wider: the outline set is cellCondition **or**
+  nestingCondition (spec.md's union), and nestingCondition alone already includes intermediate
+  directory nodes the cell/fill set deliberately excludes (only leaves and depth-limit nodes get a
+  fill). Confirmed by eye at depth 3 on openmrs: interior directories render a flat neutral fill
+  _and_ a correctly-levelled outline, matching the SVG worktree exactly.
+- `outlineLevel(depth, circleAncestors)` naturally reproduces both legacy fallbacks through the
+  same `<0 or >=4 -> index 4` rule: the old `.cell` layer's unconditional defaultStroke (nodes
+  that qualify only via cellCondition, so their level is usually out of nesting range) and the old
+  `redrawNesting`'s own overflow-to-default (nodes past the 4 configured levels). No separate code
+  path needed for either case.
+- Outline vertex/index counts are now measured, not projected - captured by monkey-patching
+  `WebGLRenderingContext.prototype.bufferData` via `playwright-cli run-code`'s `page.addInitScript`
+  and reading the byte lengths of each of the 6 `bufferData` calls `setGeometry()` makes, in order,
+  on openmrs (34k nodes, depth default):
+  - Fills: 282,243 vertices, 5.4 MB (positions + colours) - matches spec.md's projection almost
+    exactly (282,243 vertices / ~5.6 MB).
+  - Outlines: **1,275,364 vertices**, 1,913,046 indices, **~31.6 MB** (positions + normals +
+    levels + indices, all `Float32`/`Uint32`, unpacked per plan-level decision "measure before
+    optimising"). Vertex count matches spec.md's ~1.3M projection; the byte total is higher than
+    spec's 26 MB because that number already assumed the Int16-normal/Uint8-level packing this
+    step deliberately doesn't do yet.
+  - Extrapolating openmrs -> spring-projects at spec.md's stated 3.6x node ratio: fills ~19 MB,
+    outlines ~114 MB, ~133 MB total. Open question 1 isn't fully answered until step 10 measures
+    spring-projects directly, but this is close enough to flag: if 114 MB proves uncomfortable, the
+    packing fallback documented in spec.md is exactly what to reach for, and step 8 doesn't
+    interact with it either way (the packed layout still splits into the same three uniform-vs-
+    buffer update paths).
+- WebGL1's native index type is `UNSIGNED_SHORT` (max 65,535) - hopelessly short of 1.9M indices at
+  openmrs scale. `GlRenderer`'s constructor now requires `OES_element_index_uint` and throws if
+  it's unavailable (universally supported on desktop/ANGLE, so this should never actually fire in
+  practice) rather than silently chunking into multiple `drawElements` calls - consistent with the
+  repo's fail-loud-on-missing-data convention rather than adding an unrequested fallback path.
+- `GlRenderer.setGeometry()`'s signature grew to
+  `(fillNodes, outlineNodes, fillFn, nestingStyle)` rather than the spec pseudocode's single
+  `setGeometry(nodes)` - the two node lists have genuinely different filters (see above), and
+  `NestingStyle` (`{ widths, strokeColours }`, both length-5 arrays, index 4 = default) is built by
+  a new `buildNestingStyle(state)` in Viz.tsx, kept there rather than in `webgl/` so that module
+  stays decoupled from the `State` type, matching how `buildFillFn` already works.
+- Manual side-by-side against the `../explorer-svg` worktree (`playwright-cli`, dispatching real
+  `WheelEvent`/`MouseEvent`s per the gotchas above): `openmrs.json` at default depth and at depth 3
+  (interior directories exposed), `omf.json` (nestedCircles, the varying-circle-depth case) at
+  default depth, and `default.json` with the coupling panel opened. All pixel-structurally
+  identical to the worktree - same outline colours/widths at every level, same fill/outline
+  interaction at a depth that exposes directory fills. Click-to-select and the SVG selection
+  outline both still work unchanged. Coupling showed 0 arcs in both old and new at the default
+  0.9 min-ratio threshold on this data file - a pre-existing filter-threshold fact, not a
+  regression (`drawCoupling` is untouched by this step).
+- `npm run check` clean (typecheck, lint, format, all 96 unit tests including the new
+  `outlineLevel`/`buildOutlines` cases in `geometry.test.ts`).
