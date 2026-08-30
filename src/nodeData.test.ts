@@ -8,241 +8,136 @@ import {
   topTeamsPartitioned,
   UserStats,
 } from "./nodeData";
-import { GitData } from "./polyglot_data.types";
-import { UserAliases, UserTeams } from "./state";
-import { minimalFileNode } from "./testFixtures";
+import { GitDetails } from "./polyglot_data.types";
+import { FileChangeMetric, UserAliases, UserTeams } from "./state";
+import { gitDetails, minimalFileNode, minimalGitData } from "./testFixtures";
 
-function minimalGitData(): GitData {
-  return {
-    last_update: 0,
-    age_in_days: 0,
-    user_count: 0,
-    users: [],
-    details: [],
-    activity: [],
-  };
+// The date window every fixture below sits inside; individual tests vary the commits, not the
+// range, so the range is a constant rather than another thing each test has to thread through.
+const EARLIEST = 0;
+const LATEST = 100;
+
+function changersByTeam({
+  details,
+  userTeams = new Map(),
+  ignoredUsers = new Set(),
+  includeNonTeamChanges = true,
+}: {
+  details: GitDetails[];
+  userTeams?: UserTeams;
+  ignoredUsers?: Set<number>;
+  includeNonTeamChanges?: boolean;
+}) {
+  const fileNode = minimalFileNode("foo", "bar", {
+    data: { git: minimalGitData(details) },
+  });
+  const aliases: UserAliases = new Map();
+  return nodeChangersByTeam(
+    fileNode,
+    aliases,
+    ignoredUsers,
+    userTeams,
+    EARLIEST,
+    LATEST,
+    includeNonTeamChanges
+  );
 }
 
-function minimalNodeChangersParams() {
-  const fileNode = minimalFileNode("foo", "bar");
-  fileNode.data.git = minimalGitData();
-  const aliases: UserAliases = new Map();
-  const ignoredUsers: Set<number> = new Set();
-  const userTeams: UserTeams = new Map();
-  const earliest = 0;
-  const latest = 100;
-  return { fileNode, aliases, ignoredUsers, userTeams, earliest, latest };
+// The shape nodeChangersByTeam accumulates into, spelled out per team in the expectations below.
+function teamTotals(commits: number, lines: number, days: number[]): UserStats {
+  return { commits, lines, days: new Set(days), files: 1 };
 }
 
 describe("aggregating node info by team", () => {
-  test("minimal data returns empty results", () => {
-    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
-      minimalNodeChangersParams();
-    const nodeChangers = nodeChangersByTeam(
-      fileNode,
-      aliases,
-      ignoredUsers,
-      userTeams,
-      earliest,
-      latest,
-      false
-    );
-    expect(nodeChangers).toBeDefined();
-    const expected: Map<string, UserStats> = new Map();
-    expect(nodeChangers!).toEqual(expected);
+  test("a file with no commits has no team stats", () => {
+    expect(changersByTeam({ details: [] })).toEqual(new Map());
   });
-  test("can aggregate basic team stats", () => {
-    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
-      minimalNodeChangersParams();
-    userTeams.set(0, new Set(["teamA", "teamB"]));
-    fileNode.data.git!.details!.push({
-      commit_day: 1,
-      users: [0],
-      commits: 1,
-      lines_added: 1,
-      lines_deleted: 1,
+
+  test("a change by someone in two teams counts once for each of them", () => {
+    const changers = changersByTeam({
+      details: [gitDetails(1, [0])],
+      userTeams: new Map([[0, new Set(["teamA", "teamB"])]]),
     });
-    const nodeChangers = nodeChangersByTeam(
-      fileNode,
-      aliases,
-      ignoredUsers,
-      userTeams,
-      earliest,
-      latest,
-      true
+
+    expect(changers).toEqual(
+      new Map([
+        ["teamA", teamTotals(1, 2, [1])],
+        ["teamB", teamTotals(1, 2, [1])],
+      ])
     );
-    expect(nodeChangers).toBeDefined();
-    const expected: Map<string, UserStats> = new Map([
-      ["teamA", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
-      ["teamB", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
-    ]);
-    expect(nodeChangers!).toEqual(expected);
   });
-  test("can aggregate more complex team stats", () => {
-    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
-      minimalNodeChangersParams();
-    userTeams.set(0, new Set(["teamA"]));
-    userTeams.set(1, new Set(["teamB"]));
-    fileNode.data.git!.details!.push({
-      commit_day: 1,
-      users: [0, 1],
-      commits: 1,
-      lines_added: 1,
-      lines_deleted: 1,
+
+  // The reason this function exists rather than summing `nodeChangers`: one commit made by two
+  // members of the same team is one change by that team, not two.
+  test("a change by two people on the same team counts once, not twice", () => {
+    const changers = changersByTeam({
+      details: [gitDetails(1, [0, 1], { commits: 3 })],
+      userTeams: new Map([
+        [0, new Set(["teamA"])],
+        [1, new Set(["teamA"])],
+      ]),
     });
-    const nodeChangers = nodeChangersByTeam(
-      fileNode,
-      aliases,
-      ignoredUsers,
-      userTeams,
-      earliest,
-      latest,
-      true
-    );
-    expect(nodeChangers).toBeDefined();
-    const expected: Map<string, UserStats> = new Map([
-      ["teamA", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
-      ["teamB", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
-    ]);
-    expect(nodeChangers!).toEqual(expected);
+
+    expect(changers).toEqual(new Map([["teamA", teamTotals(3, 2, [1])]]));
   });
-  test("can aggregate overlapping teams", () => {
-    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
-      minimalNodeChangersParams();
-    userTeams.set(0, new Set(["teamA"]));
-    userTeams.set(1, new Set(["teamB"]));
-    userTeams.set(2, new Set(["teamA", "teamB"]));
-    fileNode.data.git!.details!.push({
-      commit_day: 1,
-      users: [0, 1],
-      commits: 1,
-      lines_added: 1,
-      lines_deleted: 1,
+
+  test("accumulates commits, lines and distinct days across overlapping teams", () => {
+    const changers = changersByTeam({
+      details: [
+        gitDetails(1, [0, 1]),
+        gitDetails(2, [1, 2]),
+        gitDetails(3, [1]),
+      ],
+      userTeams: new Map([
+        [0, new Set(["teamA"])],
+        [1, new Set(["teamB"])],
+        [2, new Set(["teamA", "teamB"])],
+      ]),
     });
-    fileNode.data.git!.details!.push({
-      commit_day: 2,
-      users: [1, 2],
-      commits: 1,
-      lines_added: 1,
-      lines_deleted: 1,
-    });
-    fileNode.data.git!.details!.push({
-      commit_day: 3,
-      users: [1],
-      commits: 1,
-      lines_added: 1,
-      lines_deleted: 1,
-    });
-    const nodeChangers = nodeChangersByTeam(
-      fileNode,
-      aliases,
-      ignoredUsers,
-      userTeams,
-      earliest,
-      latest,
-      true
+
+    expect(changers).toEqual(
+      new Map([
+        ["teamA", teamTotals(2, 4, [1, 2])],
+        ["teamB", teamTotals(3, 6, [1, 2, 3])],
+      ])
     );
-    expect(nodeChangers).toBeDefined();
-    const expected: Map<string, UserStats> = new Map([
-      ["teamA", { commits: 2, lines: 4, days: new Set([1, 2]), files: 1 }],
-      ["teamB", { commits: 3, lines: 6, days: new Set([1, 2, 3]), files: 1 }],
-    ]);
-    expect(nodeChangers!).toEqual(expected);
   });
-  test("users with no team get special 'no team' category", () => {
-    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
-      minimalNodeChangersParams();
-    userTeams.set(0, new Set(["teamA"]));
-    fileNode.data.git!.details!.push({
-      commit_day: 1,
-      users: [0],
-      commits: 1,
-      lines_added: 1,
-      lines_deleted: 1,
+
+  test("gathers changes by people with no team under a 'no team' heading", () => {
+    const changers = changersByTeam({
+      details: [
+        gitDetails(1, [0]),
+        gitDetails(2, [1], { commits: 3, lines_added: 3, lines_deleted: 4 }),
+      ],
+      userTeams: new Map([[0, new Set(["teamA"])]]),
     });
-    fileNode.data.git!.details!.push({
-      commit_day: 2,
-      users: [1],
-      commits: 3,
-      lines_added: 3,
-      lines_deleted: 4,
-    });
-    const nodeChangers = nodeChangersByTeam(
-      fileNode,
-      aliases,
-      ignoredUsers,
-      userTeams,
-      earliest,
-      latest,
-      true
+
+    expect(changers).toEqual(
+      new Map([
+        ["teamA", teamTotals(1, 2, [1])],
+        [NO_TEAM_SYMBOL, teamTotals(3, 7, [2])],
+      ])
     );
-    expect(nodeChangers).toBeDefined();
-    const expected: Map<string, UserStats> = new Map([
-      ["teamA", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
-      ["<NO TEAM>", { commits: 3, lines: 7, days: new Set([2]), files: 1 }],
-    ]);
-    expect(nodeChangers!).toEqual(expected);
   });
-  test("users with no team ignored if wanted", () => {
-    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
-      minimalNodeChangersParams();
-    userTeams.set(0, new Set(["teamA"]));
-    fileNode.data.git!.details!.push({
-      commit_day: 1,
-      users: [0],
-      commits: 1,
-      lines_added: 1,
-      lines_deleted: 1,
+
+  test("drops those changes entirely when non-team changes aren't wanted", () => {
+    const changers = changersByTeam({
+      details: [gitDetails(1, [0]), gitDetails(2, [1], { commits: 3 })],
+      userTeams: new Map([[0, new Set(["teamA"])]]),
+      includeNonTeamChanges: false,
     });
-    fileNode.data.git!.details!.push({
-      commit_day: 2,
-      users: [1],
-      commits: 3,
-      lines_added: 3,
-      lines_deleted: 4,
-    });
-    const nodeChangers = nodeChangersByTeam(
-      fileNode,
-      aliases,
-      ignoredUsers,
-      userTeams,
-      earliest,
-      latest,
-      false
-    );
-    expect(nodeChangers).toBeDefined();
-    const expected: Map<string, UserStats> = new Map([
-      ["teamA", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
-    ]);
-    expect(nodeChangers!).toEqual(expected);
+
+    expect(changers).toEqual(new Map([["teamA", teamTotals(1, 2, [1])]]));
   });
-  test("ignored users are ignored", () => {
-    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
-      minimalNodeChangersParams();
-    userTeams.set(0, new Set(["teamA", "teamB"]));
-    ignoredUsers.add(1);
-    fileNode.data.git!.details!.push({
-      commit_day: 1,
-      users: [0, 1],
-      commits: 1,
-      lines_added: 1,
-      lines_deleted: 1,
+
+  test("ignores an ignored user's share of a shared commit", () => {
+    const changers = changersByTeam({
+      details: [gitDetails(1, [0, 1])],
+      userTeams: new Map([[0, new Set(["teamA"])]]),
+      ignoredUsers: new Set([1]),
     });
-    const nodeChangers = nodeChangersByTeam(
-      fileNode,
-      aliases,
-      ignoredUsers,
-      userTeams,
-      earliest,
-      latest,
-      true
-    );
-    expect(nodeChangers).toBeDefined();
-    const expected: Map<string, UserStats> = new Map([
-      ["teamA", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
-      ["teamB", { commits: 1, lines: 2, days: new Set([1]), files: 1 }],
-    ]);
-    expect(nodeChangers!).toEqual(expected);
+
+    expect(changers).toEqual(new Map([["teamA", teamTotals(1, 2, [1])]]));
   });
 });
 
@@ -365,136 +260,87 @@ describe("finding top teams as partitions", () => {
   });
 });
 
+function singleTeam({
+  details,
+  team = "teamA",
+  metric,
+  userTeams = new Map(),
+}: {
+  details: GitDetails[];
+  team?: string;
+  metric: FileChangeMetric;
+  userTeams?: UserTeams;
+}) {
+  const fileNode = minimalFileNode("foo", "bar", {
+    data: { git: minimalGitData(details) },
+  });
+  return nodeSingleTeam(
+    fileNode,
+    team,
+    metric,
+    new Map(),
+    new Set(),
+    userTeams,
+    EARLIEST,
+    LATEST
+  );
+}
+
+// `nodeSingleTeam` splits a file's changes into "this team" and "everyone else" - the pair the
+// single-team visualisation shades between. A change counts to the team if *any* of its authors
+// is in it, so the two halves deliberately don't sum to the file's total.
 describe("aggregating for a single team", () => {
-  test("minimal change info returns undefined", () => {
-    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
-      minimalNodeChangersParams();
-    const singleTeamData = nodeSingleTeam(
-      fileNode,
-      "team",
-      "commits",
-      aliases,
-      ignoredUsers,
-      userTeams,
-      earliest,
-      latest
-    );
-    expect(singleTeamData).toBeUndefined();
+  const onlyUserZeroIsInTeamA: UserTeams = new Map([[0, new Set(["teamA"])]]);
+
+  test("a file with no commits has no split to report", () => {
+    expect(singleTeam({ details: [], metric: "commits" })).toBeUndefined();
   });
-  test("separate changes are divided into this team and other users, for all metrics", () => {
-    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
-      minimalNodeChangersParams();
-    userTeams.set(0, new Set(["teamA"]));
-    fileNode.data.git!.details!.push({
-      commit_day: 1,
-      users: [0],
-      commits: 1,
-      lines_added: 2,
-      lines_deleted: 3,
-    });
-    fileNode.data.git!.details!.push({
-      commit_day: 1,
-      users: [1],
-      commits: 1,
-      lines_added: 1,
-      lines_deleted: 1,
-    });
-    const singleTeamData = nodeSingleTeam(
-      fileNode,
-      "teamA",
-      "commits",
-      aliases,
-      ignoredUsers,
-      userTeams,
-      earliest,
-      latest
-    );
-    expect(singleTeamData).toEqual([1, 1]);
-    const singleTeamLines = nodeSingleTeam(
-      fileNode,
-      "teamA",
-      "lines",
-      aliases,
-      ignoredUsers,
-      userTeams,
-      earliest,
-      latest
-    );
-    expect(singleTeamLines).toEqual([5, 2]);
+
+  test("counts commits and lines separately for the team and for everyone else", () => {
+    const details = [
+      gitDetails(1, [0], { lines_added: 2, lines_deleted: 3 }),
+      gitDetails(1, [1]),
+    ];
+
+    expect(
+      singleTeam({
+        details,
+        metric: "commits",
+        userTeams: onlyUserZeroIsInTeamA,
+      })
+    ).toEqual([1, 1]);
+    expect(
+      singleTeam({ details, metric: "lines", userTeams: onlyUserZeroIsInTeamA })
+    ).toEqual([5, 2]);
   });
-  test("commits shared with a team count towards that team", () => {
-    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
-      minimalNodeChangersParams();
-    userTeams.set(0, new Set(["teamA"]));
-    fileNode.data.git!.details!.push({
-      commit_day: 1,
-      users: [0, 1],
-      commits: 2,
-      lines_added: 1,
-      lines_deleted: 1,
+
+  test("gives the team a commit it shares with someone outside it", () => {
+    const result = singleTeam({
+      details: [
+        gitDetails(1, [0, 1], { commits: 2 }),
+        gitDetails(2, [1], { commits: 3 }),
+      ],
+      metric: "commits",
+      userTeams: onlyUserZeroIsInTeamA,
     });
-    fileNode.data.git!.details!.push({
-      commit_day: 2,
-      users: [1],
-      commits: 3,
-      lines_added: 1,
-      lines_deleted: 1,
-    });
-    const singleTeamData = nodeSingleTeam(
-      fileNode,
-      "teamA",
-      "commits",
-      aliases,
-      ignoredUsers,
-      userTeams,
-      earliest,
-      latest
-    );
-    expect(singleTeamData).toEqual([2, 3]);
+
+    expect(result).toEqual([2, 3]);
   });
-  test("days are counted as unique days, not added", () => {
-    const { fileNode, aliases, ignoredUsers, userTeams, earliest, latest } =
-      minimalNodeChangersParams();
-    userTeams.set(0, new Set(["teamA"]));
-    fileNode.data.git!.details!.push({
-      commit_day: 1,
-      users: [0],
-      commits: 1,
-      lines_added: 1,
-      lines_deleted: 1,
+
+  test("counts days as distinct days rather than adding them up", () => {
+    const result = singleTeam({
+      details: [
+        gitDetails(1, [0]),
+        gitDetails(1, [0, 1], { commits: 2 }),
+        gitDetails(2, [1]),
+        gitDetails(3, [1]),
+      ],
+      metric: "days",
+      userTeams: onlyUserZeroIsInTeamA,
     });
-    fileNode.data.git!.details!.push({
-      commit_day: 1,
-      users: [0, 1],
-      commits: 2,
-      lines_added: 1,
-      lines_deleted: 1,
-    });
-    fileNode.data.git!.details!.push({
-      commit_day: 2,
-      users: [1],
-      commits: 1,
-      lines_added: 1,
-      lines_deleted: 1,
-    });
-    fileNode.data.git!.details!.push({
-      commit_day: 3,
-      users: [1],
-      commits: 1,
-      lines_added: 1,
-      lines_deleted: 1,
-    });
-    const singleTeamData = nodeSingleTeam(
-      fileNode,
-      "teamA",
-      "days",
-      aliases,
-      ignoredUsers,
-      userTeams,
-      earliest,
-      latest
-    );
-    expect(singleTeamData).toEqual([1, 2]);
+
+    // the team changed the file on one distinct day; others on two
+    expect(result).toEqual([1, 2]);
   });
 });
 
@@ -528,5 +374,22 @@ describe("filtering coupling by distance", () => {
     expect(filesHaveMaxCommonRoots(-1, "src/deep/a.js", "src/deep/b.js")).toBe(
       true
     );
+  });
+});
+
+describe("top team partitions never exceed the partition count", () => {
+  // The stripe palette only has room for `partitions` colours, and the result is sorted
+  // alphabetically before it gets there - so an over-long list wouldn't merely be trimmed, it
+  // would be trimmed by team *name*. Two teams with identical stats would then render
+  // differently depending on what they were called.
+  test("a dominant team plus a minority team still yields at most `partitions` entries", () => {
+    const stats: Map<string, UserStats> = new Map([
+      testTeamStat("zebra", 10),
+      testTeamStat("aardvark", 2),
+    ]);
+
+    const partitioned = topTeamsPartitioned(stats, "commits", 3, true);
+
+    expect(partitioned!.length).toBeLessThanOrEqual(3);
   });
 });

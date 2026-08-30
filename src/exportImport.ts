@@ -26,6 +26,7 @@ import {
   UserAliases,
 } from "./state";
 import { VizMetadata } from "./viz.types";
+import { NESTED_LEVEL_COUNT } from "./webgl/geometry";
 
 /** the version of the format file - changes whenever state format changes */
 export const FORMAT_FILE_VERSION = "1.4.2";
@@ -80,20 +81,23 @@ export type ExportableState = {
   teamsAndAliases: ExportTeamsAndAliases;
 };
 
-function padNestedStrokes(strokes: string[] | undefined, fallback: string) {
-  const nextStrokes = [...(strokes ?? [])];
-  while (nextStrokes.length < 4) {
-    nextStrokes.push(nextStrokes[nextStrokes.length - 1] ?? fallback);
+// An older state file may carry fewer nesting levels than this release configures (or, after a
+// downgrade, more). Missing levels repeat the last one given rather than jumping to the default,
+// so a saved gradient stays a gradient.
+function padNestedLevels<T>(values: T[] | undefined, fallback: T): T[] {
+  const padded = [...(values ?? [])];
+  while (padded.length < NESTED_LEVEL_COUNT) {
+    padded.push(padded[padded.length - 1] ?? fallback);
   }
-  return nextStrokes.slice(0, 4) as [string, string, string, string];
+  return padded.slice(0, NESTED_LEVEL_COUNT);
+}
+
+function padNestedStrokes(strokes: string[] | undefined, fallback: string) {
+  return padNestedLevels(strokes, fallback) as [string, string, string, string];
 }
 
 function padNestedWidths(widths: number[] | undefined, fallback: number) {
-  const nextWidths = [...(widths ?? [])];
-  while (nextWidths.length < 4) {
-    nextWidths.push(nextWidths[nextWidths.length - 1] ?? fallback);
-  }
-  return nextWidths.slice(0, 4) as [number, number, number, number];
+  return padNestedLevels(widths, fallback) as [number, number, number, number];
 }
 
 function toExportUser(

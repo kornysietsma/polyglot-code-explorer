@@ -565,7 +565,19 @@ function postprocessState(
 ) {
   console.time("postprocessing state");
   let resultingState = newState;
-  let alreadyCloned = false; // if we modify state, need to clone it - but only once!
+  let alreadyCloned = false;
+  // Every block below writes into `calculated`, so each has to be working on a copy - but only
+  // the first one to fire should pay for the clone. Going through this rather than each block
+  // testing `alreadyCloned` itself keeps them independently correct: the file-maxima block used
+  // to write straight into `resultingState`, safe only because its condition happened to imply
+  // the user-teams block above had already cloned.
+  const mutableState = () => {
+    if (!alreadyCloned) {
+      resultingState = _.cloneDeep(resultingState);
+      alreadyCloned = true;
+    }
+    return resultingState;
+  };
   const force = newState.calculated.forceRecalculateAll;
   const datesChanged = !_.isEqual(
     oldState.config.filters.dateRange,
@@ -580,19 +592,17 @@ function postprocessState(
     )
   ) {
     console.time("postprocessing - building user teams");
-    if (!alreadyCloned) {
-      resultingState = _.cloneDeep(resultingState);
-      alreadyCloned = true;
-    }
-    resultingState.calculated.userTeams = buildUserTeams(
-      resultingState.config.teamsAndAliases.teams
+    const state = mutableState();
+    state.calculated.userTeams = buildUserTeams(
+      state.config.teamsAndAliases.teams
     );
     console.timeEnd("postprocessing - building user teams");
   }
   if (force || datesChanged) {
     console.time("postprocessing - file maxima");
-    resultingState.calculated.fileMaxima = calculateFileMaxima(
-      resultingState,
+    const state = mutableState();
+    state.calculated.fileMaxima = calculateFileMaxima(
+      state,
       dataRef.current.data.tree
     );
     console.timeEnd("postprocessing - file maxima");
@@ -611,19 +621,19 @@ function postprocessState(
         newState.config.teamsAndAliases
       ) ||
       datesChanged ||
-      oldState.config.teamVisualisation.showNonTeamChanges !=
-        newState.config.teamVisualisation.showNonTeamChanges ||
-      themedColours(oldState.config).teams !=
+      // by value, like every other check here - the team colours are a fresh object on any
+      // state that was cloned, so comparing by reference recomputed the whole pattern set
+      // on dispatches that had not touched a colour at all
+      !_.isEqual(
+        themedColours(oldState.config).teams,
         themedColours(newState.config).teams
+      )
     ) {
       console.timeEnd("checking for svg state change");
       console.time("postprocessing - svg patterns");
-      if (!alreadyCloned) {
-        resultingState = _.cloneDeep(resultingState);
-        alreadyCloned = true;
-      }
-      resultingState.calculated.svgPatterns = calculateSvgPatterns(
-        resultingState,
+      const state = mutableState();
+      state.calculated.svgPatterns = calculateSvgPatterns(
+        state,
         dataRef.current.data
       );
       console.timeEnd("postprocessing - svg patterns");
@@ -632,10 +642,7 @@ function postprocessState(
     }
   }
   if (force) {
-    if (!alreadyCloned) {
-      resultingState = _.cloneDeep(resultingState);
-    }
-    resultingState.calculated.forceRecalculateAll = false;
+    mutableState().calculated.forceRecalculateAll = false;
   }
   console.timeEnd("postprocessing state");
   return resultingState;

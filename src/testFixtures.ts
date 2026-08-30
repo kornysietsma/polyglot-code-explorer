@@ -116,13 +116,10 @@ export function minimalPolyglotData(
   };
 }
 
-// The real default `State`, built the way App.tsx builds it. Going through
-// `initialiseGlobalState` rather than hand-writing a Config keeps tests honest about the shape:
-// a new config field can't be silently missed here. `initialiseGlobalState` reads only the
-// handful of fields set below.
-export function minimalState(): State {
-  const data: PolyglotData = minimalPolyglotData(minimalFileNode("root", ""));
-  const metadata: VizMetadata = {
+// The postprocessed metadata `Loader.tsx` builds. `users` is the field most tests override,
+// since it is what teams and aliases resolve against.
+export function vizMetadata(overrides: Partial<VizMetadata> = {}): VizMetadata {
+  return {
     languages: {
       languageKey: [],
       languageMap: new Map(),
@@ -132,8 +129,17 @@ export function minimalState(): State {
     users: [],
     nodesByPath: new Map(),
     timescaleData: [],
+    ...overrides,
   };
-  const vizData: VizData = { data, metadata };
+}
+
+// The real default `State`, built the way App.tsx builds it. Going through
+// `initialiseGlobalState` rather than hand-writing a Config keeps tests honest about the shape:
+// a new config field can't be silently missed here. `initialiseGlobalState` reads only the
+// handful of fields set below.
+export function minimalState(): State {
+  const data: PolyglotData = minimalPolyglotData(minimalFileNode("root", ""));
+  const vizData: VizData = { data, metadata: vizMetadata() };
   const dataRef: VizDataRef = { current: vizData };
   return initialiseGlobalState(dataRef);
 }
