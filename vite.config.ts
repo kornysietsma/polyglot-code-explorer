@@ -41,10 +41,15 @@ function serveDataDir(): Plugin {
         let size: number;
         try {
           size = statSync(filePath).size;
-        } catch {
+        } catch (e) {
+          // A missing file is routine — every data file without a `_state.json` sidecar asks
+          // for one and gets a 404 — so only say something when the reason is *not* that.
+          // Otherwise a permissions or path problem is indistinguishable from a normal miss.
+          if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
+            console.error(`Cannot stat data file ${filePath}:`, e);
+          }
           // Answer directly rather than calling next() — otherwise Vite's SPA fallback serves
-          // index.html for a missing file (e.g. a data file with no `_state.json` sidecar),
-          // which breaks callers expecting a normal fetch failure.
+          // index.html for a missing file, which breaks callers expecting a normal fetch failure.
           res.statusCode = 404;
           res.end();
           return;
@@ -55,7 +60,31 @@ function serveDataDir(): Plugin {
           res.end();
           return;
         }
-        createReadStream(filePath).pipe(res);
+        // Piping without this is how a failed data load says nothing anywhere: an unhandled
+        // 'error' on either end is silent here, and the browser only sees a truncated response.
+        const stream = createReadStream(filePath);
+        stream.on("error", (e) => {
+          console.error(`Error reading data file ${filePath}:`, e);
+          res.end();
+        });
+        res.on("error", (e) => {
+          console.error(
+            `Error writing data file ${filePath} to the client:`,
+            e
+          );
+          stream.destroy();
+        });
+        res.on("close", () => {
+          // The client went away mid-transfer — a navigation, or the tab dying under the weight
+          // of the file it just asked for, which is the case this whole exercise started from.
+          if (!res.writableEnded) {
+            console.warn(
+              `Client disconnected while sending data file ${filePath} (${size} bytes)`
+            );
+            stream.destroy();
+          }
+        });
+        stream.pipe(res);
       });
     },
   };

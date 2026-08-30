@@ -2,6 +2,8 @@ import React, { MutableRefObject, useEffect, useRef, useState } from "react";
 import semver from "semver";
 
 import App from "./App";
+import ErrorBoundary from "./ErrorBoundary";
+import ErrorReport from "./ErrorReport";
 import { ExportableState } from "./exportImport";
 import { PolyglotData, SUPPORTED_FILE_VERSION } from "./polyglot_data.types";
 import {
@@ -14,6 +16,21 @@ import {
 } from "./preprocess";
 import { VizData, VizDataRefMaybe } from "./viz.types";
 
+/**
+ * V8 cannot create a string longer than 2^29 - 24 bytes, and `response.json()` decodes the whole
+ * body to a string before parsing it — so a data file above this size cannot load however much
+ * heap is free. Confirmed in Chrome: `"a".repeat(536870889)` throws `RangeError: Invalid string
+ * length`.
+ *
+ * This is a real ceiling rather than a chosen one, which matters because scanner outputs get
+ * genuinely large. `data/spring-projects.json` (514 MB, 80,691 nodes) sits just under it and
+ * loads fine, using 508 MB of a 4.4 GB heap — so this refuses only files that truly cannot be
+ * parsed, and says so up front instead of failing somewhere deep in the fetch.
+ */
+export const MAX_DATA_FILE_BYTES = 536_870_888;
+
+const describeBytes = (bytes: number) => `${(bytes / 1_000_000).toFixed(1)} MB`;
+
 const useFetch = (
   url: string,
   setErrors: React.Dispatch<React.SetStateAction<string[]>>
@@ -24,6 +41,28 @@ const useFetch = (
     async function fetchData() {
       try {
         const response = await fetch(url);
+        if (!response.ok) {
+          // Without this an HTTP failure reaches `json()` anyway, and a 500's HTML error page
+          // is reported as a JSON syntax error — which says nothing about what went wrong.
+          throw new Error(
+            `Failed to fetch data file at ${url}: ${response.status} ${response.statusText}`
+          );
+        }
+        // `fetch` resolves once the headers are in, so this refuses an impossible file before
+        // the body is read — and cancels the download rather than spending minutes on hundreds
+        // of megabytes that cannot be parsed anyway.
+        const declaredSize = Number(response.headers.get("Content-Length"));
+        if (
+          Number.isFinite(declaredSize) &&
+          declaredSize > MAX_DATA_FILE_BYTES
+        ) {
+          await response.body?.cancel();
+          throw new Error(
+            `Data file at ${url} is ${describeBytes(declaredSize)}, larger than the ` +
+              `${describeBytes(MAX_DATA_FILE_BYTES)} this browser can parse. Scan a subset of ` +
+              `the codebase, or turn off features that add per-file detail.`
+          );
+        }
         const json = await response.json();
 
         const data = json as PolyglotData;
@@ -72,7 +111,7 @@ const useFetch = (
         setData({ data: data, metadata });
       } catch (e) {
         if (e instanceof Error) {
-          const errors = [`Error ${e.name}:`, e.message];
+          const errors = [`${e.name}:`, e.message];
           setErrors(errors);
         } else {
           setErrors([`${e}`]);
@@ -142,21 +181,16 @@ const Loader = () => {
   stateRefEventually.current = initialState;
 
   return errors.length > 0 ? (
-    <div>
-      <h1>Errors loading data:</h1>
-      <ul>
-        {errors.map((e, ix) => (
-          <li key={ix}>{e}</li>
-        ))}
-      </ul>
-    </div>
+    <ErrorReport title="Errors loading data:" lines={errors} />
   ) : dataRefEventually.current === undefined ? (
     <div>Loading...</div>
   ) : (
-    <App
-      dataRefMaybe={dataRefEventually}
-      initialStateMaybe={stateRefEventually}
-    />
+    <ErrorBoundary>
+      <App
+        dataRefMaybe={dataRefEventually}
+        initialStateMaybe={stateRefEventually}
+      />
+    </ErrorBoundary>
   );
 };
 

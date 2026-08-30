@@ -4,7 +4,10 @@ import "./css/custom.scss";
 import { createRoot } from "react-dom/client";
 import ReactModal from "react-modal";
 
+import { registerGlobalErrorHandlers } from "./globalErrorHandlers";
 import Loader from "./Loader";
+
+registerGlobalErrorHandlers();
 
 const container = document.getElementById("root");
 if (!container) {
