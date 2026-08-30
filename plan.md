@@ -47,36 +47,36 @@ Spec table order. Each is a failing test, then a one- or two-line fix.
 
 ### 1.3 Extract for testability
 
-- [ ] Pull `Viz.tsx` `draw()`'s two `descendants().filter(...)` chains into a pure module
+- [x] Pull `Viz.tsx` `draw()`'s two `descendants().filter(...)` chains into a pure module
       (`vizNodeSelection.ts`), keeping `vizUpdatePaths.ts`'s "outside `src/webgl/`, pure, no
       `gl` import" convention.
-- [ ] Unit-test it against a nested fixture tree, including the case CLAUDE.md names: a circle
+- [x] Unit-test it against a nested fixture tree, including the case CLAUDE.md names: a circle
       whose children are all circles must stay in the outline set.
-- [ ] Extend `src/testFixtures.ts` with a small nested-tree builder so `preprocess.test.ts`,
+- [x] Extend `src/testFixtures.ts` with a small nested-tree builder so `preprocess.test.ts`,
       `geometry.test.ts` and the new selection tests stop each rolling their own
       `directory()`/`file()` helpers.
 
 ### 1.4 Fill the genuine gaps, prune the rest
 
-- [ ] `preprocess.ts` — one integration-style test over a small `PolyglotData` covering
+- [x] `preprocess.ts` — one integration-style test over a small `PolyglotData` covering
       `gatherGlobalStats`, `gatherTimescaleData`'s week bucketing (Sunday pinning, commits
       merging into one bucket, and the same bucketing on the `file_stats` branch), and
       `countLanguagesIn`'s colour-exhaustion fallback to `otherColour`.
-- [ ] `BaseVisualization.fillFn` — one test pinning the three override rules
+- [x] `BaseVisualization.fillFn` — one test pinning the three override rules
       (circle-packed → background at any depth, not-yet-created → nonexistent, undefined value →
       neutral).
-- [ ] `svgPatterns.calculateSvgPatterns` — one test that a fewer-than-`SVG_PARTITIONS` team
+- [x] `svgPatterns.calculateSvgPatterns` — one test that a fewer-than-`SVG_PARTITIONS` team
       result still produces a usable pattern, and that identical colour keys share a pattern id.
-- [ ] `exportImport.ts` — one round-trip test (export a state, re-import it, assert equality)
+- [x] `exportImport.ts` — one round-trip test (export a state, re-import it, assert equality)
       plus the version-rejection path. This is user-facing save/load with no coverage at all.
-- [ ] `state.ts` `postprocessState` — one test per recompute trigger showing it _does_ and
+- [x] `state.ts` `postprocessState` — one test per recompute trigger showing it _does_ and
       _does not_ fire; this is the performance-critical diffing CLAUDE.md says to preserve, and
       the refactor in phase 2 will lean on it.
-- [ ] Review `nodeData.test.ts` (496 lines) for tests that restate each other. The
+- [x] Review `nodeData.test.ts` (496 lines) for tests that restate each other. The
       `nodeChangersByTeam` block has six cases where three would document the rule; merge rather
       than delete outright, keeping the overlapping-teams and ignored-users cases, which are the
       ones carrying real logic.
-- [ ] Fix the reference-vs-`_.isEqual` and redundant-check inconsistencies in `postprocessState`,
+- [x] Fix the reference-vs-`_.isEqual` and redundant-check inconsistencies in `postprocessState`,
       and the hardcoded `4` in `exportImport.ts`, now that there are tests around them.
 
 ### 1.5 Close out phase 1

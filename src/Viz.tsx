@@ -29,6 +29,7 @@ import { FeatureFlags, Point, TreeNode } from "./polyglot_data.types";
 import { TimescaleIntervalData } from "./preprocess";
 import { Action, State, themedColours } from "./state";
 import { VizMetadata } from "./viz.types";
+import { selectNodesToDraw } from "./vizNodeSelection";
 import VizTooltip from "./VizTooltip";
 import {
   buildFillFn,
@@ -408,39 +409,16 @@ const draw = (
   });
   metadata.hierarchyNodesByPath = hierarchyNodesByPath;
 
-  // note we filter out nodes that are parents who will be hidden by their children, for speed
-  // so only show parent nodes at the clipping level. This is the cell set - also what the picking
-  // index is built from, so a pick can never return a node with no fill.
-  const allNodes = rootNode
-    .descendants()
-    .filter((d) => d.depth <= expensiveConfig.depth)
-    .filter(
-      (d) => d.children === undefined || d.depth === expensiveConfig.depth
-    );
-  refs.visibleNodes.current = allNodes;
-
-  // The outline set is every node below the root, down to the depth limit, whether or not it has
-  // a fill - that includes the circle-packed nodes, whose boundaries are otherwise only implied
-  // by whatever their children happen to tile (nothing at all, for a circle full of circles).
-  // `outlineLevel` (geometry.ts) is what tells a circle boundary from a nesting stroke. The root
-  // is left out - its boundary is the edge of the whole diagram - except when the depth limit
-  // makes it the only cell drawn. Sorted depth-descending so shallower/wider outlines paint over
-  // deeper ones; there is no depth buffer.
-  const outlineNodes = rootNode
-    .descendants()
-    .filter(
-      (d) =>
-        d.depth <= expensiveConfig.depth &&
-        (d.depth >= 1 ||
-          d.children === undefined ||
-          d.depth === expensiveConfig.depth)
-    )
-    .sort((left, right) => right.depth - left.depth);
-  refs.outlineNodes.current = outlineNodes;
+  const { fills, outlines } = selectNodesToDraw(
+    rootNode,
+    expensiveConfig.depth
+  );
+  refs.visibleNodes.current = fills;
+  refs.outlineNodes.current = outlines;
 
   glRenderer.setGeometry(
-    allNodes,
-    outlineNodes,
+    fills,
+    outlines,
     buildFillFn(metadata, features, state),
     buildNestingStyle(state),
     buildFillPalette(state)

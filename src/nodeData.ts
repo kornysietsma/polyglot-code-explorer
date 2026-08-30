@@ -565,12 +565,14 @@ function singleStat(stats: UserStats, metric: FileChangeMetric): number {
 }
 
 /**
- * finds the top teams by given metric, split into N partitions
- * for striped patterns (so usually 2 for 2 stripes)
- * @param teamStats
- * @param metric
- * @param partitions
- * @returns
+ * Finds the top teams by the given metric, split into at most `partitions` shares - one per
+ * stripe of a team pattern. A team needs half a share to earn a stripe at all, so the result is
+ * often shorter than `partitions`, and is `undefined` when no team has any of the metric.
+ *
+ * It is never *longer*: the pattern palette only has room for `partitions` colours, and the
+ * result is sorted by name before it gets there, so an overshoot would be trimmed by team name
+ * rather than by contribution - two teams with identical stats rendering differently depending
+ * on what they were called.
  */
 export function topTeamsPartitioned(
   teamStats: Map<string, UserStats>,
@@ -596,7 +598,11 @@ export function topTeamsPartitioned(
   }
   const halfQuota = statTotal / (partitions * 2);
   const results: string[] = [];
-  while (workingStats.length > 0 && workingStats[0]![1] >= halfQuota) {
+  while (
+    results.length < partitions &&
+    workingStats.length > 0 &&
+    workingStats[0]![1] >= halfQuota
+  ) {
     results.push(workingStats[0]![0]);
     workingStats[0]![1] -= halfQuota + halfQuota;
     if (workingStats[0]![1] < 0) {
