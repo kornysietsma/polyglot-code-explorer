@@ -1,4 +1,4 @@
-import { describe, expect, it, test } from "vitest";
+import { describe, expect, it, test, vi } from "vitest";
 
 import { NodeLayoutAlgorithm } from "./polyglot_data.types";
 import {
@@ -204,6 +204,77 @@ describe("gatherTimescaleData", () => {
     expect(timescale.length).toBe(2);
     expect(timescale[0]!.files).toBe(2);
     expect(timescale[1]!.files).toBe(1);
+  });
+
+  test("buckets a timestamp into the same UTC week whatever the machine's timezone", () => {
+    // The scanner's timestamps are day-aligned UTC, so the week a commit lands in must not
+    // depend on where the person reading the visualisation happens to be. This is the assertion
+    // that fails with date-fns's local-time `startOfWeek`: in `America/New_York` it bucketed to
+    // 2019-04-07T04:00:00Z, and in `Europe/London` to 2019-04-06T23:00:00Z - neither of which is
+    // a week boundary anywhere.
+    const node = minimalFileNode("f", "f", {
+      data: {
+        // Tuesday 2019-04-09, 00:00 UTC
+        git: minimalGitData([gitDetails(1554768000, [0])]),
+      },
+    });
+    const root = directory("root", "voronoi", [node]);
+
+    const bucketStartsByZone = [
+      "Europe/London",
+      "America/New_York",
+      "Australia/Sydney",
+    ].map((timeZone) => {
+      vi.stubEnv("TZ", timeZone);
+      try {
+        const timescale = gatherTimescaleData(
+          minimalPolyglotData(root, { git: true }),
+          "week"
+        );
+        return timescale[0]!.day.getTime();
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    // Sunday 2019-04-07, 00:00 UTC - the same instant in all three zones
+    expect(bucketStartsByZone).toEqual([
+      1554595200000, 1554595200000, 1554595200000,
+    ]);
+  });
+
+  test("buckets dates that fall around calendar quirks onto the right Sunday", () => {
+    // The bucketing is integer arithmetic on whole days, which needs no special case for any of
+    // these - unix time is 86400 seconds per day by definition. That is exactly why they are
+    // worth pinning: it would be easy to "fix" this back into something month-aware that does.
+    const quirkyDays = [
+      "2000-02-29", // a leap day, in a century year that *is* a leap year
+      "2016-12-31", // the day a real leap second was inserted
+      "2024-02-29", // an ordinary leap day
+      "2100-02-28", // a century year that is *not* a leap year
+    ];
+    const node = minimalFileNode("f", "f", {
+      data: {
+        git: minimalGitData(
+          quirkyDays.map((day) =>
+            gitDetails(Date.parse(`${day}T00:00:00Z`) / 1000, [0])
+          )
+        ),
+      },
+    });
+    const root = directory("root", "voronoi", [node]);
+
+    const timescale = gatherTimescaleData(
+      minimalPolyglotData(root, { git: true }),
+      "week"
+    );
+
+    expect(timescale.map((d) => d.day.toISOString())).toEqual([
+      "2000-02-27T00:00:00.000Z",
+      "2016-12-25T00:00:00.000Z",
+      "2024-02-25T00:00:00.000Z",
+      "2100-02-28T00:00:00.000Z",
+    ]);
   });
 
   test("returns buckets in date order", () => {

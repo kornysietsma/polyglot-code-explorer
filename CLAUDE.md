@@ -224,6 +224,14 @@ sharp edges; read them before changing either.
 
 ## Things that will bite you
 
+- **Every displayed date and week bucket is UTC**, deliberately and throughout — see
+  `docs/dates-and-timezones.md`. `humanizeDate` uses `Intl` with `timeZone: "UTC"` and the
+  `en-US` locale (`en-GB` abbreviates September as "Sept"); week bucketing is integer arithmetic
+  on unix days, with no `Date` involved. The single exception is `state.ts`'s
+  `subYears`/`addDays`, which set the date slider's default bounds with ±2 days of deliberate
+  leeway and stay on date-fns' local-calendar arithmetic; it is commented in place. That
+  exception is also the only thing left that can make a screenshot baseline timezone-dependent,
+  and only when those bounds cross a daylight-saving boundary.
 - **`index.tsx` deliberately omits `React.StrictMode`**, and `react-hooks/refs` is off in
   `eslint.config.ts`. Both for the same reason: this app reads refs during render and does
   imperative D3 rendering in `Viz.tsx`, which StrictMode's double-invoked effects would break.
@@ -273,15 +281,6 @@ Import ordering is enforced by `simple-import-sort` via eslint (not manually mai
 
 Deliberately not done; all still open:
 
-- **Every date is rendered in the machine's local timezone, but the data is UTC.** The scanner
-  emits day-aligned UTC timestamps; `datetimes.ts`'s `humanizeDate` formats them with date-fns's
-  local-time `format`, so on any machine behind UTC a commit renders as **the previous day**
-  (`1554768000` shows as `08-Apr-2019` in `America/New_York`, `09-Apr-2019` in
-  `Europe/London`). The same applies to `preprocess.ts`'s `startOfWeek` bucketing, whose comment
-  only claims to pin the week's _start day_: buckets land on local midnight, so away from UTC
-  they are offset by the local UTC offset rather than sitting on a real week boundary. Not fixed
-  — it changes every displayed date and every timescale bucket, and it also means the screenshot
-  baselines are only reproducible in the timezone they were recorded in.
 - **Accessibility regression from the WebGL rewrite.** The canvas is opaque to screen readers;
   the old SVG `.cell`/`.nesting` paths were DOM nodes (unlabelled, so not genuinely navigable
   either, but present). Recorded rather than fixed — out of scope for that rewrite, revisit if

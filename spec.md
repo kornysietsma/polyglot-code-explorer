@@ -4,18 +4,23 @@
 
 Phase 1 (test clarity, the `nestedCircles` screenshot suite, seven defect fixes) is **done and
 committed**: `174d284`, `b86044d`, `262bf9b`, `e268255`. Its findings are folded into `CLAUDE.md`;
-git holds the rest. This spec covers only what is left.
+git holds the rest.
+
+Of this spec, **Parts 1 and 2 are done and committed** — error visibility (`72f820c`, `e9e4453`)
+and UTC dates (`4438d4c`, `70b73d3`, `89ed94b`). Their sections below now record what was decided
+and what was found, rather than what is planned. **Parts 3 and 4 remain**, with `plan.md` holding
+the ordered steps.
 
 ## Why
 
-The codebase works and is now reasonably well tested — 163 unit tests and 16 screenshots — but it
-sprawls. Four files carry 4,167 lines between them, and each mixes several unrelated concerns in
+The codebase works and is now reasonably well tested — 181 unit tests and 16 screenshots — but it
+sprawls. Four files carry 4,172 lines between them, and each mixes several unrelated concerns in
 one namespace:
 
 | file                | lines | what is tangled together                                                                                                         |
 | ------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `UsersAndTeams.tsx` | 1348  | one 1219-line component: modal, three sortable tables, selection, filters, alias/team creation, import/export, colour management |
-| `state.ts`          | 993   | the `Config` shape, a ~25-case `Action` union, the reducer, and `postprocessState`'s derived-data cache                          |
+| `state.ts`          | 998   | the `Config` shape, a ~25-case `Action` union, the reducer, and `postprocessState`'s derived-data cache                          |
 | `Viz.tsx`           | 944   | imperative D3/WebGL: draw, update, coupling arcs, timescale brush, zoom wiring, tooltip, GL recovery                             |
 | `nodeData.ts`       | 882   | ~50 `nodeXxx` functions over four unrelated concerns: git change details, coupling, layout accessors, team aggregation           |
 
@@ -23,8 +28,8 @@ The goal is expressive, readable, modular code — each module about one thing, 
 says what that thing is. Tests already cover the risky logic; this is about where the code lives
 and what it is called.
 
-Three correctness items ride along, none dependent on the refactor: error visibility, UTC dates,
-and the user lookup.
+Three correctness items ride along, none dependent on the refactor: error visibility and UTC
+dates, both now done, and the user lookup, which is next.
 
 ## Scope
 
@@ -77,37 +82,31 @@ though it is not the file that broke.
 So the fix is to fail early and legibly on a file that cannot fit, checked against that limit —
 which refuses nothing that currently works, and would have caught the larger file.
 
-### What is definitely wrong regardless
+### The decision, and what shipped
 
-Four gaps, each of which would make an _ordinary_ failure just as invisible. These are worth
-fixing whether or not they explain this particular crash.
+Make failures loud, then make the size limit explicit. Four gaps were fixed, each of which would
+have made an _ordinary_ failure just as invisible as the crash:
 
-1. **There is no React error boundary anywhere.** Confirmed: nothing in `src/` implements
-   `componentDidCatch` or `getDerivedStateFromError`. An exception thrown while rendering `App`,
-   `Viz` or the inspectors unmounts the whole tree and leaves a blank page. React already
-   complains about this in the console — the `Inspector` throwing `bad selected node` during the
-   `nested.json` work produced _"An error occurred in the &lt;Inspector&gt; component. Consider
-   adding an error boundary"_. `Loader.tsx`'s error list only covers the fetch-and-preprocess
-   phase; once `App` mounts, nothing catches anything.
-2. **`vite.config.ts`'s `createReadStream(filePath).pipe(res)` has no error handling.** A stream
-   error — a read failure, or the client disconnecting mid-transfer, which is precisely what
-   happens when a tab dies mid-download — emits an unhandled `'error'` event. Nothing logs it,
-   which is a strong candidate for the silent Vite console.
-3. **`vite.config.ts`'s bare `catch {}` around `statSync` discards the reason.** Answering 404 is
-   right, but a permissions error, a path problem and a genuinely missing file become
-   indistinguishable.
-4. **`Loader.tsx` never checks `response.ok`.** A 500 or an HTML error page goes straight to
-   `response.json()`, so the user sees a JSON syntax error instead of the actual HTTP failure.
+1. **An error boundary now wraps `App`** (`ErrorBoundary.tsx`), rendering the message and
+   component stack through the same `ErrorReport` markup `Loader` uses for load-time errors, so a
+   render-time failure looks like a load-time one instead of blanking the page. It catches
+   render-time failures only: `Viz.tsx`'s WebGL context-loss recovery runs in native canvas event
+   handlers, which never reach a boundary and keep handling themselves.
+2. **`index.tsx` registers global `error` and `unhandledrejection` handlers**
+   (`globalErrorHandlers.ts`), for anything thrown outside React's render. They log; they do not
+   surface in the UI.
+3. **`vite.config.ts` handles stream and response errors**, and warns when the client disconnects
+   mid-transfer — which is exactly what a tab dying mid-download looks like, and was the most
+   likely reason its console said nothing. Its `statSync` catch now logs the reason, except
+   `ENOENT`, which is routine: every data file without a `_state.json` sidecar asks for one and
+   misses.
+4. **`Loader.tsx` checks `response.ok`** before `json()`, so an HTTP failure reports itself rather
+   than surfacing as a JSON syntax error, and **refuses an oversized file** from `Content-Length`
+   before reading the body, cancelling the download.
 
-### The decision
-
-Make failures loud, then make the size limit explicit. Specifically: an error boundary around the
-app, real error handling on the dev server's file streaming, an `response.ok` check, and a clear
-up-front message when a data file is too large to load rather than a dead tab. A global
-`unhandledrejection` / `window.onerror` hook catches whatever the boundary cannot.
-
-This comes first in the plan, not because it is the most valuable, but because every later step
-is easier to diagnose once a failure says so.
+This came first in the plan, not because it is the most valuable, but because every later step is
+easier to diagnose once a failure says so — which paid off immediately, since the boundary is
+what makes a mid-refactor throw legible.
 
 ## Part 2 — dates are UTC
 
@@ -129,43 +128,45 @@ Measured on one timestamp (`1554768000` = Tuesday 9 April 2019, 00:00 UTC):
 | `America/New_York` | **08-Apr-2019** ✗ | 2019-04-07T04:00:00Z ✗ |
 | `Australia/Sydney` | 09-Apr-2019 ✓     | 2019-04-06T13:00:00Z ✗ |
 
-### The decision
+### The decision, and what shipped
 
 Everything is stored and displayed as **UTC**. Korny works in the UK, where UTC day and week
 boundaries are close enough to local time to cause no confusion, and the tool is his.
 
-Note the practical consequence: **in the UK this fix is very likely invisible.** The UK is never
-behind UTC, so `humanizeDate` is already correct there, and the hour-early bucket boundary still
-lands in the same week. The screenshot suite is therefore expected to show **zero** diffs — and
-if it does not, that is a finding worth understanding, not a re-baseline.
+The bug existed only because day-aligned integers were pushed through a `Date`, so:
 
-### The approach
-
-The bug exists only because day-aligned integers were pushed through a `Date`. So:
-
-- **Week bucketing becomes integer arithmetic on unix seconds** — `d - ((d + 4) % 7)` days, where
+- **Week bucketing is integer arithmetic on unix seconds** — `d - ((d + 4) % 7)` days, where
   `d = floor(t / 86400)` and the `+ 4` is the offset from the epoch's Thursday to Sunday. No
-  `Date`, so no timezone to get wrong. Verified exact against all three zones above.
-- **Display uses `Intl.DateTimeFormat` with `timeZone: "UTC"`.** No new dependency.
+  `Date`, so no timezone to get wrong. The `% 7` is doubled so it stays right for pre-epoch
+  dates. Verified against a UTC reference over 292,196 timestamps from 1900 to 2100 in six
+  timezones, zero mismatches: leap years, the century rules and leap seconds all need no special
+  case, because unix time is 86400 seconds per day _by definition_ and the weekday cycle never
+  breaks.
+- **Display uses `Intl.DateTimeFormat` with `timeZone: "UTC"`.** No new dependency. The locale is
+  **`en-US`, not `en-GB`** despite this being a UK tool: en-GB abbreviates September as "Sept",
+  which would silently have changed the output. en-US matches date-fns' `MMM` for all twelve
+  months, so nothing but the timezone changed.
 
-`state.ts`'s `subYears`/`addDays` are ±2 days of deliberate slider leeway, not correctness — they
-can stay on date-fns, but should be noted so the next reader does not think they were missed.
+`state.ts`'s `subYears`/`addDays` stay on date-fns — ±2 days of deliberate slider leeway, not
+correctness — and are commented so the next reader does not think they were missed. They are also
+the only thing left that can make a screenshot baseline timezone-dependent, and then only across a
+daylight-saving boundary. `Viz.tsx`'s `scaleUtc`/`addUtcDays` were checked and are correct as they
+stand.
 
-`Viz.tsx`'s timescale axis already uses `scaleUtc` and a hand-rolled `addUtcDays`; that is
-correct today and gets checked against the new helpers rather than rewritten.
+**The prediction of zero screenshot diffs was half wrong, and the finding was worth having.**
+Bucket _membership_ is unchanged in the UK as expected — but the bucket's start _timestamp_ is
+what the timescale plots, and it moves an hour under BST, from Saturday 23:00 UTC (local midnight,
+not a week boundary) to Sunday 00:00 UTC. Nine shots were re-baselined deliberately, after
+confirming the changed pixels were confined to the timescale strip and identical across
+date-sensitive and date-insensitive visualisations alike — no polygon moved.
 
 ### The documentation
 
-A short page, `docs/dates-and-timezones.md`, aimed at anyone reading a diagram:
-
-- every date and week bucket in the app is UTC;
-- what that means outside the UK — a late-evening US commit lands on the following day, and on
-  the following week if it is a Saturday;
-- why the scanner's day-aligned timestamps make UTC the honest choice rather than an arbitrary one;
-- that the UI never displays a timezone, so UTC is the standing assumption.
-
-Linked from `README.md`. `docs/rendering-performance.md` is currently unlinked from anywhere —
-the same README section should pick it up.
+`docs/dates-and-timezones.md`, aimed at anyone reading a diagram rather than maintaining the code:
+what the dates mean, what UTC implies outside the UK, why the scanner's day-aligned timestamps
+make UTC the honest choice rather than an arbitrary one, and that the UI never displays a
+timezone so UTC is a standing assumption. Linked from a new `README.md` "Design notes" section,
+which also picks up the previously unlinked `docs/rendering-performance.md`.
 
 ## Part 3 — user lookup by id, not by array position
 
@@ -207,8 +208,9 @@ mechanical, but it touches every dispatch site, so it wants its own step.
 The riskiest step in the plan, and the only file with no coverage at all. **Whole-panel tests
 come first**, before anything moves: create a team, assign users, create an alias, ignore a user,
 filter, sort. They assert on the actions dispatched rather than on markup, so they survive the
-restructure and document what the panel is for. `@testing-library/react` is already a
-devDependency and has never been used — this establishes the pattern for the repo.
+restructure and document what the panel is for. Part 1 put `@testing-library/react` into use for
+the first time (`ErrorBoundary.test.tsx`, `Loader.test.tsx`), so the pattern exists to follow
+rather than invent — this step only has to scale it to a much larger component.
 
 Only once those are green does the component get broken up.
 
