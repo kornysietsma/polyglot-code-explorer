@@ -1,105 +1,227 @@
-# Test clarity and expressiveness — spec
+# Expressiveness refactor — spec
+
+## Status
+
+Phase 1 (test clarity, the `nestedCircles` screenshot suite, seven defect fixes) is **done and
+committed**: `174d284`, `b86044d`, `262bf9b`, `e268255`. Its findings are folded into `CLAUDE.md`;
+git holds the rest. This spec covers only what is left.
 
 ## Why
 
-Two goals, in this order:
+The codebase works and is now reasonably well tested — 163 unit tests and 16 screenshots — but it
+sprawls. Four files carry 4,167 lines between them, and each mixes several unrelated concerns in
+one namespace:
 
-1. **Cover nested circle packing.** `nestedCircles` is a layout Korny uses often, and it is the
-   awkward one — circle depth varies per branch, and the outline/level logic exists almost
-   entirely to serve it. Today no screenshot test renders it at all: `data/default.json` is a
-   `circlePack` root, so the whole e2e suite exercises one circle at the top and voronoi below.
-   The one regression CLAUDE.md records for this area ("a circle full of packed circles has
-   nothing tiling its boundary, so dropping those nodes makes the group's circle vanish") is
-   invisible to CI-equivalent checks.
-2. **Make the test suite say what the code does.** The next piece of work is an expressiveness
-   refactor. Tests are the safety net for that, so before refactoring they need to (a) pin the
-   behaviour that is genuinely risky, and (b) read as documentation. Right now coverage is
-   lopsided: the WebGL layer is well covered, and `nodeData.ts`'s team aggregation is well
-   covered, but several pure modules with real edge cases have no tests, and a handful of them
-   have confirmed defects.
+| file                | lines | what is tangled together                                                                                                         |
+| ------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `UsersAndTeams.tsx` | 1348  | one 1219-line component: modal, three sortable tables, selection, filters, alias/team creation, import/export, colour management |
+| `state.ts`          | 993   | the `Config` shape, a ~25-case `Action` union, the reducer, and `postprocessState`'s derived-data cache                          |
+| `Viz.tsx`           | 944   | imperative D3/WebGL: draw, update, coupling arcs, timescale brush, zoom wiring, tooltip, GL recovery                             |
+| `nodeData.ts`       | 882   | ~50 `nodeXxx` functions over four unrelated concerns: git change details, coupling, layout accessors, team aggregation           |
 
-The end state is _enough_ tests to verify risky logic and document behaviour — not a test per
-function.
+The goal is expressive, readable, modular code — each module about one thing, with a name that
+says what that thing is. Tests already cover the risky logic; this is about where the code lives
+and what it is called.
 
-## What "enough" means here
+Three correctness items ride along, none dependent on the refactor: error visibility, UTC dates,
+and the user lookup.
 
-- Prefer one expressive test over a module's real behaviour to five tests over its internals.
-- A test earns its place if it would catch a plausible regression, or if reading it tells you
-  something the code does not say plainly.
-- Deleting or merging tests that do neither is part of the work, not a failure of it.
+## Scope
 
-## Confirmed defects found during the survey
+In scope: all four files above, plus the three fixes below. Out of scope: the accessibility
+regression, the visualisation-switch performance target, the tooltip contents, and regenerating
+`default.json` — all remain in `CLAUDE.md`'s follow-ups.
 
-All verified by running the code, not read off. Each gets a test that fails first.
+## Working agreements
 
-| #   | Where                               | Defect                                                                                                                                                                                                                                                                                                                                                                                            |
-| --- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `nodeData.ts` `commonRoots`         | Overcounts by 1 when both paths are identical (`"a/b/c/d"` vs itself → 5, not 4). The `while` loop compares `undefined === undefined` past the end of both arrays before the `index >= maxLength` break fires. Feeds `nodeCouplingFilesFiltered`'s "max common roots" filter.                                                                                                                     |
-| 2   | `preprocess.ts` `gatherNodeStats`   | `gitData?.details?.length ?? 0 > 0` parses as `length ?? (0 > 0)` — `??` binds looser than `>`. Currently harmless (a `0` length is falsy either way) but the guard does not mean what it reads as, and the `days.length == 0` throw below it is unreachable.                                                                                                                                     |
-| 3   | `preprocess.ts` `gatherNodeStats`   | `days.sort()` is the default **lexicographic** sort on unix timestamps. Correct today only because every timestamp is 10 digits; wrong for any other magnitude. Drives the global earliest/latest date range.                                                                                                                                                                                     |
-| 4   | `preprocess.ts` `stripTabs`         | `text.replace("\t", "<tab>")` replaces only the _first_ tab. The function exists specifically so `"name\temail"` is a safe map key — a two-tab name still yields a tab and can collide.                                                                                                                                                                                                           |
-| 5   | `datetimes.ts` `humanizeDays`       | Boundaries are `>` where they should be `>=`: 365 days renders "52 weeks, 1 day", 7 days renders "7 days". `humanizeDays(0)` returns `""`. User-visible in the age inspector.                                                                                                                                                                                                                     |
-| 6   | `preprocess.ts` `addTimescaleData`  | The `file_stats` branch keys buckets on the raw `modified` timestamp instead of `startOfUnit(...)`, so a non-git data file gets one timescale bucket per distinct mtime rather than one per week. Rare — most data files have git — but real.                                                                                                                                                     |
-| 7   | `nodeData.ts` `topTeamsPartitioned` | Can return **more** entries than `partitions` — 4 stripes for 3. `buildPatternPalette` only reads `SVG_PARTITIONS` bands, and the result is sorted alphabetically before it gets there, so the overshoot is trimmed by team _name_ rather than by contribution: two teams with identical stats render differently depending on what they are called. Found while writing the `svgPatterns` tests. |
+These shape every step in `plan.md`.
 
-## Non-defects worth pinning with a test rather than changing
+- **One reviewable commit per step.** Each step ends green (`npm run check`) with the screenshot
+  suite explained — either zero diffs, or a deliberate re-baseline named in the commit. The repo
+  is in a good state after every step, so work can stop between any two.
+- **Behaviour-preserving by default; UI change is permitted, not sought.** Restructure the code
+  and leave the UI alone — unless preserving some behaviour would force the new structure to be
+  ugly, or the behaviour is plainly wrong. Then change it deliberately, say so, re-baseline.
+  Do not go looking for things to improve.
+- **New feature folders, following the existing convention.** `src/` already nests
+  `inspectors/`, `visualizations/`, `webgl/`, `widgets/`. New folders join them rather than
+  inventing a different scheme, and each folder is the obvious home for its own tests.
+- **Tests move with the code they cover**, and are not rewritten to match new behaviour. A test
+  that has to change to keep passing is a signal that the step was not behaviour-preserving —
+  stop and decide, rather than editing the assertion.
 
-- `BaseVisualization.overrideColourFunction` paints _every_ circle-packed node with
-  `circlePackBackground`, at any nesting depth — deliberate (children paint over it), but
-  surprising, and it is what makes nested circles legible.
-- `topTeamsPartitioned` can return fewer entries than `partitions`, so a striped pattern can be
-  built from 2 colours when `SVG_PARTITIONS` is 3 — `buildPatternPalette` fills the rest with the
-  neutral colour. (Returning _more_ than `partitions` was a defect; see the table above.)
-- `findMaxima` sets `maxima.files = 1` unconditionally — "files" maxima is per-file, not a count.
-- `outlineLevel`'s split by kind (every circle at level 0, voronoi-inside-a-circle from level 1).
-  Already tested; the nested screenshots make it visible too.
+## Part 1 — failures are visible
 
-## Inconsistencies to clean up (no behaviour change)
+### The symptom
 
-- `postprocessState` compares `themedColours(...).teams` by reference (`!=`) while every other
-  check in the same function uses `_.isEqual`. Over-recomputes rather than under-recomputes, so
-  it is a clarity bug, not a correctness one. The adjacent `showNonTeamChanges` check is
-  redundant — already covered by the `_.isEqual(teamVisualisation)` above it.
-- `postprocessState`'s file-maxima block writes into `resultingState.calculated` relying on an
-  earlier block having cloned (its `datesChanged` condition happens to imply the first block's).
-  Safe today, coupled by accident.
-- `exportImport.ts`'s `padNestedStrokes`/`padNestedWidths` hardcode `4`, which CLAUDE.md says
-  should come from `NESTED_LEVEL_COUNT`.
+Loading a very large data file crashed the app, and **nothing was reported anywhere** — not in the
+browser console, not in the Vite dev-server output. The crash matters less than the silence: a
+failure nobody can see is a failure nobody can diagnose.
 
-## Testability refactors this implies
+### What is actually happening
 
-Small and local — this is _not_ the expressiveness refactor, just what the tests need.
+The file that failed is larger than anything on this machine, so the crash itself is still
+unreproduced. But the heap-exhaustion hypothesis this section used to carry is **measured wrong**
+for files of the size that _is_ available, and the real ceiling turned out to be somewhere else.
 
-- **`Viz.tsx`'s visible/outline node selection.** The two `rootNode.descendants().filter(...)`
-  chains in `draw()` decide which nodes get a fill and which get an outline, including the rule
-  that keeps circle-packed nodes in the outline set. That is exactly the logic the vanishing-
-  circle regression lives in, and it is pure — but it is buried in a 966-line imperative D3
-  function that jsdom cannot run. Extract to a pure module (`vizNodeSelection.ts` or similar,
-  alongside `vizUpdatePaths.ts`) and unit-test against a nested fixture tree.
-- **`preprocess.ts`'s week bucketing.** Already pure; just needs tests.
+`data/spring-projects.json` — 514 MB, 80,691 nodes — **loads fine**, and afterwards the tab holds
+508 MB against a 4,396 MB heap limit. The parsed graph is about the size of the text, not the
+several GB assumed, and there is 8.6x headroom. Heap exhaustion is not what kills a file this big.
 
-## Nested-circles e2e fixture
+The hard ceiling is **V8's maximum string length**, 536,870,888 bytes: `response.json()` decodes
+the whole body to a string before parsing it, so above that the load cannot succeed however much
+heap is free. Confirmed in Chrome — `"a".repeat(536870889)` throws `RangeError: Invalid string
+length`. `spring-projects.json` sits 23 MB under it, which is why it was the useful example even
+though it is not the file that broke.
 
-`data/nested.json`, committed: `omf.json` pruned to the `nesteda` and `nestedc` circle-packed
-groups plus two plain voronoi siblings (`qclib`, `tac`), capped at 5 children per directory but
-otherwise left at its natural depth of 13. 367 KB, 217 nodes, 124 files — half the size of the
-746 KB `default.json`. It is real scanner output apart from the nesting arrangement, which was
-hand-built to match what `packChildren` produces (as CLAUDE.md already records for `omf.json`).
+So the fix is to fail early and legibly on a file that cannot fit, checked against that limit —
+which refuses nothing that currently works, and would have caught the larger file.
 
-Its 35 contributors are **anonymised** — omf.json is an open-source project, but its committers
-are real people who did not agree to appear in this repo. Every reference to a user in the data
-is by numeric id, so replacing `metadata.git.users` with random alphanumeric names and
-`@example.com` addresses anonymises the whole file while keeping the tree resolvable. The only
-identifying strings left are the project's own public `git@github.com:openmainframeproject/...`
-remote URLs.
+### What is definitely wrong regardless
 
-The pruning was a one-off, done with a throwaway script rather than a committed one — the fixture
-is a golden file that should not need rebuilding, and a build script for it would be maintenance
-with no reader.
+Four gaps, each of which would make an _ordinary_ failure just as invisible. These are worth
+fixing whether or not they explain this particular crash.
 
-`default.json` stays as it is. Making the _shipped_ sample `nestedCircles` needs a fresh scanner
-plus layout run, which lives outside this repo; that remains the existing follow-up.
+1. **There is no React error boundary anywhere.** Confirmed: nothing in `src/` implements
+   `componentDidCatch` or `getDerivedStateFromError`. An exception thrown while rendering `App`,
+   `Viz` or the inspectors unmounts the whole tree and leaves a blank page. React already
+   complains about this in the console — the `Inspector` throwing `bad selected node` during the
+   `nested.json` work produced _"An error occurred in the &lt;Inspector&gt; component. Consider
+   adding an error boundary"_. `Loader.tsx`'s error list only covers the fetch-and-preprocess
+   phase; once `App` mounts, nothing catches anything.
+2. **`vite.config.ts`'s `createReadStream(filePath).pipe(res)` has no error handling.** A stream
+   error — a read failure, or the client disconnecting mid-transfer, which is precisely what
+   happens when a tab dies mid-download — emits an unhandled `'error'` event. Nothing logs it,
+   which is a strong candidate for the silent Vite console.
+3. **`vite.config.ts`'s bare `catch {}` around `statSync` discards the reason.** Answering 404 is
+   right, but a permissions error, a path problem and a genuinely missing file become
+   indistinguishable.
+4. **`Loader.tsx` never checks `response.ok`.** A 500 or an HTML error page goes straight to
+   `response.json()`, so the user sees a JSON syntax error instead of the actual HTTP failure.
 
-The e2e suite grows a second Playwright project against a second dev server on port 5174 with
-`EXPLORER_DATA=explorernested`, so the two datasets keep separate baselines and the app gains no
-test-only code path.
+### The decision
+
+Make failures loud, then make the size limit explicit. Specifically: an error boundary around the
+app, real error handling on the dev server's file streaming, an `response.ok` check, and a clear
+up-front message when a data file is too large to load rather than a dead tab. A global
+`unhandledrejection` / `window.onerror` hook catches whatever the boundary cannot.
+
+This comes first in the plan, not because it is the most valuable, but because every later step
+is easier to diagnose once a failure says so.
+
+## Part 2 — dates are UTC
+
+### The defect
+
+The scanner emits day-aligned **UTC** unix timestamps. The app then round-trips them through
+local-time `Date` operations it never needed:
+
+- `datetimes.ts`'s `humanizeDate` formats with date-fns's local-time `format`, so on any machine
+  **behind** UTC a commit renders as the previous day.
+- `preprocess.ts`'s `startOfUnit` uses local `startOfWeek`, so week buckets land on local
+  midnight rather than a real week boundary.
+
+Measured on one timestamp (`1554768000` = Tuesday 9 April 2019, 00:00 UTC):
+
+| zone               | `humanizeDate`    | week bucket start      |
+| ------------------ | ----------------- | ---------------------- |
+| `Europe/London`    | 09-Apr-2019 ✓     | 2019-04-06T23:00:00Z ✗ |
+| `America/New_York` | **08-Apr-2019** ✗ | 2019-04-07T04:00:00Z ✗ |
+| `Australia/Sydney` | 09-Apr-2019 ✓     | 2019-04-06T13:00:00Z ✗ |
+
+### The decision
+
+Everything is stored and displayed as **UTC**. Korny works in the UK, where UTC day and week
+boundaries are close enough to local time to cause no confusion, and the tool is his.
+
+Note the practical consequence: **in the UK this fix is very likely invisible.** The UK is never
+behind UTC, so `humanizeDate` is already correct there, and the hour-early bucket boundary still
+lands in the same week. The screenshot suite is therefore expected to show **zero** diffs — and
+if it does not, that is a finding worth understanding, not a re-baseline.
+
+### The approach
+
+The bug exists only because day-aligned integers were pushed through a `Date`. So:
+
+- **Week bucketing becomes integer arithmetic on unix seconds** — `d - ((d + 4) % 7)` days, where
+  `d = floor(t / 86400)` and the `+ 4` is the offset from the epoch's Thursday to Sunday. No
+  `Date`, so no timezone to get wrong. Verified exact against all three zones above.
+- **Display uses `Intl.DateTimeFormat` with `timeZone: "UTC"`.** No new dependency.
+
+`state.ts`'s `subYears`/`addDays` are ±2 days of deliberate slider leeway, not correctness — they
+can stay on date-fns, but should be noted so the next reader does not think they were missed.
+
+`Viz.tsx`'s timescale axis already uses `scaleUtc` and a hand-rolled `addUtcDays`; that is
+correct today and gets checked against the new helpers rather than rewritten.
+
+### The documentation
+
+A short page, `docs/dates-and-timezones.md`, aimed at anyone reading a diagram:
+
+- every date and week bucket in the app is UTC;
+- what that means outside the UK — a late-evening US commit lands on the following day, and on
+  the following week if it is a Saturday;
+- why the scanner's day-aligned timestamps make UTC the honest choice rather than an arbitrary one;
+- that the UI never displays a timezone, so UTC is the standing assumption.
+
+Linked from `README.md`. `docs/rendering-performance.md` is currently unlinked from anywhere —
+the same README section should pick it up.
+
+## Part 3 — user lookup by id, not by array position
+
+`state.ts`'s `getUserData` does `users[userId]` — **positional** indexing — and `isAlias` treats
+any id `>= users.length` as an alias. So `metadata.git.users` must be dense with `index === id`,
+an invariant nothing documents or checks. Building the `nested.json` fixture broke it by pruning
+that array to the users actually referenced, and the failure surfaced as `Invalid user id` thrown
+from deep inside the Inspector.
+
+**There is no performance argument for keeping it.** Measured at ~5ns (array) versus ~13ns (Map)
+per lookup, against three call sites — `exportImport.ts` twice, and `NodeChangeInspector.tsx`
+once — all driven by a user action and bounded by one node's or one team's user count. Never
+per-node, never per-frame. The genuinely hot path, `nodeData.ts`'s per-node aggregation, already
+uses `possiblyAlias`, **which is a Map lookup**, so this makes the two consistent rather than
+diverging.
+
+While here: the error message reads `` `Invalid user id #{userId}` `` — Ruby interpolation in a
+JavaScript template string, so it never reports the id.
+
+## Part 4 — the refactor
+
+### `nodeData.ts` → `src/model/`
+
+Four concerns share one namespace. Split along the seams that already exist:
+
+- git change details, age, churn, number of changers;
+- team and user aggregation (well covered by tests already, lifts out cleanly — do this first);
+- coupling links and the distance filter;
+- the small layout/loc accessors, several of which are one-line passthroughs. `nodePath` is
+  already marked `// TODO: inline me`.
+
+### `state.ts` → `src/state/`
+
+Config shape, action union, reducer, and derived-data cache into separate modules. Mostly
+mechanical, but it touches every dispatch site, so it wants its own step.
+
+### `UsersAndTeams.tsx` → `src/teams/`
+
+The riskiest step in the plan, and the only file with no coverage at all. **Whole-panel tests
+come first**, before anything moves: create a team, assign users, create an alias, ignore a user,
+filter, sort. They assert on the actions dispatched rather than on markup, so they survive the
+restructure and document what the panel is for. `@testing-library/react` is already a
+devDependency and has never been used — this establishes the pattern for the repo.
+
+Only once those are green does the component get broken up.
+
+### `Viz.tsx`
+
+One pure slice is already out (`vizNodeSelection.ts`). Remaining candidates, each its own module:
+the coupling arc geometry, the timescale brush, and the zoom/camera wiring. `Viz.tsx` keeps the
+imperative D3 shell that CLAUDE.md's test boundary says stays manually verified.
+
+## What done looks like
+
+- No file over ~400 lines among the four.
+- Every new module has a name that says what it holds, and its tests sit beside it.
+- `npm run check` green; `npm run e2e:strict` at zero tolerance either clean or deliberately
+  re-baselined with the reason recorded.
+- `CLAUDE.md` updated to describe the new layout; `spec.md` and `plan.md` deleted.
