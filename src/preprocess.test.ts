@@ -5,6 +5,7 @@ import {
   countLanguagesIn,
   gatherGlobalStats,
   gatherTimescaleData,
+  indexUsersById,
   linkParents,
   postprocessUsers,
 } from "./preprocess";
@@ -376,5 +377,37 @@ describe("postprocessUsers", () => {
 
   it("returns nothing for a data file with no user list", () => {
     expect(postprocessUsers(undefined)).toEqual([]);
+  });
+});
+
+describe("indexUsersById", () => {
+  it("indexes each user by their id", () => {
+    const alice = { id: 0, name: "Alice", email: "alice@example.com" };
+    const bob = { id: 1, name: "Bob", email: "bob@example.com" };
+
+    const byId = indexUsersById([alice, bob]);
+
+    expect(byId.get(0)).toBe(alice);
+    expect(byId.get(1)).toBe(bob);
+    expect(byId.size).toBe(2);
+  });
+
+  // Alias ids are allocated from `users.length` upward, so a gap in the real ids means the first
+  // alias silently collides with a real user. Refusing the file on load says so, instead of
+  // letting it surface later as a mis-attributed commit or an "Invalid user id" from inside the
+  // Inspector - which is exactly how building the `nested.json` fixture broke it.
+  it("refuses a sparse user list, naming the position and the id that disagree", () => {
+    const users = [
+      { id: 0, name: "Alice", email: "alice@example.com" },
+      { id: 7, name: "Bob", email: "bob@example.com" },
+    ];
+
+    expect(() => indexUsersById(users)).toThrowError(
+      /position 1 in the data file has id 7/
+    );
+  });
+
+  it("accepts an empty user list", () => {
+    expect(indexUsersById([]).size).toBe(0);
   });
 });

@@ -15,6 +15,7 @@ import {
   SUPPORTED_FILE_VERSION,
   TreeNode,
 } from "./polyglot_data.types";
+import { indexUsersById } from "./preprocess";
 import { initialiseGlobalState, State } from "./state";
 import { VizData, VizDataRef, VizMetadata } from "./viz.types";
 
@@ -119,7 +120,7 @@ export function minimalPolyglotData(
 // The postprocessed metadata `Loader.tsx` builds. `users` is the field most tests override,
 // since it is what teams and aliases resolve against.
 export function vizMetadata(overrides: Partial<VizMetadata> = {}): VizMetadata {
-  return {
+  const metadata: VizMetadata = {
     languages: {
       languageKey: [],
       languageMap: new Map(),
@@ -127,9 +128,17 @@ export function vizMetadata(overrides: Partial<VizMetadata> = {}): VizMetadata {
     },
     stats: { maxDepth: 1, maxLoc: 1 },
     users: [],
+    usersById: new Map(),
     nodesByPath: new Map(),
     timescaleData: [],
     ...overrides,
+  };
+  // Derive the index from whatever `users` the caller supplied, so a test that overrides the
+  // user list doesn't also have to hand-build a matching map - and gets the same density check
+  // the real Loader applies.
+  return {
+    ...metadata,
+    usersById: overrides.usersById ?? indexUsersById(metadata.users),
   };
 }
 

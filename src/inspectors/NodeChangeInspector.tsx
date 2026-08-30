@@ -40,7 +40,6 @@ const NodeChangeInspector = ({
   const { topChangersCount } = state.config.numberOfChangers;
   const { fileChangeMetric } = state.config;
   const { showNonTeamChanges } = state.config.teamVisualisation;
-  const { users } = metadata;
 
   const userStats = isDirectory(node)
     ? aggregateUserStats(node, earliest, latest, aliases, ignoredUsers)
@@ -88,7 +87,7 @@ const NodeChangeInspector = ({
             {topUserChangers.map(([user, stats]) => {
               return (
                 <tr key={user}>
-                  <td>{displayUser(getUserData(users, state, user))}</td>
+                  <td>{displayUser(getUserData(metadata, state, user))}</td>
                   <td>{metricFrom(stats, fileChangeMetric)}</td>
                   <td>{userTeamListForUser(state, user, false)}</td>
                 </tr>

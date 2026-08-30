@@ -11,6 +11,7 @@ import {
   gatherGlobalStats,
   gatherNodesByPath,
   gatherTimescaleData,
+  indexUsersById,
   linkParents,
   postprocessUsers,
 } from "./preprocess";
@@ -93,6 +94,7 @@ const useFetch = (
         const timescaleData = gatherTimescaleData(data, "week");
         console.log("postprocessing complete");
         const users = postprocessUsers(data.metadata.git?.users);
+        const usersById = indexUsersById(users);
         if (data.metadata.coupling) {
           const bucketConfig = data.metadata.coupling.buckets;
           stats.coupling = {
@@ -105,6 +107,7 @@ const useFetch = (
           languages,
           stats,
           users,
+          usersById,
           nodesByPath,
           timescaleData,
         };

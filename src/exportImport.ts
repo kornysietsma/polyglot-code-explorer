@@ -101,34 +101,34 @@ function padNestedWidths(widths: number[] | undefined, fallback: number) {
 }
 
 function toExportUser(
-  users: UserData[],
+  metadata: VizMetadata,
   state: State,
   userId: number
 ): ExportUser {
-  const user = getUserData(users, state, userId);
+  const user = getUserData(metadata, state, userId);
   return { name: user.name, email: user.email };
 }
 function toExportTeamMember(
-  users: UserData[],
+  metadata: VizMetadata,
   state: State,
   userId: number
 ): ExportTeamMember {
-  const user = getUserData(users, state, userId);
+  const user = getUserData(metadata, state, userId);
   return {
     name: user.name,
     email: user.email,
-    isAlias: isAlias(users, userId),
+    isAlias: isAlias(metadata.users, userId),
   };
 }
 
 function exportableTeamsAndAliases(
   state: State,
-  users: UserData[]
+  metadata: VizMetadata
 ): ExportTeamsAndAliases {
   const { teamsAndAliases } = state.config;
 
   const toExport = (userId: number) => {
-    return toExportUser(users, state, userId);
+    return toExportUser(metadata, state, userId);
   };
 
   const aliasData: ExportUser[] = [...teamsAndAliases.aliasData]
@@ -142,7 +142,7 @@ function exportableTeamsAndAliases(
   const teams: ExportTeam[] = [...teamsAndAliases.teams].map(
     ([teamName, team]) => {
       const teamMembers: ExportTeamMember[] = [...team.users].map((u) =>
-        toExportTeamMember(users, state, u)
+        toExportTeamMember(metadata, state, u)
       );
       return {
         name: teamName,
@@ -183,7 +183,7 @@ export function stateToExportable(
     config: fixedConfig,
     expensiveConfig: state.expensiveConfig,
     couplingConfig: state.couplingConfig,
-    teamsAndAliases: exportableTeamsAndAliases(state, metadata.users),
+    teamsAndAliases: exportableTeamsAndAliases(state, metadata),
   };
 }
 
