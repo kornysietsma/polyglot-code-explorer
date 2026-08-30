@@ -26,7 +26,8 @@ The version check at `Loader.tsx` is `semver.satisfies(data.version, SUPPORTED_F
 - `EXPLORER_DATA=foo npm start` — load `data/foo.json` instead (and optionally `data/foo_state.json` for saved UI state)
 - `npm run build` — production build to `dist/`, containing the app plus exactly the one data file named by `EXPLORER_DATA` (or `default.json` if unset)
 - `npm test` / `npm run test:watch` — Vitest unit tests
-- `npm run e2e` / `npm run e2e:update` — Playwright screenshot suite (10 baseline shots under `tests/screenshots.spec.ts-snapshots/`)
+- `npm run e2e` / `npm run e2e:update` — Playwright screenshot suite (see below)
+- `npm run e2e:strict` — the same suite with the screenshot tolerance dropped to zero
 - `npm run typecheck` / `npm run lint` / `npm run format:check` — individual checks; `npm run check` runs all of them plus the unit tests
 - Release process: bump `package.json` version, update `CHANGELOG.md`, tag `vX.Y.Z`, push tags. No CI and no build artifacts — users build from source (see `README.md`).
 
@@ -36,6 +37,25 @@ _visible_ so it's a deliberate choice. Open any reported diff and decide, then r
 change that touches no UI code should produce **zero** diffs, and any diff on the visualisation
 canvas is a real bug, because those polygons are pre-computed in the data file rather than laid
 out at render time.
+
+It runs as **two Playwright projects against two dev servers**, because the data file is baked in
+at build time (`__EXPLORER_DATA__`) and so cannot be switched at runtime:
+
+| project           | port | data                                   | spec                         | shots |
+| ----------------- | ---- | -------------------------------------- | ---------------------------- | ----- |
+| `chromium`        | 5173 | `default.json` — a `circlePack` root   | `screenshots.spec.ts`        | 10    |
+| `chromium-nested` | 5174 | `nested.json` — a `nestedCircles` root | `nested-screenshots.spec.ts` | 6     |
+
+`tests/helpers.ts` holds the interactions both share. The nested shots exist because
+`circlePack` puts circles at the top level only, so the core 10 never render recursive circle
+packing, varying circle depth, or the level-0-is-every-circle rule that `outlineLevel` implements
+— including the regression where a circle full of packed circles vanishes entirely if it is
+dropped from the outline set. Each nested shot is aimed at one specific behaviour; read the
+comment above it before changing or removing it.
+
+Both projects' `testMatch` patterns are anchored (`/[\\/]screenshots\.spec\.ts$/`) — unanchored,
+the core project's pattern also matches `nested-screenshots.spec.ts` and it runs both specs
+against the wrong data file.
 
 ## Manual visual verification
 
@@ -211,22 +231,34 @@ sharp edges; read them before changing either.
   `typescript <6.1.0`. Check that cap before bumping.
 - **`publish_*.sh` and `statefiles/` are gitignored on purpose** — they reference internal bucket
   names and have never been tracked. Don't "helpfully" commit them.
-- **The Playwright fixture is generated, not committed.** `tests/global-setup.ts` copies
-  `data/default.json` → `data/explorertest.json` at run start and drops the committed state
-  sidecar beside it, so the fixture tracks the shipped default instead of duplicating 746 KB.
+- **The Playwright fixtures are generated, not committed.** `tests/global-setup.ts` copies
+  `data/default.json` → `data/explorertest.json` and `data/nested.json` →
+  `data/explorernested.json` at run start, dropping the committed state sidecars beside them, so
+  the fixtures track the tracked data files instead of duplicating a megabyte of JSON.
+- **`data/nested.json`'s contributor list is anonymised, and must stay dense.** It is derived
+  from a local `omf.json`, an open-source project whose committers are real people, so
+  `metadata.git.users` was replaced wholesale with random names and `@example.com` addresses.
+  Everything else references a user by numeric id, so that one list is the whole of it. All 210
+  users are kept even though the pruned tree references far fewer, because `state.ts`'s
+  `getUserData` indexes the array **positionally** (`users[userId]`) and `isAlias` treats any id
+  `>= users.length` as an alias — a sparse list makes the Inspector throw
+  `Invalid user id` on the first commit it renders. Pruning that list is the obvious "shrink the
+  fixture" move and it does not work.
 - **The screenshot suite's 2% tolerance (`maxDiffPixelRatio` in `playwright.config.ts`) can
   make `npm run e2e` pass clean while the actual pixels differ.** A real re-baseline (not just
-  "does it currently pass") needs checking at `maxDiffPixelRatio: 0` first, or
+  "does it currently pass") needs checking at zero tolerance first, or
   `npm run e2e:update` will silently leave a stale-but-still-passing baseline in place instead
   of updating it — confirmed doing exactly this during the WebGL rewrite's re-baseline, and
   again when re-baselining the circle outlines, where it reported "10 passed" and rewrote
-  nothing. `npx playwright test --update-snapshots=all` rewrites regardless of tolerance; check
-  the result at `maxDiffPixelRatio: 0` afterwards to prove the baselines actually moved.
-- **`tests/screenshots.spec.ts`'s `selectAFileNode` clicks canvas coordinates, not a DOM
+  nothing. `npx playwright test --update-snapshots=all` rewrites regardless of tolerance; then
+  `npm run e2e:strict` (which sets `STRICT_SCREENSHOTS`) proves the baselines actually moved.
+- **`tests/helpers.ts`'s `selectAFileNode` clicks canvas coordinates, not a DOM
   element.** Since the WebGL rewrite there's no per-cell DOM node to target; it raster-scans a
   grid of canvas points and clicks the first one that resolves to a file. Which file that is
   can change if anything shifts the layout or the grid — it's deterministic given a fixed
-  layout, not fixed in identity.
+  layout, not fixed in identity. Prefer `selectSubdirectory`, which clicks the Inspector's
+  subdirectory buttons and so names the node it selects; the raster scan is only needed when the
+  test specifically wants a _file_.
 
 ## TypeScript conventions specific to this repo
 
@@ -241,6 +273,15 @@ Import ordering is enforced by `simple-import-sort` via eslint (not manually mai
 
 Deliberately not done; all still open:
 
+- **Every date is rendered in the machine's local timezone, but the data is UTC.** The scanner
+  emits day-aligned UTC timestamps; `datetimes.ts`'s `humanizeDate` formats them with date-fns's
+  local-time `format`, so on any machine behind UTC a commit renders as **the previous day**
+  (`1554768000` shows as `08-Apr-2019` in `America/New_York`, `09-Apr-2019` in
+  `Europe/London`). The same applies to `preprocess.ts`'s `startOfWeek` bucketing, whose comment
+  only claims to pin the week's _start day_: buckets land on local midnight, so away from UTC
+  they are offset by the local UTC offset rather than sitting on a real week boundary. Not fixed
+  — it changes every displayed date and every timescale bucket, and it also means the screenshot
+  baselines are only reproducible in the timezone they were recorded in.
 - **Accessibility regression from the WebGL rewrite.** The canvas is opaque to screen readers;
   the old SVG `.cell`/`.nesting` paths were DOM nodes (unlabelled, so not genuinely navigable
   either, but present). Recorded rather than fixed — out of scope for that rewrite, revisit if
@@ -255,15 +296,15 @@ Deliberately not done; all still open:
   that hover is cheap (WebGL picking, no native tooltip delay), it could show more (LOC, age,
   churn) — deliberately deferred, not attempted.
 - **Regenerate `data/default.json` with the current scanner** — a `nestedCircles` root with
-  coupling enabled and real git history. The tracked file is a hand-bumped 1.0.4-shaped one, and
-  `nestedCircles` is the awkward layout, so the shipped default should eventually exercise it.
+  coupling enabled and real git history. The tracked file is a hand-bumped 1.0.4-shaped one. The
+  `chromium-nested` screenshot project now covers `nestedCircles` rendering, so this is no
+  longer about test coverage — it is about the _shipped sample_ showing the awkward layout.
 - **Re-verify against real scanner-generated multi-repo output** once
   `polyglot-code-offline-layout`'s `nested-circles` branch lands. The nested groups in the local
   `omf.json` smoke-test file were hand-built to match what `packChildren` produces; a real scan is
   the final word.
 - **Consolidate the four `publish_*.sh` scripts.**
 - **TypeScript 7** once `typescript-eslint` lifts its peer cap.
-- **Better test coverage.** `datetimes.ts` and the week-bucketing in `preprocess.ts` are pure and
-  currently covered only by the screenshot suite; `state.ts`'s no-git-dates branch calls
+- **Better test coverage.** `datetimes.ts` and `preprocess.ts` now have their own tests; `state.ts`'s no-git-dates branch calls
   `new Date()` directly, so it isn't testable as written. Korny is aware and content with this for
   now — don't add tests unasked.
