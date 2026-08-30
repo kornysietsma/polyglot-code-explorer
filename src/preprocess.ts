@@ -93,6 +93,9 @@ function updateEarliestLatest(stats: TreeStats, newDate: number) {
   }
 }
 
+const minOf = (a: number, b: number) => Math.min(a, b);
+const maxOf = (a: number, b: number) => Math.max(a, b);
+
 function gatherNodeStats(
   node: TreeNode,
   features: FeatureFlags,
@@ -109,7 +112,7 @@ function gatherNodeStats(
   }
   if (features.git) {
     const gitData = isFile(node) ? node.data.git : undefined;
-    if (gitData && (gitData?.details?.length ?? 0 > 0)) {
+    if (gitData && gitData.details.length > 0) {
       const days = gitData.details.map((d) => d.commit_day);
       if (gitData.last_update) {
         days.push(gitData.last_update);
@@ -117,14 +120,10 @@ function gatherNodeStats(
       if (gitData.creation_date) {
         days.push(gitData.creation_date);
       }
-      if (days.length == 0) {
-        throw new Error("No days in git data");
-      }
-      days.sort();
-      const earliest = days[0]!;
-      const latest = days[days.length - 1]!;
-      updateEarliestLatest(stats, earliest);
-      updateEarliestLatest(stats, latest);
+      // reduce rather than Math.min(...days) - a busy file's history can be long enough to hit
+      // the argument-count limit on a spread
+      updateEarliestLatest(stats, days.reduce(minOf));
+      updateEarliestLatest(stats, days.reduce(maxOf));
     }
   }
   if (features.file_stats) {
@@ -177,6 +176,25 @@ function startOfUnit(date: Date, timeUnit: TimescaleUnit): Date {
   }
 }
 
+// Finds or creates the bucket `date` falls in, and hands it to `accumulate`. Both kinds of scan
+// go through here so a git scan and a file_stats-only one bucket dates the same way.
+function addToUnitBucket(
+  timescaleData: Map<number, TimescaleData>,
+  timeUnit: TimescaleUnit,
+  date: number,
+  accumulate: (bucket: TimescaleData) => void
+) {
+  const bucketStart = getUnixTime(startOfUnit(fromUnixTime(date), timeUnit));
+  const bucket = timescaleData.get(bucketStart) ?? {
+    files: 0,
+    commits: 0,
+    lines_added: 0,
+    lines_deleted: 0,
+  };
+  accumulate(bucket);
+  timescaleData.set(bucketStart, bucket);
+}
+
 // yes, I'm modifying a parameter, it's hard to avoid in JavaScript with big data structures
 function addTimescaleData(
   timescaleData: Map<number, TimescaleData>,
@@ -185,42 +203,22 @@ function addTimescaleData(
   timeUnit: TimescaleUnit
 ) {
   if (features.git) {
-    const gitData = isFile(node) && node.data.git;
-    if (gitData && gitData.details && gitData.details.length > 0) {
-      gitData.details.forEach((data) => {
-        const startDate = getUnixTime(
-          startOfUnit(fromUnixTime(data.commit_day), timeUnit)
-        );
-        let dateData = timescaleData.get(startDate);
-        if (!dateData) {
-          dateData = {
-            files: 0,
-            commits: 0,
-            lines_added: 0,
-            lines_deleted: 0,
-          };
-        }
-        dateData.files += 1;
-        dateData.commits += data.commits;
-        dateData.lines_added += data.lines_added;
-        dateData.lines_deleted += data.lines_deleted;
-        timescaleData.set(startDate, dateData);
+    const gitData = isFile(node) ? node.data.git : undefined;
+    for (const detail of gitData?.details ?? []) {
+      addToUnitBucket(timescaleData, timeUnit, detail.commit_day, (bucket) => {
+        bucket.files += 1;
+        bucket.commits += detail.commits;
+        bucket.lines_added += detail.lines_added;
+        bucket.lines_deleted += detail.lines_deleted;
       });
     }
   } else if (features.file_stats) {
-    const date = node.data?.file_stats?.modified;
-    if (date !== undefined) {
-      let dateData = timescaleData.get(date);
-      if (!dateData) {
-        dateData = {
-          files: 0,
-          commits: 0,
-          lines_added: 0,
-          lines_deleted: 0,
-        };
-      }
-      dateData.files += 1;
-      timescaleData.set(date, dateData);
+    const modified = node.data?.file_stats?.modified;
+    if (modified !== undefined) {
+      addToUnitBucket(timescaleData, timeUnit, modified, (bucket) => {
+        // a file_stats-only scan has no commit history, so all there is to count is the file
+        bucket.files += 1;
+      });
     }
   }
   if (isDirectory(node)) {
@@ -268,7 +266,7 @@ I need tab-free names so later I can use "name\temail" as a map key.
 */
 function stripTabs(text: string | undefined): string {
   if (text == undefined) return "";
-  return text.replace("\t", "<tab>");
+  return text.replaceAll("\t", "<tab>");
 }
 
 export function postprocessUsers(users: GitUser[] | undefined): UserData[] {

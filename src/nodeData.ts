@@ -338,31 +338,33 @@ function nodeCouplingFiles(
   });
 }
 
-function commonRoots(file1: string, file2: string) {
+// How many leading path segments two files share - so "a/b/x.js" and "a/b/y.js" have 2.
+function commonRoots(file1: string, file2: string): number {
   const f1bits = file1.split("/");
   const f2bits = file2.split("/");
-  let maxLength = f1bits.length;
-  if (f2bits.length < maxLength) {
-    maxLength = f2bits.length;
-  }
+  const maxLength = Math.min(f1bits.length, f2bits.length);
   let commonLength = 0;
-  let index = 0;
-  while (f1bits[index] === f2bits[index]) {
+  while (
+    commonLength < maxLength &&
+    f1bits[commonLength] === f2bits[commonLength]
+  ) {
     commonLength += 1;
-    if (index >= maxLength) break;
-    index += 1;
   }
   return commonLength;
 }
 
-function filesHaveMaxCommonRoots(
+/**
+ * The Coupling controls' "filter coupling by distance": keeps only pairs of files that are at
+ * most `maxCommonRoots` directories apart, so you can hide the coupling within a single
+ * directory and see only the links that cross the codebase. A negative value means no filter.
+ */
+export function filesHaveMaxCommonRoots(
   maxCommonRoots: number,
   file1: string,
   file2: string
-) {
+): boolean {
   if (maxCommonRoots < 0) return true;
-  const common = commonRoots(file1, file2);
-  return common <= maxCommonRoots;
+  return commonRoots(file1, file2) <= maxCommonRoots;
 }
 
 export function nodeCouplingFilesFiltered(

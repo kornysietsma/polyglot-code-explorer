@@ -12,27 +12,27 @@ export function unixToDate(date: number): Date {
   return fromUnixTime(date);
 }
 
+// No months: they aren't a fixed number of days, so "3 months" would mean different spans
+// depending on where in the year the range fell.
+const DAYS_PER_YEAR = 365;
+const DAYS_PER_WEEK = 7;
+
+function pluralize(count: number, unit: string): string {
+  return `${count} ${unit}${count === 1 ? "" : "s"}`;
+}
+
 export function humanizeDays(days: number): string {
-  let daysRemaining = days;
-  let years = 0;
-  let weeks = 0; // no months, as they are not really precise
-  if (daysRemaining > 365) {
-    years = Math.floor(daysRemaining / 365);
-    daysRemaining %= 365;
-  }
-  if (daysRemaining > 7) {
-    weeks = Math.floor(daysRemaining / 7);
-    daysRemaining %= 7;
-  }
-  const yearText =
-    years > 0 ? `${years} year${years > 1 ? "s" : ""}` : undefined;
-  const weekText =
-    weeks > 0 ? `${weeks} week${weeks > 1 ? "s" : ""}` : undefined;
-  const dayText =
-    daysRemaining > 0
-      ? `${daysRemaining} day${daysRemaining > 1 ? "s" : ""}`
-      : undefined;
-  return [yearText, weekText, dayText]
-    .filter((t) => t !== undefined)
-    .join(", ");
+  const years = Math.floor(days / DAYS_PER_YEAR);
+  const daysAfterYears = days % DAYS_PER_YEAR;
+  const weeks = Math.floor(daysAfterYears / DAYS_PER_WEEK);
+  const remainingDays = daysAfterYears % DAYS_PER_WEEK;
+
+  const parts = [
+    years > 0 ? pluralize(years, "year") : undefined,
+    weeks > 0 ? pluralize(weeks, "week") : undefined,
+    remainingDays > 0 ? pluralize(remainingDays, "day") : undefined,
+  ].filter((part) => part !== undefined);
+
+  // an exact zero has no parts at all, and an empty string reads as a rendering failure
+  return parts.length > 0 ? parts.join(", ") : pluralize(days, "day");
 }
