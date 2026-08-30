@@ -32,6 +32,10 @@ export type VizMetadata = {
   languages: LanguagesMetadata;
   stats: TreeStats;
   users: UserData[];
+  // The same users, indexed by id. `users` stays the list because the alias-id threshold and
+  // the users table both want it in order; `usersById` is what lookups go through.
+  // `preprocess.indexUsersById` builds it, and checks the two agree.
+  usersById: Map<number, UserData>;
   nodesByPath: Map<string, TreeNode>;
   hierarchyNodesByPath?: Map<string, d3.HierarchyNode<TreeNode>>;
   timescaleData: TimescaleIntervalData[];

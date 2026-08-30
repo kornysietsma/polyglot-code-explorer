@@ -5,7 +5,7 @@ for a single ~30-60 minute session, ending green and leaving the repo in a good 
 
 **Parts 1 and 2 are done** (`72f820c`, `e9e4453`, `4438d4c`, `70b73d3`, `89ed94b`). Their durable
 findings are in `CLAUDE.md`, `docs/dates-and-timezones.md` and the commits; what is worth carrying
-forward is folded into the context below. **Part 3 is next.**
+forward is folded into the context below. **Part 3 is done; Part 4 is next.**
 
 ## Technical context
 
@@ -71,21 +71,24 @@ the safest one. `UsersAndTeams.tsx` gets its tests before anything moves.
 
 ## Part 3 — user lookup
 
-### Step 3.1 — look users up by id
+### Step 3.1 — look users up by id — **done**
 
-- [ ] Build a `Map<number, UserData>` for user lookup (in `VizMetadata`, beside `users`, or
-      derived in `postprocessUsers` — decide when the call sites are in view).
-- [ ] `getUserData` uses it. Fix the error message: `` `Invalid user id #{userId}` `` is Ruby
-      interpolation in a JS template string and never reports the id.
-- [ ] Validate density once, on load, with an error naming the problem — alias ids are still
-      allocated from `users.length` upward, so a sparse array is genuinely unsupported and should
-      say so rather than throwing from inside the Inspector.
-- [ ] Comment `isAlias` to record that the id threshold is a deliberate remaining assumption.
+- [x] `VizMetadata` gained `usersById: Map<number, UserData>` beside `users`, built by
+      `preprocess.indexUsersById`. `users` stays the list because the alias threshold and the
+      users table both want it in order.
+- [x] `getUserData` now takes `metadata` rather than `users`, and looks up through the map. Error
+      message fixed to report the id.
+- [x] `indexUsersById` validates density (`users[i].id === i`) on load and **throws**, so the
+      `ErrorReport` names the position and the id that disagree. Fatal rather than a warning
+      because a gap makes the first alias collide with a real user — silent mis-attribution.
+- [x] `isAlias` commented; the id threshold is recorded as a deliberate remaining assumption.
+- [x] `testFixtures.vizMetadata` derives `usersById` from whatever `users` a test overrides, so
+      no existing test had to change.
 
-**Verify:** unit tests for the lookup and for the density check's error. The `exportImport`
-round-trip tests already exercise `getUserData` via `toExportUser` and must pass unchanged.
-`npm run e2e:strict` clean. Manual: open the app, select a file with commits, confirm the
-Inspector's changers table still names people.
+**Verified:** 187 unit tests green (was 181); both new error-path tests proved to discriminate by
+neutering the check and the message. `npm run e2e:strict` 16/16 clean. Manually confirmed the
+Inspector's changers table still names people, and that a hand-mangled sparse data file is
+refused with the new message on screen.
 
 ---
 

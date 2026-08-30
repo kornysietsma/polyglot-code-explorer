@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { globalDispatchReducer, State, Teams } from "./state";
+import { getUserData, globalDispatchReducer, State, Teams } from "./state";
 import {
   minimalFileNode,
   minimalPolyglotData,
@@ -103,5 +103,39 @@ describe("postprocessing state after a dispatch", () => {
     });
 
     expect(state.calculated.userTeams).toBe(POISON);
+  });
+});
+
+// `getUserData` resolves an id to a person, and has to tell a real user from an alias. Real users
+// come from the data file's list, indexed by id; aliases are created in the UI and live in
+// `config.teamsAndAliases.aliasData`, with ids allocated from `users.length` upward.
+describe("looking a user up by id", () => {
+  const ALICE = { id: 0, name: "Alice", email: "alice@example.com" };
+  const BOB = { id: 1, name: "Bob", email: "bob@example.com" };
+
+  it("finds a real user through the id index", () => {
+    const metadata = vizMetadata({ users: [ALICE, BOB] });
+
+    expect(getUserData(metadata, minimalState(), 1)).toEqual(BOB);
+  });
+
+  it("finds an alias, whose id is past the end of the real user list", () => {
+    const metadata = vizMetadata({ users: [ALICE, BOB] });
+    const state = minimalState();
+    const alias = { id: 2, name: "Robert", email: "bob@work.example.com" };
+    state.config.teamsAndAliases.aliasData.set(2, alias);
+
+    expect(getUserData(metadata, state, 2)).toEqual(alias);
+  });
+
+  // The message used to read `Invalid user id #{userId}` - Ruby interpolation in a JavaScript
+  // template string, so it reported the literal text and never the id that was actually bad.
+  it("names the offending id when there is no such user", () => {
+    const metadata = vizMetadata({ users: [ALICE, BOB] });
+    const state = minimalState();
+
+    expect(() => getUserData(metadata, state, 5)).toThrowError(
+      "Invalid user id 5"
+    );
   });
 });

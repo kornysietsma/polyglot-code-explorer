@@ -299,3 +299,27 @@ export function postprocessUsers(users: GitUser[] | undefined): UserData[] {
     };
   });
 }
+
+/**
+ * Index users by id, and check the invariant the rest of the app relies on: the data file's
+ * user list is dense, with `users[i].id === i`.
+ *
+ * Nothing in the data format promises this, but two things assume it. Alias ids are allocated
+ * from `users.length` upward, so a gap in the real ids means an alias silently collides with a
+ * real user; and `UsersAndTeams` indexes its combined user/alias list positionally. A sparse
+ * list is therefore unsupported rather than merely slow, and this says so on load rather than
+ * letting it surface as a mis-attributed commit or an `Invalid user id` from inside the
+ * Inspector.
+ */
+export function indexUsersById(users: UserData[]): Map<number, UserData> {
+  const byId: Map<number, UserData> = new Map();
+  users.forEach((user, index) => {
+    if (user.id !== index) {
+      throw new Error(
+        `User at position ${index} in the data file has id ${user.id} - the user list must be dense, listing every user in id order with no gaps`
+      );
+    }
+    byId.set(user.id, user);
+  });
+  return byId;
+}

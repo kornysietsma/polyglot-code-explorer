@@ -6,7 +6,7 @@ import { calculateFileMaxima } from "./nodeData";
 import { UserData } from "./polyglot_data.types";
 import { calculateSvgPatterns } from "./svgPatterns";
 import { isParentVisualization, Visualizations } from "./VisualizationData";
-import { VizDataRef } from "./viz.types";
+import { VizDataRef, VizMetadata } from "./viz.types";
 
 export type UserAliases = Map<number, number>;
 export type UserAliasData = Map<number, UserData>;
@@ -278,6 +278,12 @@ export type State = {
   messages: Message[];
 };
 
+/**
+ * Alias ids are allocated from `users.length` upward (see `TeamsAndAliases.aliasData`), so an id
+ * past the end of the real user list is an alias. That threshold is a deliberate remaining
+ * assumption: it only holds while the data file's user list is dense, which
+ * `preprocess.indexUsersById` checks on load.
+ */
 export function isAlias(users: UserData[], userId: number): boolean {
   return userId >= users.length;
 }
@@ -287,15 +293,15 @@ export function possiblyAlias(aliases: UserAliases, userId: number): number {
 }
 
 export function getUserData(
-  users: UserData[],
+  metadata: VizMetadata,
   state: State,
   userId: number
 ): UserData {
-  const user = isAlias(users, userId)
+  const user = isAlias(metadata.users, userId)
     ? state.config.teamsAndAliases.aliasData.get(userId)
-    : users[userId];
+    : metadata.usersById.get(userId);
   if (user == undefined) {
-    throw new Error(`Invalid user id #{userId}`);
+    throw new Error(`Invalid user id ${userId}`);
   }
   return user;
 }
