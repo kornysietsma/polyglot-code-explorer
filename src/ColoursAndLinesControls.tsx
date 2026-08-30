@@ -8,7 +8,7 @@ import {
 } from "react-aria-components";
 
 import { DefaultProps } from "./components.types";
-import { themedColours } from "./state";
+import { themedColours } from "./state/colours";
 import { ColourPicker } from "./widgets/ColourPicker";
 import ToggleablePanel from "./widgets/ToggleablePanel";
 

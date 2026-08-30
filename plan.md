@@ -3,238 +3,115 @@
 Read `spec.md` first. This is the ordered checklist; each step is one reviewable commit, sized
 for a single ~30-60 minute session, ending green and leaving the repo in a good state.
 
-**Parts 1 and 2 are done** (`72f820c`, `e9e4453`, `4438d4c`, `70b73d3`, `89ed94b`). Their durable
-findings are in `CLAUDE.md`, `docs/dates-and-timezones.md` and the commits; what is worth carrying
-forward is folded into the context below. **Part 3 is done; Part 4 is next.**
+**Parts 1-5 are done.** Git holds the detail; what a later step still needs is below.
+**Part 6 is next.**
 
 ## Technical context
 
-**Where things stand.** 181 unit tests across 17 files, plus 16 screenshots in two Playwright
+**Where things stand.** 187 unit tests across 18 files, plus 16 screenshots in two Playwright
 projects (`chromium` on `default.json`, `chromium-nested` on `nested.json`). The existing tests
 are the safety net for everything below — they are not to be rewritten to match new behaviour.
 
-The four files this work is about, as they stand now:
+The two files left to split:
 
 | file                | lines |
 | ------------------- | ----- |
 | `UsersAndTeams.tsx` | 1348  |
-| `state.ts`          | 998   |
-| `Viz.tsx`           | 944   |
-| `nodeData.ts`       | 882   |
+| `Viz.tsx`           | 947   |
+
+Already split, for orientation:
+
+- `src/model/` — `teamStats.ts` (456), `gitChanges.ts` (228), `nodeAccessors.ts` (117),
+  `coupling.ts` (113), `couplingBuckets.ts` (39), with `teamStats.test.ts` and `coupling.test.ts`
+  beside them. `nodeData.ts` is gone.
+- `src/state/` — `config.ts` (397), `reducer.ts` (189), `actions.ts` (168), `derived.ts` (131),
+  `colours.ts` (25). `state.ts` keeps 147 lines of shared types, the `Message` constructors and
+  the user-lookup helpers, and imports nothing from `state/` at runtime.
 
 **Verification available to each step:**
 
 | tool                                         | what it proves                                                        |
 | -------------------------------------------- | --------------------------------------------------------------------- |
-| `npm run check`                              | typecheck, lint, format, 181 unit tests                               |
+| `npm run check`                              | typecheck, lint, format, 187 unit tests                               |
 | `npm run e2e:strict`                         | all 16 screenshots at **zero** tolerance — the real regression signal |
 | `npx playwright test --update-snapshots=all` | re-baseline, only ever with a stated reason (see below)               |
 
-**The zero-tolerance rule.** A pure refactor must produce zero screenshot diffs. This has proved
-itself twice: extracting `vizNodeSelection.ts` moved not one pixel, and every step of Parts 1
-and 2 that should have been invisible was. If a step that should be behaviour-preserving shows a
-diff, that is a bug found, not a baseline to update.
+**The zero-tolerance rule.** A pure refactor must produce zero screenshot diffs. Every step of
+Parts 1-5 that should have been invisible was. If a step that should be behaviour-preserving
+shows a diff, that is a bug found, not a baseline to update.
 
 **Re-baselining, when a diff is genuinely intended.** Do not use `npm run e2e:update` — the 2%
 tolerance means it can report "10 passed" and rewrite nothing, leaving a stale baseline in place.
 Use `npx playwright test --update-snapshots=all`, then `npm run e2e:strict` to prove the
 baselines actually moved. Before updating anything, work out _which pixels_ changed and satisfy
-yourself the change is the intended one; Part 2 did this by diffing actual-vs-expected PNGs and
-checking the changed pixels' y-range and count were identical across date-sensitive and
-date-insensitive visualisations alike.
+yourself the change is the intended one.
 
-**What Parts 1 and 2 established that later steps can lean on:**
+## Techniques that have earned their keep
 
-- **`@testing-library/react` is now in use** (`ErrorBoundary.test.tsx`, `Loader.test.tsx`), so
-  Part 6 no longer has to invent the pattern — only extend it to a much bigger component. Both
-  existing examples render a real component and assert on visible outcomes; `Loader.test.tsx`
-  also shows how to drive one with a stubbed `fetch`.
-- **A React error boundary now wraps `App`**, and `index.tsx` registers global `error` /
-  `unhandledrejection` handlers. A component that throws mid-refactor shows its message and
-  component stack instead of blanking the page — worth remembering when a later step breaks
-  something, because the page will now tell you what.
-- **`vi.stubEnv("TZ", …)` works in-process** for timezone-dependent tests; Node re-reads `TZ`
-  on assignment.
-- **Prove a new test discriminates**: stash just the production file with `git stash push -q`,
-  confirm the test fails without it, then `git stash pop -q`. Both Part 2 steps did this, and it
-  is what separates a real assertion from a vacuous one.
+These are what made Parts 3-5 safe; reuse them rather than reinventing.
 
-**Design decisions taken in the spec**, restated here because they govern every step: user lookup
-by Map with alias ids left on their id threshold; new feature folders under `src/`;
-behaviour-preserving unless deliberately and visibly decided otherwise.
+- **Prove a move was verbatim by diffing line multisets.** After extracting, run the old file
+  through `git show HEAD:<path>`, strip imports and blanks from both sides, `sort` each, and
+  `diff`. Every remaining difference should be a comment you wrote or an `export` keyword you
+  added. This caught nothing wrong in five steps, which is exactly the point — it turns "I think
+  I moved it faithfully" into a fact, in about ten seconds.
+- **Prove a new test discriminates.** Neuter the production code the test covers (a `sed` on the
+  check, or `git stash push -q` on the whole file), confirm the test fails, restore. A test that
+  passes either way is not a test.
+- **Prove a compile-time guarantee survived a move.** Step 5.2 deleted one reducer `case` and
+  confirmed `Type 'SetDepth' is not assignable to type 'never'` before restoring it.
+- **Temporary cross-module imports are fine if signposted.** Steps 4.1 and 5.1 each left one
+  import pointing at the old home with a comment naming the step that would close it; 4.2 and 5.3
+  closed them. Better than contorting the order to avoid a two-commit-long tie.
+- **`@testing-library/react` is in use** (`ErrorBoundary.test.tsx`, `Loader.test.tsx`), so Part 6
+  extends an existing pattern rather than inventing one. Both render a real component and assert
+  on visible outcomes; `Loader.test.tsx` also drives one with a stubbed `fetch`.
+- **A React error boundary wraps `App`**, and `index.tsx` registers global `error` /
+  `unhandledrejection` handlers, so a component that throws mid-refactor shows its message and
+  component stack instead of blanking the page.
+- **`vi.stubEnv("TZ", …)` works in-process** for timezone-dependent tests; Node re-reads `TZ` on
+  assignment.
 
-**Ordering rationale.** The remaining correctness fix comes first: it is small and independent of
-the refactor. Within the refactor, each file starts with its best-tested seam so the first cut is
-the safest one. `UsersAndTeams.tsx` gets its tests before anything moves.
+## Findings from Parts 3-5 that later steps must not rediscover
 
----
-
-## Part 3 — user lookup
-
-### Step 3.1 — look users up by id — **done**
-
-- [x] `VizMetadata` gained `usersById: Map<number, UserData>` beside `users`, built by
-      `preprocess.indexUsersById`. `users` stays the list because the alias threshold and the
-      users table both want it in order.
-- [x] `getUserData` now takes `metadata` rather than `users`, and looks up through the map. Error
-      message fixed to report the id.
-- [x] `indexUsersById` validates density (`users[i].id === i`) on load and **throws**, so the
-      `ErrorReport` names the position and the id that disagree. Fatal rather than a warning
-      because a gap makes the first alias collide with a real user — silent mis-attribution.
-- [x] `isAlias` commented; the id threshold is recorded as a deliberate remaining assumption.
-- [x] `testFixtures.vizMetadata` derives `usersById` from whatever `users` a test overrides, so
-      no existing test had to change.
-
-**Verified:** 187 unit tests green (was 181); both new error-path tests proved to discriminate by
-neutering the check and the message. `npm run e2e:strict` 16/16 clean. Manually confirmed the
-Inspector's changers table still names people, and that a hand-mangled sparse data file is
-refused with the new message on screen.
-
----
-
-## Part 4 — `nodeData.ts` → `src/model/` — **done**
-
-Team aggregation first: it has the most tests and the cleanest seam.
-
-`nodeData.ts`'s 882 lines are now `teamStats.ts` (456), `gitChanges.ts` (228), `nodeAccessors.ts`
-(117), `coupling.ts` (111) and `couplingBuckets.ts` (39), with tests beside the two modules that
-had any. **Part 5 is next.**
-
-### Step 4.1 — team and user aggregation out — **done**
-
-- [x] `src/model/teamStats.ts` (456 lines) takes the whole block, which turned out to be
-      contiguous in `nodeData.ts` (lines 400-835): `UserStats`, `DEFAULT_USER_STATS`,
-      `metricFrom`, `NO_TEAM_SYMBOL`, `nodeChangers`, `nodeChangersByTeam`,
-      `sortedUserStatsAccumulators`, `nodeTopTeam`, `topTeamsPartitioned`, `nodeSingleTeam`,
-      `addTeamStats`, `lastCommitDay`, `aggregate{User,Team}Stats` and their private helpers.
-- [x] The block's only dependency back into `nodeData.ts` is `nodeChangeDetails`, which is now
-      exported with a comment saying it moves to `model/gitChanges.ts` in step 4.2 and this
-      import follows it there. `nodeData.ts` is down to 440 lines.
-- [x] Tests split: the four team `describe`s and their helpers to
-      `src/model/teamStats.test.ts`; only the coupling-distance `describe` stays in
-      `nodeData.test.ts` (36 lines), waiting for step 4.3.
-
-**Verified:** `npm run check` green — 187 tests, now across 18 files. The moved tests passed
-unchanged, which is the proof: diffing the two new test files against the original as line
-multisets shows every line accounted for and none rewritten. `npm run e2e:strict` 16/16 clean.
-
-### Step 4.2 — git change details out — **done**
-
-- [x] `src/model/gitChanges.ts` (228 lines): `nodeChangeDetails` and its three private helpers,
-      `nodeLastChangeDay`, `nodeAge`, `nodeNumberOfChangers`, `ChurnData`, `nodeChurn*`,
-      `findMaxima`, `calculateFileMaxima`. Two contiguous runs in `nodeData.ts`, and neither
-      referenced anything left behind - a clean cut.
-- [x] `teamStats.ts`'s import followed the code, as 4.1 promised, and `nodeChangeDetails`'
-      temporary comment is replaced by one saying what it is. `nodeData.ts` is down to 228 lines
-      and no longer imports from `state.ts` at all.
-- [x] `nodeAge`'s day-0 bug is recorded in a comment at the line, not fixed.
-
-**Verified:** `npm run check` green, 187 tests. Diffing HEAD's `nodeData.ts` against the two new
-files shows every difference is a comment - not one line of code changed. `npm run e2e:strict`
-16/16 clean.
-
-No tests moved: `nodeData.test.ts` never covered this code. Its only remaining `describe` is the
-coupling one, which step 4.3 takes.
-
-### Step 4.3 — coupling out — **done**
-
-- [x] `src/model/coupling.ts` (108 lines): `nodeCouplingData`, `nodeHasCouplingData`,
-      `CouplingLink`, `nodeCouplingFiles`, `commonRoots`, `filesHaveMaxCommonRoots`,
-      `nodeCouplingFilesFiltered`.
-- [x] `couplingBuckets.ts` moved to `src/model/couplingBuckets.ts` unchanged but for its import
-      path. Kept as its own module rather than merged: it computes global bucket ranges from
-      `CouplingStats`, where `coupling.ts` reads one node's own buckets, and merging would drag a
-      `viz.types` import into the latter.
-- [x] The coupling-distance tests moved to `src/model/coupling.test.ts`; `nodeData.test.ts` is
-      now empty of content and deleted.
-- [x] `coupling.ts` still imports `nodePath` from `nodeData` - the one-line passthrough step 4.4
-      inlines. Commented as such.
-
-**Verified:** `npm run check` green, 187 tests. Code and tests both moved verbatim (diffed as
-line multisets; only the new module header differs). `npm run e2e:strict` 16/16 clean.
-
-**The plan's manual check was impossible as written, and that is worth recording.** Neither
-tracked data file can render a coupling arc: `default.json` has the coupling feature on and 14
-buckets, but _every_ `coupled_files` list in it is empty, and `nested.json` has coupling off
-entirely. So the arcs were verified against a synthetic file instead - `default.json` with real
-`coupled_files` written into four nodes - which rendered four arcs correctly through the
-extracted module. The file was temporary and is deleted. This sharpens the existing
-"regenerate `default.json`" follow-up in `CLAUDE.md`: the shipped sample cannot demonstrate
-coupling at all, and neither can any test.
-
-### Step 4.4 — what is left of nodeData — **done**
-
-- [x] `nodePath` inlined to `node.path` at its 4 sites, spending the `// TODO: inline me`.
-- [x] `nodeDepth` deleted: it was **dead**, one occurrence in the whole codebase, its own
-      definition.
-- [x] Everything else kept as-is and moved to `src/model/nodeAccessors.ts` (117 lines).
-- [x] `nodeData.ts` deleted. Part 4 is complete: 882 lines became five modules.
-
-**Verified:** `npm run check` green, 187 tests. Diffing HEAD's `nodeData.ts` against
-`nodeAccessors.ts` shows exactly those two functions removed and nothing else but the new header.
-`npm run e2e:strict` 16/16 clean.
-
-**The inlining scope was deliberately narrowed, and why matters.** The plan said "inline the
-one-line passthroughs that earn nothing", which reads as a size test. It is not: the test is
-whether the name says more than the field path. `nodeCumulativeLinesOfCode` is a one-liner and
-earns its keep by naming the opaque `node.value`; `nodeLanguage` and `nodeRemoteUrl` shorten real
-chains. Only `nodePath` restated its own field.
-
-Checked while deciding: **the accessors are not an abstraction barrier over the JSON shape**, so
-the "one edit when the scanner changes" argument for keeping them does not apply. The shape
-already leaks in seven places outside the accessor file - `preprocess.ts:114,131,224` and, since
-this Part, `gitChanges.ts:50,70` and `coupling.ts:15`. They are a convenience layer used where
-it is convenient. That is a fine thing to be, but it should not be mistaken for a boundary; the
-module header now says so.
-
----
-
-## Part 5 — `state.ts` → `src/state/`
-
-### Step 5.1 — config and its defaults out
-
-- [ ] `src/state/config.ts`: the `Config` type, `initialiseGlobalState`, `themedColours`,
-      colour-key helpers. `initialiseGlobalState` holds the one deliberate piece of local-time
-      date arithmetic left in the app (`subYears`/`addDays` for the slider bounds) — move the
-      comment with it.
-
-**Verify:** `npm run check`; `vizUpdatePaths.test.ts` and `state.test.ts` exercise these heavily
-and must pass unchanged. `npm run e2e:strict` clean.
-
-### Step 5.2 — actions and reducer out
-
-- [ ] `src/state/actions.ts` for the `Action` union, `src/state/reducer.ts` for
-      `updateStateFromAction`. Keep the exhaustive `never` check — it is what makes an unhandled
-      action a compile error.
-
-**Verify:** `npm run check` — deliberately delete one `case` locally and confirm the `never`
-check still fails the build, then restore it. `npm run e2e:strict` clean.
-
-### Step 5.3 — derived data out
-
-- [ ] `src/state/derived.ts`: `postprocessState`, `buildUserTeams`, `globalDispatchReducer`.
-      Keep the recompute-on-diff pattern exactly — `state.test.ts` pins both halves of it.
-
-**Verify:** `state.test.ts` passes unchanged. `npm run e2e:strict` clean.
+- **No tracked data file can render a coupling arc.** `default.json` has the coupling feature on
+  and 14 buckets, but _every_ `coupled_files` list in it is empty; `nested.json` has coupling off
+  entirely. Step 4.3 verified the arcs against a synthetic fixture instead — `default.json` with
+  real `coupled_files` written into four nodes, loaded via `EXPLORER_DATA`, then deleted.
+  **Step 7.1 needs the same fixture**; budget for building it rather than discovering the gap
+  again. This also sharpens `CLAUDE.md`'s "regenerate `default.json`" follow-up: the shipped
+  sample cannot demonstrate coupling at all, and neither can any test.
+- **Import cycles are a real hazard when splitting a hub module.** Part 5 hit one that the plan
+  had not anticipated (see `spec.md`). Before choosing where a function lands, check what it
+  calls and what calls it; a small leaf module is a cheap fix, and a type-only import is not an
+  edge at all.
+- **`nodeAge` treats day 0 as absent** (`if (!lastDay)`), noted in a comment at
+  `model/gitChanges.ts` and deliberately not fixed.
 
 ---
 
 ## Part 6 — `UsersAndTeams.tsx` → `src/teams/`
 
-Tests before anything moves.
+Tests before anything moves. This is the riskiest part of the plan and the only file with no
+coverage at all: 1348 lines, of which the `UsersAndTeams` component itself is one function from
+line 129 to the end. `sortUsers` (line 81) and the `UsersAndTeamsPageState` type (line 47) are
+already outside it.
+
+Related components that will likely want to move too, or at least be considered: `EditAlias.tsx`
+drives alias creation against the same page state, and `UserTeamList.tsx` renders team membership.
 
 ### Step 6.1 — whole-panel tests
 
-- [ ] Follow the `@testing-library/react` pattern Part 1 established (`ErrorBoundary.test.tsx`,
-      `Loader.test.tsx`): render the real panel against a `minimalState`, assert on **dispatched
-      actions** rather than markup so the tests survive the restructure.
+- [ ] Follow the `@testing-library/react` pattern (`ErrorBoundary.test.tsx`, `Loader.test.tsx`):
+      render the real panel against a `minimalState`, assert on **dispatched actions** rather
+      than markup so the tests survive the restructure.
 - [ ] Cover: create a team, assign users to it, create an alias, ignore a user, filter the user
       list, sort by a column.
 - [ ] Check `index.tsx`'s missing `React.StrictMode` does not bite — this component is ordinary
       React, but confirm rather than assume.
 
-**Verify:** the new tests are the verification. No production change, so `npm run e2e:strict`
-must be clean.
+**Verify:** the new tests are the verification, and each must be shown to discriminate. No
+production change, so `npm run e2e:strict` must be clean.
 
 ### Step 6.2 — pure logic out
 
@@ -259,14 +136,17 @@ Manual: open the panel and exercise each table by hand.
 
 ## Part 7 — `Viz.tsx`
 
+One pure slice is already out (`vizNodeSelection.ts`, imported at `Viz.tsx:35`).
+
 ### Step 7.1 — coupling arcs out
 
-- [ ] `src/webgl/` is for GL; coupling arcs are SVG overlay geometry. `arcPath`,
-      `normalizedCouplingNodes` and the arc styling go to their own module, keeping the pure
-      geometry separable from the D3 selection code.
+- [ ] `src/webgl/` is for GL; coupling arcs are SVG overlay geometry. `arcPath` (line 212),
+      `normalizedCouplingNodes` (line 189) and the arc styling go to their own module, keeping
+      the pure geometry separable from the D3 selection code.
 
-**Verify:** `npm run check`; unit-test `arcPath` now it is reachable. Manual: coupling arcs on
-`default.json`, since no screenshot covers them.
+**Verify:** `npm run check`; unit-test `arcPath` now it is reachable. Manual: **needs the
+synthetic coupling fixture** described in the findings above — no tracked data file has a single
+coupled pair, so there is nothing to look at otherwise.
 
 ### Step 7.2 — timescale brush out
 
@@ -290,9 +170,11 @@ loss — the WebGL recovery path described in `CLAUDE.md`.
 
 ## Close out
 
-- [ ] Confirm no file among the four is over ~400 lines.
+- [ ] Confirm no file among the original four is over ~400 lines. Two already pass
+      (`nodeData.ts` gone, `state.ts` 147); `UsersAndTeams.tsx` and `Viz.tsx` are the test.
 - [ ] Update `CLAUDE.md`'s architecture section to describe the new layout, replacing the
-      file-by-file descriptions that this work invalidates.
+      file-by-file descriptions this work invalidates — `nodeData.ts` and `state.ts` are
+      described there as they no longer are.
 - [ ] `npm run check` and `npm run e2e:strict` green from a clean checkout.
 - [ ] Delete `spec.md` and `plan.md`; git keeps the history.
 
@@ -300,17 +182,15 @@ loss — the WebGL recovery path described in `CLAUDE.md`.
 
 - **Import churn.** Moving modules touches many files' import lists. `simple-import-sort` fixes
   ordering automatically (`npm run lint:fix`), so the churn is noise rather than work — but it
-  makes diffs large, and a real change can hide in one. Keep each step to a single concern.
-- **`UsersAndTeams.tsx` is 1219 lines in one function.** Step 6.1 exists precisely because
-  moving it blind is the riskiest thing in this plan. If those tests turn out to be hard to
-  write, that is information — stop and reconsider the split before continuing.
-- **Screenshot coverage is uneven.** Coupling arcs and the Users and Teams panel have none, so
-  steps 4.3, 6.3 and 7.1 lean on manual checks. Consider adding shots for them if the manual
-  check proves fiddly. **Step 4.3 found this is worse than uneven for coupling**: no tracked
-  data file contains a single coupled file pair, so neither a screenshot nor a manual check is
-  possible without a synthetic fixture. Step 7.1's arc-rendering check has the same problem and
-  should plan for it.
-- **A plan step's stated premise can be wrong.** Step 1.2 was written around a file that turned
-  out to load fine, and following it literally would have shipped a guard refusing a working
-  file. Check a step's factual claims before building on them, and correct `spec.md` when one
-  does not hold.
+  makes diffs large, and a real change can hide in one. Keep each step to a single concern, and
+  use the multiset diff above to prove nothing hid.
+- **`UsersAndTeams.tsx` is one 1200-line function.** Step 6.1 exists precisely because moving it
+  blind is the riskiest thing left. If those tests turn out to be hard to write, that is
+  information — stop and reconsider the split before continuing.
+- **Screenshot coverage is uneven.** The Users and Teams panel has none, so step 6.3 leans on a
+  manual check; coupling arcs have none _and_ no data to render, so step 7.1 needs a synthetic
+  fixture. Consider adding shots for either if the manual check proves fiddly.
+- **A plan step's stated premise can be wrong.** This has now happened twice: step 1.2 was
+  written around a file that turned out to load fine, and step 4.3's manual check assumed
+  `default.json` could show coupling. Check a step's factual claims before building on them, and
+  correct `spec.md` when one does not hold.

@@ -9,7 +9,9 @@ import { HierarchyNode } from "d3";
 import _ from "lodash";
 
 import { FeatureFlags, TreeNode } from "./polyglot_data.types";
-import { Config, State, themedColours } from "./state";
+import { State } from "./state";
+import { themedColours } from "./state/colours";
+import { Config } from "./state/config";
 import { getCurrentVis } from "./VisualizationData";
 import { VizMetadata } from "./viz.types";
 import { buildPatternPalette, PatternPalette } from "./webgl/colours";

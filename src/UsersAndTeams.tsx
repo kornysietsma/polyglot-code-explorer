@@ -23,7 +23,6 @@ import {
 } from "./model/teamStats";
 import { displayUser, UserData } from "./polyglot_data.types";
 import {
-  buildUserTeams,
   errorMessage,
   infoMessage,
   Message,
@@ -31,10 +30,11 @@ import {
   Team,
   Teams,
   TeamsAndAliases,
-  themedColours,
   UserAliasData,
   UserAliases,
 } from "./state";
+import { themedColours } from "./state/colours";
+import { buildUserTeams } from "./state/derived";
 import { UserTeamList } from "./UserTeamList";
 import { ColourPicker } from "./widgets/ColourPicker";
 import DelayedInput from "./widgets/DelayedInput";

@@ -1,7 +1,8 @@
 import * as d3 from "d3";
 
 import { NO_TEAM_SYMBOL } from "../model/teamStats";
-import { State, Team, themedColours } from "../state";
+import { State, Team } from "../state";
+import { themedColours } from "../state/colours";
 
 export const TeamWidget = (props: {
   team: Team;

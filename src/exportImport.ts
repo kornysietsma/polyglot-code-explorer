@@ -12,7 +12,6 @@ import {
   UserData,
 } from "./polyglot_data.types";
 import {
-  Config,
   CouplingConfig,
   errorMessage,
   ExpensiveConfig,
@@ -25,6 +24,7 @@ import {
   UserAliasData,
   UserAliases,
 } from "./state";
+import { Config } from "./state/config";
 import { VizMetadata } from "./viz.types";
 import { NESTED_LEVEL_COUNT } from "./webgl/geometry";
 

@@ -1,7 +1,8 @@
 import _ from "lodash";
 import { describe, expect, it } from "vitest";
 
-import { Config, themedColours } from "./state";
+import { themedColours } from "./state/colours";
+import { Config } from "./state/config";
 import { minimalState } from "./testFixtures";
 import { buildNestingStyle, isNestingOnlyChange } from "./vizUpdatePaths";
 import { OUTLINE_LEVEL_COUNT } from "./webgl/geometry";

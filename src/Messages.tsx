@@ -1,6 +1,7 @@
 import "./Messages.css";
 
-import { Action, Message } from "./state";
+import { Message } from "./state";
+import { Action } from "./state/actions";
 
 const Messages = ({
   messages,

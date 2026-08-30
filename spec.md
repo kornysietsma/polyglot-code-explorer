@@ -6,30 +6,32 @@ Phase 1 (test clarity, the `nestedCircles` screenshot suite, seven defect fixes)
 committed**: `174d284`, `b86044d`, `262bf9b`, `e268255`. Its findings are folded into `CLAUDE.md`;
 git holds the rest.
 
-Of this spec, **Parts 1 and 2 are done and committed** — error visibility (`72f820c`, `e9e4453`)
-and UTC dates (`4438d4c`, `70b73d3`, `89ed94b`). Their sections below now record what was decided
-and what was found, rather than what is planned. **Parts 3 and 4 remain**, with `plan.md` holding
-the ordered steps.
+Of this spec, **Parts 1, 2 and 3 are done**, and **Part 4's refactor is done for `nodeData.ts`
+and `state.ts`** — error visibility (`72f820c`, `e9e4453`), UTC dates (`4438d4c`, `70b73d3`,
+`89ed94b`), user lookup (`5e2fcd1`), `src/model/` (`40f700c`, `c3e4c16`, `e3cd0a8`, `c8685a4`)
+and `src/state/` (`ef69773`, `90f34bc`, `3319b1d`). Those sections now record what was decided and
+what was found, rather than what is planned. **`UsersAndTeams.tsx` and `Viz.tsx` remain**, with
+`plan.md` holding the ordered steps.
 
 ## Why
 
-The codebase works and is now reasonably well tested — 181 unit tests and 16 screenshots — but it
-sprawls. Four files carry 4,172 lines between them, and each mixes several unrelated concerns in
+The codebase works and is now reasonably well tested — 187 unit tests and 16 screenshots — but it
+sprawled. Four files carried 4,172 lines between them, each mixing several unrelated concerns in
 one namespace:
 
-| file                | lines | what is tangled together                                                                                                         |
-| ------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `UsersAndTeams.tsx` | 1348  | one 1219-line component: modal, three sortable tables, selection, filters, alias/team creation, import/export, colour management |
-| `state.ts`          | 998   | the `Config` shape, a ~25-case `Action` union, the reducer, and `postprocessState`'s derived-data cache                          |
-| `Viz.tsx`           | 944   | imperative D3/WebGL: draw, update, coupling arcs, timescale brush, zoom wiring, tooltip, GL recovery                             |
-| `nodeData.ts`       | 882   | ~50 `nodeXxx` functions over four unrelated concerns: git change details, coupling, layout accessors, team aggregation           |
+| file                | lines | what was tangled together                                                                                                        | now                                      |
+| ------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `UsersAndTeams.tsx` | 1348  | one 1219-line component: modal, three sortable tables, selection, filters, alias/team creation, import/export, colour management | to do                                    |
+| `state.ts`          | 998   | the `Config` shape, a ~25-case `Action` union, the reducer, and `postprocessState`'s derived-data cache                          | five modules in `src/state/` + 147 lines |
+| `Viz.tsx`           | 944   | imperative D3/WebGL: draw, update, coupling arcs, timescale brush, zoom wiring, tooltip, GL recovery                             | to do                                    |
+| `nodeData.ts`       | 882   | ~50 `nodeXxx` functions over four unrelated concerns: git change details, coupling, layout accessors, team aggregation           | five modules in `src/model/`; file gone  |
 
 The goal is expressive, readable, modular code — each module about one thing, with a name that
 says what that thing is. Tests already cover the risky logic; this is about where the code lives
 and what it is called.
 
-Three correctness items ride along, none dependent on the refactor: error visibility and UTC
-dates, both now done, and the user lookup, which is next.
+Three correctness items rode along, none dependent on the refactor: error visibility, UTC dates
+and the user lookup. All three are done.
 
 ## Scope
 
@@ -170,38 +172,81 @@ which also picks up the previously unlinked `docs/rendering-performance.md`.
 
 ## Part 3 — user lookup by id, not by array position
 
-`state.ts`'s `getUserData` does `users[userId]` — **positional** indexing — and `isAlias` treats
-any id `>= users.length` as an alias. So `metadata.git.users` must be dense with `index === id`,
-an invariant nothing documents or checks. Building the `nested.json` fixture broke it by pruning
+### The defect
+
+`state.ts`'s `getUserData` did `users[userId]` — **positional** indexing — and `isAlias` treats
+any id `>= users.length` as an alias. So `metadata.git.users` had to be dense with `index === id`,
+an invariant nothing documented or checked. Building the `nested.json` fixture broke it by pruning
 that array to the users actually referenced, and the failure surfaced as `Invalid user id` thrown
 from deep inside the Inspector.
 
-**There is no performance argument for keeping it.** Measured at ~5ns (array) versus ~13ns (Map)
-per lookup, against three call sites — `exportImport.ts` twice, and `NodeChangeInspector.tsx`
-once — all driven by a user action and bounded by one node's or one team's user count. Never
-per-node, never per-frame. The genuinely hot path, `nodeData.ts`'s per-node aggregation, already
-uses `possiblyAlias`, **which is a Map lookup**, so this makes the two consistent rather than
-diverging.
+There was no performance argument for keeping it. Measured at ~5ns (array) versus ~13ns (Map) per
+lookup, against three call sites — `exportImport.ts` twice, `NodeChangeInspector.tsx` once — all
+driven by a user action and bounded by one node's or one team's user count. Never per-node, never
+per-frame. The genuinely hot path, per-node aggregation, already used `possiblyAlias`, **which is
+a Map lookup**, so this made the two consistent rather than divergent.
 
-While here: the error message reads `` `Invalid user id #{userId}` `` — Ruby interpolation in a
-JavaScript template string, so it never reports the id.
+### The decision, and what shipped
+
+- **`VizMetadata` gained `usersById: Map<number, UserData>` beside `users`**, built by
+  `preprocess.indexUsersById`. The list stays because two things genuinely want id order: the
+  alias-id threshold, and the users table. `getUserData` now takes `metadata` rather than a bare
+  array, since both call sites already had it.
+- **The density invariant is checked once, on load, and is fatal.** `indexUsersById` throws when
+  `users[i].id !== i`, naming the position and the id that disagree, and Part 1's `ErrorReport`
+  puts it on screen. Fatal rather than a warning because a gap makes the first alias collide with
+  a real user — silent mis-attribution, not a degraded view. Both tracked data files are dense, so
+  nothing that worked is now refused.
+- **`isAlias` keeps its `users.length` threshold**, with a comment recording that as the
+  deliberate remaining assumption, valid only while the list is dense.
+- The error message `` `Invalid user id #{userId}` `` — Ruby interpolation in a JavaScript
+  template string, so it never reported the id — is fixed.
 
 ## Part 4 — the refactor
 
-### `nodeData.ts` → `src/model/`
+### `nodeData.ts` → `src/model/` — **done**
 
-Four concerns share one namespace. Split along the seams that already exist:
+882 lines over four concerns became `teamStats.ts` (456), `gitChanges.ts` (228),
+`nodeAccessors.ts` (117), `coupling.ts` (113) and `couplingBuckets.ts` (39), with
+`teamStats.test.ts` and `coupling.test.ts` beside them. `nodeData.ts` is deleted.
 
-- git change details, age, churn, number of changers;
-- team and user aggregation (well covered by tests already, lifts out cleanly — do this first);
-- coupling links and the distance filter;
-- the small layout/loc accessors, several of which are one-line passthroughs. `nodePath` is
-  already marked `// TODO: inline me`.
+**A criterion was settled here that the plan had left ambiguous.** The plan said to "inline the
+one-line passthroughs that earn nothing", which reads as a size test. It is not. The test is
+**whether the name says more than the field path it stands for**: `nodeCumulativeLinesOfCode` is
+a one-liner that earns its keep by naming the opaque `node.value`, and `nodeLanguage` and
+`nodeRemoteUrl` shorten real chains. Only `nodePath` restated its own field, so only `nodePath`
+was inlined. `nodeDepth` was deleted as dead code.
 
-### `state.ts` → `src/state/`
+Checked while deciding, and worth keeping in view: **the accessors are not an abstraction barrier
+over the JSON shape**, so the "one edit when the scanner changes the format" argument for keeping
+them does not apply. The shape already leaks in seven places outside them —
+`preprocess.ts:114,131,224`, `model/gitChanges.ts:50,70` and `model/coupling.ts:15`. They are a
+convenience layer used where it is convenient. That is a fine thing to be, and `nodeAccessors.ts`'
+header now says so, so nobody mistakes it for a boundary later.
 
-Config shape, action union, reducer, and derived-data cache into separate modules. Mostly
-mechanical, but it touches every dispatch site, so it wants its own step.
+### `state.ts` → `src/state/` — **done**
+
+998 lines became `config.ts` (397), `reducer.ts` (189), `actions.ts` (168), `derived.ts` (131)
+and `colours.ts` (25). `state.ts` keeps 147 lines: the `State` shape, the small types it is built
+from, the `Message` constructors and the user-lookup helpers — what every module needs and none
+owns.
+
+**`colours.ts` was not in the plan, and exists to break a cycle the plan had not anticipated.**
+Splitting exactly as written puts `initialiseGlobalState` in `config.ts`, but it ends with
+`return postprocessState(...)`, and `postprocessState` calls `themedColours` — so `config.ts` and
+`derived.ts` would each need a value from the other. ESM tolerates that (all function
+declarations, nothing called at module-eval time), but it is a trap for a later edit that moves
+work to module scope. Making the four colour helpers a leaf breaks it cleanly. The alternative
+considered was moving `initialiseGlobalState` to `derived.ts` on the grounds that it builds a
+whole `State` rather than a `Config`; the leaf module was chosen so the plan's placement stands.
+
+The result is better than merely acyclic: `state.ts` imports nothing from `state/` at runtime at
+all — its `Config`, `ColourKey` and `PatternId` imports are type-only and erased at build — so
+the folder is a clean line, `config.ts` → `derived.ts` → `reducer.ts` → `colours.ts`.
+
+**The generalisable lesson for Parts 6 and 7:** when splitting a hub module, check what a
+function calls and what calls it before choosing where it lands. A small leaf module is a cheap
+fix, and a type-only import is not an edge at all.
 
 ### `UsersAndTeams.tsx` → `src/teams/`
 
@@ -220,9 +265,13 @@ One pure slice is already out (`vizNodeSelection.ts`). Remaining candidates, eac
 the coupling arc geometry, the timescale brush, and the zoom/camera wiring. `Viz.tsx` keeps the
 imperative D3 shell that CLAUDE.md's test boundary says stays manually verified.
 
+Note for the arc step: **no tracked data file contains a single coupled file pair**, so verifying
+the arcs needs a synthetic fixture — see `plan.md`.
+
 ## What done looks like
 
-- No file over ~400 lines among the four.
+- No file over ~400 lines among the four. Two down: `nodeData.ts` is gone and `state.ts` is 147
+  lines; `UsersAndTeams.tsx` (1348) and `Viz.tsx` (947) remain.
 - Every new module has a name that says what it holds, and its tests sit beside it.
 - `npm run check` green; `npm run e2e:strict` at zero tolerance either clean or deliberately
   re-baselined with the reason recorded.

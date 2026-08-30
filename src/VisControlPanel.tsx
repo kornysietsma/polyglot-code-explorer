@@ -1,7 +1,8 @@
 import ColourKey from "./ColourKey";
 import { humanizeDate } from "./datetimes";
 import { FeatureFlags } from "./polyglot_data.types";
-import { Action, State } from "./state";
+import { State } from "./state";
+import { Action } from "./state/actions";
 import { VisualizationData } from "./VisualizationData";
 import { VizMetadata } from "./viz.types";
 import HelpPanel from "./widgets/HelpPanel";

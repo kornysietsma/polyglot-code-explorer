@@ -1,6 +1,8 @@
 import { useId } from "react";
 
-import { Action, State, themedColours } from "../state";
+import { State } from "../state";
+import { Action } from "../state/actions";
+import { themedColours } from "../state/colours";
 import { ColourPicker } from "../widgets/ColourPicker";
 import { FileChangeMetricChooser } from "../widgets/FileChangeMetricChooser";
 

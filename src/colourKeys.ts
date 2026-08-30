@@ -1,7 +1,8 @@
 import * as d3 from "d3";
 
 import { humanizeDate } from "./datetimes";
-import { State, themedColours, themedErrorColour } from "./state";
+import { State } from "./state";
+import { themedColours, themedErrorColour } from "./state/colours";
 import { VizMetadata } from "./viz.types";
 
 export function goodBadUglyColourKeyData(

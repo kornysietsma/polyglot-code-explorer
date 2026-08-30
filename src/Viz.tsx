@@ -28,7 +28,9 @@ import {
 } from "./model/nodeAccessors";
 import { FeatureFlags, Point, TreeNode } from "./polyglot_data.types";
 import { TimescaleIntervalData } from "./preprocess";
-import { Action, State, themedColours } from "./state";
+import { State } from "./state";
+import { Action } from "./state/actions";
+import { themedColours } from "./state/colours";
 import { VizMetadata } from "./viz.types";
 import { selectNodesToDraw } from "./vizNodeSelection";
 import VizTooltip from "./VizTooltip";

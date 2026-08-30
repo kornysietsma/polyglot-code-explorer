@@ -10,16 +10,18 @@ import {
   TreeNode,
 } from "./polyglot_data.types";
 import {
-  ColourKey,
-  coloursToColourKey,
   FileChangeMetric,
-  PatternId,
   State,
   Teams,
-  themedColours,
   UserAliases,
   UserTeams,
 } from "./state";
+import {
+  ColourKey,
+  coloursToColourKey,
+  PatternId,
+  themedColours,
+} from "./state/colours";
 
 export const SVG_PARTITIONS = 3;
 

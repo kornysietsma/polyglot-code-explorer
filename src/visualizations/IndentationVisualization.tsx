@@ -4,7 +4,8 @@ import { goodBadUglyColourKeyData } from "../colourKeys";
 import { goodBadUglyScale } from "../ColourScales";
 import { nodeIndentation } from "../model/nodeAccessors";
 import { FeatureFlags, FileNode } from "../polyglot_data.types";
-import { Action, State } from "../state";
+import { State } from "../state";
+import { Action } from "../state/actions";
 import { VizMetadata } from "../viz.types";
 import { BaseVisualization } from "./BaseVisualization";
 

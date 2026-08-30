@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { getUserData, globalDispatchReducer, State, Teams } from "./state";
+import { getUserData, State, Teams } from "./state";
+import { globalDispatchReducer } from "./state/derived";
 import {
   minimalFileNode,
   minimalPolyglotData,
