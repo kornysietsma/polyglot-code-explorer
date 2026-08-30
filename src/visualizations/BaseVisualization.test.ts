@@ -7,7 +7,8 @@ import {
   FileNode,
   TreeNode,
 } from "../polyglot_data.types";
-import { State, themedColours } from "../state";
+import { State } from "../state";
+import { themedColours } from "../state/colours";
 import {
   minimalDirectoryNode,
   minimalFileNode,

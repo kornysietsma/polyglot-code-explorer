@@ -2,7 +2,9 @@ import { HierarchyNode } from "d3";
 import { ReactElement } from "react";
 
 import { FeatureFlags, TreeNode } from "./polyglot_data.types";
-import { Action, Config, State } from "./state";
+import { State } from "./state";
+import { Action } from "./state/actions";
+import { Config } from "./state/config";
 import { AgeVisualization } from "./visualizations/AgeVisualization";
 import { ChurnVisualization } from "./visualizations/ChurnVisualization";
 import { CreationDateVisualization } from "./visualizations/CreationDateVisualization";

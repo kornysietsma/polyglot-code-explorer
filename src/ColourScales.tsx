@@ -1,7 +1,8 @@
 import * as d3 from "d3";
 
 import { NO_TEAM_SYMBOL } from "./model/teamStats";
-import { Config, State } from "./state";
+import { State } from "./state";
+import { Config } from "./state/config";
 
 export function numberOfChangersScale(state: State) {
   const { config } = state;

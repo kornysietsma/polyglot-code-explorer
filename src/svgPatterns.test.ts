@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { colourKeyToColours, State, Teams } from "./state";
+import { State, Teams } from "./state";
+import { colourKeyToColours } from "./state/colours";
 import { calculateSvgPatterns, SVG_PARTITIONS } from "./svgPatterns";
 import {
   gitDetails,

@@ -5,12 +5,9 @@ import { stateFromExportable } from "./exportImport";
 import Inspector from "./inspectors/Inspector";
 import { ExportableStateMaybe } from "./Loader";
 import Messages from "./Messages";
-import {
-  globalDispatchReducer,
-  infoMessage,
-  initialiseGlobalState,
-  warnMessage,
-} from "./state";
+import { infoMessage, warnMessage } from "./state";
+import { initialiseGlobalState } from "./state/config";
+import { globalDispatchReducer } from "./state/derived";
 import Viz from "./Viz";
 import { VizDataRef, VizDataRefMaybe } from "./viz.types";
 

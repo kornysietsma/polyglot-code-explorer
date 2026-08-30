@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ColourKey, coloursToColourKey, PatternId } from "../state";
+import { ColourKey, coloursToColourKey, PatternId } from "../state/colours";
 import { buildPatternPalette, parseCssColour, parsePatternId } from "./colours";
 
 describe("parseCssColour", () => {

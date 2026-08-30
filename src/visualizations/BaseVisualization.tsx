@@ -11,7 +11,10 @@ import {
   isFile,
   TreeNode,
 } from "../polyglot_data.types";
-import { Action, Config, State, themedColours } from "../state";
+import { State } from "../state";
+import { Action } from "../state/actions";
+import { themedColours } from "../state/colours";
+import { Config } from "../state/config";
 import { Visualization } from "../VisualizationData";
 import { VizMetadata } from "../viz.types";
 

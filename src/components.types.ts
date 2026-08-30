@@ -1,4 +1,5 @@
-import { Action, State } from "./state";
+import { State } from "./state";
+import { Action } from "./state/actions";
 import { VizDataRef } from "./viz.types";
 
 export type DefaultProps = {

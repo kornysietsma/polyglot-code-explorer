@@ -2,7 +2,7 @@
 
 import * as d3 from "d3";
 
-import { ColourKey, colourKeyToColours, PatternId } from "../state";
+import { ColourKey, colourKeyToColours, PatternId } from "../state/colours";
 import { SVG_PARTITIONS } from "../svgPatterns";
 
 export type RGB = [r: number, g: number, b: number];

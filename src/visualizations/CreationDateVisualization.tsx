@@ -4,7 +4,8 @@ import { creationKeyData } from "../colourKeys";
 import { earlyLateScaleBuilder } from "../ColourScales";
 import { nodeCreationDateClipped } from "../model/nodeAccessors";
 import { FeatureFlags, FileNode } from "../polyglot_data.types";
-import { Action, State } from "../state";
+import { State } from "../state";
+import { Action } from "../state/actions";
 import { VizMetadata } from "../viz.types";
 import { BaseVisualization } from "./BaseVisualization";
 

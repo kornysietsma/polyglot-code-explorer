@@ -16,7 +16,8 @@ import {
   TreeNode,
 } from "./polyglot_data.types";
 import { indexUsersById } from "./preprocess";
-import { initialiseGlobalState, State } from "./state";
+import { State } from "./state";
+import { initialiseGlobalState } from "./state/config";
 import { VizData, VizDataRef, VizMetadata } from "./viz.types";
 
 export const DUMMY_LOC: LocData = {

@@ -1,7 +1,7 @@
 import React from "react";
 
 import { DirectoryNode, isDirectory } from "../polyglot_data.types";
-import { Action } from "../state";
+import { Action } from "../state/actions";
 import ToggleablePanel from "../widgets/ToggleablePanel";
 
 const SubdirInspector = ({

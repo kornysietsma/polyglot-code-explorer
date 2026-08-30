@@ -1,13 +1,9 @@
 import { HierarchyNode } from "d3";
 
 import { FeatureFlags, FileNode } from "../polyglot_data.types";
-import {
-  Action,
-  PatternId,
-  sortTeamsByName,
-  State,
-  themedColours,
-} from "../state";
+import { sortTeamsByName, State } from "../state";
+import { Action } from "../state/actions";
+import { PatternId, themedColours } from "../state/colours";
 import { VizMetadata } from "../viz.types";
 import { BaseVisualization } from "./BaseVisualization";
 import { TeamExtraControls } from "./TeamExtraControls";
