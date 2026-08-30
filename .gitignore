@@ -29,9 +29,10 @@ yarn-error.log*
 /playwright-report
 /.playwright-cli
 
-# scanner data files — only the shipped default is tracked
+# scanner data files — only the shipped default and the nestedCircles e2e fixture are tracked
 /data/*
 !/data/default.json
+!/data/nested.json
 
 # personal deploy scripts — reference internal bucket names/targets, stay local only
 /publish_*.sh
