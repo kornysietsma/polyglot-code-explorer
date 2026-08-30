@@ -20,7 +20,7 @@ import {
   aggregateUserStats,
   DEFAULT_USER_STATS,
   UserStats,
-} from "./nodeData";
+} from "./model/teamStats";
 import { displayUser, UserData } from "./polyglot_data.types";
 import {
   buildUserTeams,

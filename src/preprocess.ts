@@ -2,7 +2,7 @@ import * as d3 from "d3";
 import { fromUnixTime } from "date-fns";
 import _ from "lodash";
 
-import { nodeLinesOfCode, nodeLocData } from "./nodeData";
+import { nodeLinesOfCode, nodeLocData } from "./model/nodeAccessors";
 import {
   DirectoryNode,
   FeatureFlags,

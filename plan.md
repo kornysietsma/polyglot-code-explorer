@@ -92,46 +92,100 @@ refused with the new message on screen.
 
 ---
 
-## Part 4 — `nodeData.ts` → `src/model/`
+## Part 4 — `nodeData.ts` → `src/model/` — **done**
 
 Team aggregation first: it has the most tests and the cleanest seam.
 
-### Step 4.1 — team and user aggregation out
+`nodeData.ts`'s 882 lines are now `teamStats.ts` (456), `gitChanges.ts` (228), `nodeAccessors.ts`
+(117), `coupling.ts` (111) and `couplingBuckets.ts` (39), with tests beside the two modules that
+had any. **Part 5 is next.**
 
-- [ ] Move `nodeChangers`, `nodeChangersByTeam`, `nodeTopTeam`, `nodeSingleTeam`,
-      `topTeamsPartitioned`, `aggregate*Stats`, `add*Stats`, `UserStats`, `metricFrom`,
-      `NO_TEAM_SYMBOL` to `src/model/teamStats.ts`.
-- [ ] Move the matching tests out of `nodeData.test.ts` to sit beside it.
+### Step 4.1 — team and user aggregation out — **done**
 
-**Verify:** `npm run check` — the moved tests pass unchanged, which is the whole proof.
-`npm run e2e:strict` clean.
+- [x] `src/model/teamStats.ts` (456 lines) takes the whole block, which turned out to be
+      contiguous in `nodeData.ts` (lines 400-835): `UserStats`, `DEFAULT_USER_STATS`,
+      `metricFrom`, `NO_TEAM_SYMBOL`, `nodeChangers`, `nodeChangersByTeam`,
+      `sortedUserStatsAccumulators`, `nodeTopTeam`, `topTeamsPartitioned`, `nodeSingleTeam`,
+      `addTeamStats`, `lastCommitDay`, `aggregate{User,Team}Stats` and their private helpers.
+- [x] The block's only dependency back into `nodeData.ts` is `nodeChangeDetails`, which is now
+      exported with a comment saying it moves to `model/gitChanges.ts` in step 4.2 and this
+      import follows it there. `nodeData.ts` is down to 440 lines.
+- [x] Tests split: the four team `describe`s and their helpers to
+      `src/model/teamStats.test.ts`; only the coupling-distance `describe` stays in
+      `nodeData.test.ts` (36 lines), waiting for step 4.3.
 
-### Step 4.2 — git change details out
+**Verified:** `npm run check` green — 187 tests, now across 18 files. The moved tests passed
+unchanged, which is the proof: diffing the two new test files against the original as line
+multisets shows every line accounted for and none rewritten. `npm run e2e:strict` 16/16 clean.
 
-- [ ] `src/model/gitChanges.ts`: `nodeChangeDetails` and its helpers, `nodeLastChangeDay`,
-      `nodeAge`, `nodeNumberOfChangers`, `nodeChurn*`, `ChurnData`, `findMaxima`,
-      `calculateFileMaxima`.
-- [ ] While here, note (do not fix) that `nodeAge`'s `if (!lastDay)` treats day 0 as absent.
+### Step 4.2 — git change details out — **done**
 
-**Verify:** as 4.1.
+- [x] `src/model/gitChanges.ts` (228 lines): `nodeChangeDetails` and its three private helpers,
+      `nodeLastChangeDay`, `nodeAge`, `nodeNumberOfChangers`, `ChurnData`, `nodeChurn*`,
+      `findMaxima`, `calculateFileMaxima`. Two contiguous runs in `nodeData.ts`, and neither
+      referenced anything left behind - a clean cut.
+- [x] `teamStats.ts`'s import followed the code, as 4.1 promised, and `nodeChangeDetails`'
+      temporary comment is replaced by one saying what it is. `nodeData.ts` is down to 228 lines
+      and no longer imports from `state.ts` at all.
+- [x] `nodeAge`'s day-0 bug is recorded in a comment at the line, not fixed.
 
-### Step 4.3 — coupling out
+**Verified:** `npm run check` green, 187 tests. Diffing HEAD's `nodeData.ts` against the two new
+files shows every difference is a comment - not one line of code changed. `npm run e2e:strict`
+16/16 clean.
 
-- [ ] `src/model/coupling.ts`: `nodeCouplingFiles*`, `commonRoots`, `filesHaveMaxCommonRoots`,
-      `CouplingLink`, `nodeHasCouplingData`, plus `couplingBuckets.ts` if it belongs there too.
-- [ ] Move the coupling-distance tests across.
+No tests moved: `nodeData.test.ts` never covered this code. Its only remaining `describe` is the
+coupling one, which step 4.3 takes.
 
-**Verify:** as 4.1, and manually check coupling arcs still render — `default.json` has coupling
-enabled but no screenshot covers it, so this is eyes-on via `npm start`.
+### Step 4.3 — coupling out — **done**
 
-### Step 4.4 — what is left of nodeData
+- [x] `src/model/coupling.ts` (108 lines): `nodeCouplingData`, `nodeHasCouplingData`,
+      `CouplingLink`, `nodeCouplingFiles`, `commonRoots`, `filesHaveMaxCommonRoots`,
+      `nodeCouplingFilesFiltered`.
+- [x] `couplingBuckets.ts` moved to `src/model/couplingBuckets.ts` unchanged but for its import
+      path. Kept as its own module rather than merged: it computes global bucket ranges from
+      `CouplingStats`, where `coupling.ts` reads one node's own buckets, and merging would drag a
+      `viz.types` import into the latter.
+- [x] The coupling-distance tests moved to `src/model/coupling.test.ts`; `nodeData.test.ts` is
+      now empty of content and deleted.
+- [x] `coupling.ts` still imports `nodePath` from `nodeData` - the one-line passthrough step 4.4
+      inlines. Commented as such.
 
-- [ ] Whatever remains is layout and loc accessors. Inline the one-line passthroughs that earn
-      nothing (`nodePath` is already marked `// TODO: inline me`), and give the rest a home —
-      `src/model/nodeAccessors.ts` or similar.
-- [ ] Delete `nodeData.ts` if nothing is left.
+**Verified:** `npm run check` green, 187 tests. Code and tests both moved verbatim (diffed as
+line multisets; only the new module header differs). `npm run e2e:strict` 16/16 clean.
 
-**Verify:** `npm run check`, `npm run e2e:strict` clean.
+**The plan's manual check was impossible as written, and that is worth recording.** Neither
+tracked data file can render a coupling arc: `default.json` has the coupling feature on and 14
+buckets, but _every_ `coupled_files` list in it is empty, and `nested.json` has coupling off
+entirely. So the arcs were verified against a synthetic file instead - `default.json` with real
+`coupled_files` written into four nodes - which rendered four arcs correctly through the
+extracted module. The file was temporary and is deleted. This sharpens the existing
+"regenerate `default.json`" follow-up in `CLAUDE.md`: the shipped sample cannot demonstrate
+coupling at all, and neither can any test.
+
+### Step 4.4 — what is left of nodeData — **done**
+
+- [x] `nodePath` inlined to `node.path` at its 4 sites, spending the `// TODO: inline me`.
+- [x] `nodeDepth` deleted: it was **dead**, one occurrence in the whole codebase, its own
+      definition.
+- [x] Everything else kept as-is and moved to `src/model/nodeAccessors.ts` (117 lines).
+- [x] `nodeData.ts` deleted. Part 4 is complete: 882 lines became five modules.
+
+**Verified:** `npm run check` green, 187 tests. Diffing HEAD's `nodeData.ts` against
+`nodeAccessors.ts` shows exactly those two functions removed and nothing else but the new header.
+`npm run e2e:strict` 16/16 clean.
+
+**The inlining scope was deliberately narrowed, and why matters.** The plan said "inline the
+one-line passthroughs that earn nothing", which reads as a size test. It is not: the test is
+whether the name says more than the field path. `nodeCumulativeLinesOfCode` is a one-liner and
+earns its keep by naming the opaque `node.value`; `nodeLanguage` and `nodeRemoteUrl` shorten real
+chains. Only `nodePath` restated its own field.
+
+Checked while deciding: **the accessors are not an abstraction barrier over the JSON shape**, so
+the "one edit when the scanner changes" argument for keeping them does not apply. The shape
+already leaks in seven places outside the accessor file - `preprocess.ts:114,131,224` and, since
+this Part, `gitChanges.ts:50,70` and `coupling.ts:15`. They are a convenience layer used where
+it is convenient. That is a fine thing to be, but it should not be mistaken for a boundary; the
+module header now says so.
 
 ---
 
@@ -252,7 +306,10 @@ loss — the WebGL recovery path described in `CLAUDE.md`.
   write, that is information — stop and reconsider the split before continuing.
 - **Screenshot coverage is uneven.** Coupling arcs and the Users and Teams panel have none, so
   steps 4.3, 6.3 and 7.1 lean on manual checks. Consider adding shots for them if the manual
-  check proves fiddly.
+  check proves fiddly. **Step 4.3 found this is worse than uneven for coupling**: no tracked
+  data file contains a single coupled file pair, so neither a screenshot nor a manual check is
+  possible without a synthetic fixture. Step 7.1's arc-rendering check has the same problem and
+  should plan for it.
 - **A plan step's stated premise can be wrong.** Step 1.2 was written around a file that turned
   out to load fine, and following it literally would have shipped a guard refusing a working
   file. Check a step's factual claims before building on them, and correct `spec.md` when one

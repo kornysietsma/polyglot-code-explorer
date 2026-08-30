@@ -2,7 +2,7 @@ import _ from "lodash";
 import { Dispatch, SetStateAction, useId, useState } from "react";
 import ReactModal from "react-modal";
 
-import { lastCommitDay } from "./nodeData";
+import { lastCommitDay } from "./model/teamStats";
 import { Teams } from "./state";
 import {
   UserAndStatsAndAliases,

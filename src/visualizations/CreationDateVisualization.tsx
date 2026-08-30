@@ -2,7 +2,7 @@ import { HierarchyNode } from "d3";
 
 import { creationKeyData } from "../colourKeys";
 import { earlyLateScaleBuilder } from "../ColourScales";
-import { nodeCreationDateClipped } from "../nodeData";
+import { nodeCreationDateClipped } from "../model/nodeAccessors";
 import { FeatureFlags, FileNode } from "../polyglot_data.types";
 import { Action, State } from "../state";
 import { VizMetadata } from "../viz.types";

@@ -1,6 +1,6 @@
 // bucket calculations needed all over the place
 
-import { CouplingStats } from "./viz.types";
+import { CouplingStats } from "../viz.types";
 
 function allBuckets(couplingStats: CouplingStats) {
   const { bucketCount, bucketSize, firstBucketStart } = couplingStats;

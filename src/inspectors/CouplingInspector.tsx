@@ -1,6 +1,6 @@
-import { couplingDateRange } from "../couplingBuckets";
 import { humanizeDate } from "../datetimes";
-import { nodeCouplingFilesFiltered } from "../nodeData";
+import { nodeCouplingFilesFiltered } from "../model/coupling";
+import { couplingDateRange } from "../model/couplingBuckets";
 import { TreeNode } from "../polyglot_data.types";
 import { State } from "../state";
 import { CouplingStats } from "../viz.types";

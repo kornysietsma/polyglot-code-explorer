@@ -5,7 +5,7 @@ import {
   nodeChangers,
   nodeChangersByTeam,
   sortedUserStatsAccumulators,
-} from "../nodeData";
+} from "../model/teamStats";
 import {
   assertFlag,
   DirectoryNode,
