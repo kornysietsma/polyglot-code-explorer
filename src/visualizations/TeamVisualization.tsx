@@ -1,7 +1,7 @@
 import { HierarchyNode } from "d3";
 
 import { teamScale } from "../ColourScales";
-import { nodeTopTeam } from "../nodeData";
+import { nodeTopTeam } from "../model/teamStats";
 import { FeatureFlags, FileNode } from "../polyglot_data.types";
 import { Action, sortTeamsByName, State, themedColours } from "../state";
 import { VizMetadata } from "../viz.types";

@@ -7,13 +7,15 @@ import {
   ChurnData,
   nodeAge,
   nodeChurnData,
+  nodeLastChangeDay,
+} from "../model/gitChanges";
+import {
   nodeCreationDate,
   nodeIndentationData,
-  nodeLastChangeDay,
   nodeLocData,
   nodeRemoteHead,
   nodeRemoteUrl,
-} from "../nodeData";
+} from "../model/nodeAccessors";
 import {
   FeatureFlags,
   FileNode,

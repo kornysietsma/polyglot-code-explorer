@@ -3,7 +3,7 @@ import { useId } from "react";
 
 import { singleTeamColourScaleKey } from "../colourKeys";
 import { singleTeamScale } from "../ColourScales";
-import { nodeSingleTeam } from "../nodeData";
+import { nodeSingleTeam } from "../model/teamStats";
 import { FeatureFlags, FileNode } from "../polyglot_data.types";
 import { Action, State, themedColours } from "../state";
 import { VizMetadata } from "../viz.types";

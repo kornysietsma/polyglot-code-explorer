@@ -2,7 +2,7 @@ import {
   NO_TEAM_SYMBOL,
   nodeChangersByTeam,
   topTeamsPartitioned,
-} from "./nodeData";
+} from "./model/teamStats";
 import {
   FileNode,
   isFile,

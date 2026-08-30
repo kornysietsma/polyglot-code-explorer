@@ -2,7 +2,7 @@
 
 import { HierarchyNode } from "d3";
 
-import { nodeCircleAncestors } from "../nodeData";
+import { nodeCircleAncestors } from "../model/nodeAccessors";
 import { TreeNode } from "../polyglot_data.types";
 import { parseCssColour, parsePatternId } from "./colours";
 import { assertConvex, fanTriangulate } from "./triangulate";

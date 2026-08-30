@@ -1,7 +1,7 @@
 import { HierarchyNode } from "d3";
 import { ReactElement } from "react";
 
-import { nodeCreationDate } from "../nodeData";
+import { nodeCreationDate } from "../model/nodeAccessors";
 import {
   DirectoryNode,
   FeatureFlags,

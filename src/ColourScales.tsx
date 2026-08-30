@@ -1,6 +1,6 @@
 import * as d3 from "d3";
 
-import { NO_TEAM_SYMBOL } from "./nodeData";
+import { NO_TEAM_SYMBOL } from "./model/teamStats";
 import { Config, State } from "./state";
 
 export function numberOfChangersScale(state: State) {

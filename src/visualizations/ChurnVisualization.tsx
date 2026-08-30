@@ -2,7 +2,11 @@ import { HierarchyNode } from "d3";
 
 import { goodBadUglyColourKeyData } from "../colourKeys";
 import { goodBadUglyScale } from "../ColourScales";
-import { nodeChurnCommits, nodeChurnDays, nodeChurnLines } from "../nodeData";
+import {
+  nodeChurnCommits,
+  nodeChurnDays,
+  nodeChurnLines,
+} from "../model/gitChanges";
 import { FeatureFlags, FileNode } from "../polyglot_data.types";
 import { Action, State } from "../state";
 import { VizMetadata } from "../viz.types";

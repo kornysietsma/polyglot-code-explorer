@@ -1,6 +1,6 @@
 import React from "react";
 
-import { nodeCumulativeLinesOfCode } from "../nodeData";
+import { nodeCumulativeLinesOfCode } from "../model/nodeAccessors";
 import { DirectoryNode, FeatureFlags } from "../polyglot_data.types";
 import { Action, State } from "../state";
 import { VizMetadata } from "../viz.types";

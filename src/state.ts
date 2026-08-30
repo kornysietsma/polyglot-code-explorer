@@ -2,7 +2,7 @@ import * as d3 from "d3";
 import { addDays, fromUnixTime, getUnixTime, subYears } from "date-fns";
 import _ from "lodash";
 
-import { calculateFileMaxima } from "./nodeData";
+import { calculateFileMaxima } from "./model/gitChanges";
 import { UserData } from "./polyglot_data.types";
 import { calculateSvgPatterns } from "./svgPatterns";
 import { isParentVisualization, Visualizations } from "./VisualizationData";

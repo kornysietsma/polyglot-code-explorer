@@ -2,7 +2,7 @@ import { HierarchyNode } from "d3";
 
 import { numberOfChangersKeyData } from "../colourKeys";
 import { numberOfChangersScale } from "../ColourScales";
-import { nodeNumberOfChangers } from "../nodeData";
+import { nodeNumberOfChangers } from "../model/gitChanges";
 import { FeatureFlags, FileNode } from "../polyglot_data.types";
 import { Action, State } from "../state";
 import { VizMetadata } from "../viz.types";

@@ -18,13 +18,14 @@ import { DefaultProps } from "./components.types";
 import { dateToUnix, unixToDate } from "./datetimes";
 import {
   CouplingLink,
+  nodeCouplingFilesFiltered,
+  nodeHasCouplingData,
+} from "./model/coupling";
+import {
   nodeCenter,
   nodeCircleAncestors,
-  nodeCouplingFilesFiltered,
   nodeDescendants,
-  nodeHasCouplingData,
-  nodePath,
-} from "./nodeData";
+} from "./model/nodeAccessors";
 import { FeatureFlags, Point, TreeNode } from "./polyglot_data.types";
 import { TimescaleIntervalData } from "./preprocess";
 import { Action, State, themedColours } from "./state";
@@ -276,7 +277,7 @@ function drawCoupling(
 
   const couplingLabel = (d: CouplingLink) => {
     const ratio = d.targetCount / d.sourceCount;
-    const from = nodePath(d.source);
+    const from = d.source.path;
     return `${from} -> ${d.targetFile} (${ratio.toFixed(3)})`;
   };
 

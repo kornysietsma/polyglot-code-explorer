@@ -1,7 +1,7 @@
 import React, { useId } from "react";
 
-import { couplingDateRange } from "./couplingBuckets";
 import { humanizeDate } from "./datetimes";
+import { couplingDateRange } from "./model/couplingBuckets";
 import { FeatureFlags } from "./polyglot_data.types";
 import { Action, State } from "./state";
 import { VizMetadata } from "./viz.types";

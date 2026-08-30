@@ -1,7 +1,7 @@
 import { HierarchyNode } from "d3";
 import { ReactElement } from "react";
 
-import { nodeLanguage } from "../nodeData";
+import { nodeLanguage } from "../model/nodeAccessors";
 import { FeatureFlags, FileNode } from "../polyglot_data.types";
 import { Action, State } from "../state";
 import { VizMetadata } from "../viz.types";
