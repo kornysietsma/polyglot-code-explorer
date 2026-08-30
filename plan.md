@@ -3,12 +3,12 @@
 Read `spec.md` first. This is the ordered checklist; each step is one reviewable commit, sized
 for a single ~30-60 minute session, ending green and leaving the repo in a good state.
 
-**Parts 1-5 are done.** Git holds the detail; what a later step still needs is below.
-**Part 6 is next.**
+**Parts 1-5 are done, and so is step 6.1.** Git holds the detail; what a later step still needs
+is below. **Step 6.2 is next.**
 
 ## Technical context
 
-**Where things stand.** 187 unit tests across 18 files, plus 16 screenshots in two Playwright
+**Where things stand.** 196 unit tests across 19 files, plus 16 screenshots in two Playwright
 projects (`chromium` on `default.json`, `chromium-nested` on `nested.json`). The existing tests
 are the safety net for everything below — they are not to be rewritten to match new behaviour.
 
@@ -87,6 +87,22 @@ These are what made Parts 3-5 safe; reuse them rather than reinventing.
   edge at all.
 - **`nodeAge` treats day 0 as absent** (`if (!lastDay)`), noted in a comment at
   `model/gitChanges.ts` and deliberately not fixed.
+- **Two latent defects in the users panel, found while writing step 6.1's tests.** Step 6.1 left
+  both alone, since it was a no-production-change step, and its tests pin the current behaviour.
+  Korny has since decided both are to be fixed, each in the step that is touching that code
+  anyway — so each is a deliberate behaviour change, noted in its commit, with a step 6.1 test
+  updated alongside it. Those are the only two test edits Part 6 is allowed; any other test that
+  has to change is still the signal that the restructure was not faithful.
+  - **Fix in step 6.2:** the user filter never lower-cases the query (`UsersAndTeams.tsx`,
+    `filterUsers`) although it lower-cases the name and email it compares against, so any
+    capital letter typed into the filter box matches nothing.
+  - **Fix in step 6.3:** `EditAlias.tsx`'s Email label carries `htmlFor={aliasNameId}` — the
+    _name_ input's id — so both labels point at the same input and the email field has no label
+    at all. This is why the alias test currently reaches those two inputs by role and order
+    rather than by label text.
+- **react-modal calls `onAfterOpen` from a `requestAnimationFrame`**, so a test that opens the
+  alias modal has to `await` before the modal's seeded state is there. `EditAlias` is the only
+  user of `onAfterOpen`.
 
 ---
 
@@ -100,26 +116,43 @@ already outside it.
 Related components that will likely want to move too, or at least be considered: `EditAlias.tsx`
 drives alias creation against the same page state, and `UserTeamList.tsx` renders team membership.
 
-### Step 6.1 — whole-panel tests
+### Step 6.1 — whole-panel tests — **done**
 
-- [ ] Follow the `@testing-library/react` pattern (`ErrorBoundary.test.tsx`, `Loader.test.tsx`):
+- [x] Follow the `@testing-library/react` pattern (`ErrorBoundary.test.tsx`, `Loader.test.tsx`):
       render the real panel against a `minimalState`, assert on **dispatched actions** rather
       than markup so the tests survive the restructure.
-- [ ] Cover: create a team, assign users to it, create an alias, ignore a user, filter the user
+- [x] Cover: create a team, assign users to it, create an alias, ignore a user, filter the user
       list, sort by a column.
-- [ ] Check `index.tsx`'s missing `React.StrictMode` does not bite — this component is ordinary
-      React, but confirm rather than assume.
+- [x] Check `index.tsx`'s missing `React.StrictMode` does not bite — this component is ordinary
+      React, but confirm rather than assume. It does not: the panel produces the same action
+      under `<StrictMode>`, and there is now a test saying so.
 
-**Verify:** the new tests are the verification, and each must be shown to discriminate. No
-production change, so `npm run e2e:strict` must be clean.
+`src/UsersAndTeams.test.tsx`, 9 tests. The panel dispatches exactly one action,
+`setUserTeamAliasData`, and only on "save and close" — so seven of the nine drive the DOM and
+assert on that payload and nothing else. Filtering and sorting dispatch nothing, so those two
+read the users table's Name column; that is the only markup any of these tests depend on. The
+fixture gives three users stats that rank them differently in every sortable column, so a sort
+assertion cannot pass by coincidence.
+
+Two things the tests had to work around are recorded under the findings above: react-modal's
+`onAfterOpen` fires a frame late, and `EditAlias`'s email input has no working label.
+
+**Verified:** all nine shown to discriminate, by mutating the production code each one covers —
+nine mutations in all: `newTeam`'s `set`, its single-user naming, `addUsersToTeam`,
+`removeUsersFromTeam`, `EditAlias`'s `addAlias`, `ignoreCheckedUsers`, `filterUsers`,
+`sortUsers`' comparator, and `cancel` wired to `save`. `npm run check` green;
+`npm run e2e:strict` 16/16 clean, as it must be with no production change.
 
 ### Step 6.2 — pure logic out
 
 - [ ] `src/teams/` gets the non-React parts: `sortUsers`, filtering, `usersAndTeamsToPageFormat`,
       the page-state shape and its transitions.
 - [ ] Unit-test them directly now they are reachable.
+- [ ] Lower-case the filter query as it is extracted (see the findings above), and update the one
+      step 6.1 assertion that pins the broken behaviour.
 
-**Verify:** step 6.1's tests pass unchanged — that is the proof the extraction was faithful.
+**Verify:** step 6.1's tests pass, unchanged apart from that single filter assertion — that is
+the proof the extraction was faithful.
 
 ### Step 6.3 — split the component
 
@@ -127,10 +160,14 @@ production change, so `npm run e2e:strict` must be clean.
       table, the users table, the import/export controls.
 - [ ] This is where the "UI change is permitted, not sought" rule earns its keep: if some
       behaviour forces an ugly structure, change it deliberately and note it in the commit.
+- [ ] Point `EditAlias.tsx`'s Email label at the email input (see the findings above), and
+      switch the alias test to `getByLabelText` — which then proves the fix rather than merely
+      surviving it.
 
-**Verify:** step 6.1's tests pass. `npm run e2e:strict` — shots 8 and 9 cover the Colours and
-Lines panel, not this one, so expect clean; any diff means something moved that should not have.
-Manual: open the panel and exercise each table by hand.
+**Verify:** step 6.1's tests pass, unchanged apart from how the alias test reaches those two
+inputs. `npm run e2e:strict` — shots 8 and 9 cover the Colours and Lines panel, not this one, so
+expect clean; any diff means something moved that should not have. Manual: open the panel and
+exercise each table by hand.
 
 ---
 
