@@ -3,119 +3,69 @@
 Read `spec.md` first. This is the ordered checklist; each step is one reviewable commit, sized
 for a single ~30-60 minute session, ending green and leaving the repo in a good state.
 
+**Parts 1 and 2 are done** (`72f820c`, `e9e4453`, `4438d4c`, `70b73d3`, `89ed94b`). Their durable
+findings are in `CLAUDE.md`, `docs/dates-and-timezones.md` and the commits; what is worth carrying
+forward is folded into the context below. **Part 3 is next.**
+
 ## Technical context
 
-**Where things stand.** Phase 1 landed 163 unit tests across 14 files, plus 16 screenshots in two
-Playwright projects (`chromium` on `default.json`, `chromium-nested` on `nested.json`). The
-existing tests are the safety net for everything below — they are not to be rewritten to match
-new behaviour.
+**Where things stand.** 181 unit tests across 17 files, plus 16 screenshots in two Playwright
+projects (`chromium` on `default.json`, `chromium-nested` on `nested.json`). The existing tests
+are the safety net for everything below — they are not to be rewritten to match new behaviour.
+
+The four files this work is about, as they stand now:
+
+| file                | lines |
+| ------------------- | ----- |
+| `UsersAndTeams.tsx` | 1348  |
+| `state.ts`          | 998   |
+| `Viz.tsx`           | 944   |
+| `nodeData.ts`       | 882   |
 
 **Verification available to each step:**
 
-| tool                    | what it proves                                                        |
-| ----------------------- | --------------------------------------------------------------------- |
-| `npm run check`         | typecheck, lint, format, 163 unit tests                               |
-| `npm run e2e:strict`    | all 16 screenshots at **zero** tolerance — the real regression signal |
-| `npm run e2e:update`    | re-baseline, only ever with a stated reason                           |
-| `TZ=... npx vitest run` | timezone-dependent behaviour (Part 2 only)                            |
+| tool                                         | what it proves                                                        |
+| -------------------------------------------- | --------------------------------------------------------------------- |
+| `npm run check`                              | typecheck, lint, format, 181 unit tests                               |
+| `npm run e2e:strict`                         | all 16 screenshots at **zero** tolerance — the real regression signal |
+| `npx playwright test --update-snapshots=all` | re-baseline, only ever with a stated reason (see below)               |
 
-**The zero-tolerance rule.** A pure refactor must produce zero screenshot diffs. This already
-proved itself: extracting `vizNodeSelection.ts` moved not one pixel. If a step that should be
-behaviour-preserving shows a diff, that is a bug found, not a baseline to update.
+**The zero-tolerance rule.** A pure refactor must produce zero screenshot diffs. This has proved
+itself twice: extracting `vizNodeSelection.ts` moved not one pixel, and every step of Parts 1
+and 2 that should have been invisible was. If a step that should be behaviour-preserving shows a
+diff, that is a bug found, not a baseline to update.
 
-**Design decisions taken in the spec**, restated here because they govern every step: UTC via
-integer arithmetic and `Intl`, no new dependency; user lookup by Map with alias ids left on their
-id threshold; new feature folders under `src/`; behaviour-preserving unless deliberately and
-visibly decided otherwise.
+**Re-baselining, when a diff is genuinely intended.** Do not use `npm run e2e:update` — the 2%
+tolerance means it can report "10 passed" and rewrite nothing, leaving a stale baseline in place.
+Use `npx playwright test --update-snapshots=all`, then `npm run e2e:strict` to prove the
+baselines actually moved. Before updating anything, work out _which pixels_ changed and satisfy
+yourself the change is the intended one; Part 2 did this by diffing actual-vs-expected PNGs and
+checking the changed pixels' y-range and count were identical across date-sensitive and
+date-insensitive visualisations alike.
 
-**Ordering rationale.** The three correctness fixes come first: they are small, independent of
-the refactor, and clear the open questions. Error visibility leads, because a silent failure
-during any later step would cost more than the step itself. Within the refactor, each file starts with its
-best-tested seam so the first cut is the safest one. `UsersAndTeams.tsx` gets its tests before
-anything moves.
+**What Parts 1 and 2 established that later steps can lean on:**
 
----
+- **`@testing-library/react` is now in use** (`ErrorBoundary.test.tsx`, `Loader.test.tsx`), so
+  Part 6 no longer has to invent the pattern — only extend it to a much bigger component. Both
+  existing examples render a real component and assert on visible outcomes; `Loader.test.tsx`
+  also shows how to drive one with a stubbed `fetch`.
+- **A React error boundary now wraps `App`**, and `index.tsx` registers global `error` /
+  `unhandledrejection` handlers. A component that throws mid-refactor shows its message and
+  component stack instead of blanking the page — worth remembering when a later step breaks
+  something, because the page will now tell you what.
+- **`vi.stubEnv("TZ", …)` works in-process** for timezone-dependent tests; Node re-reads `TZ`
+  on assignment.
+- **Prove a new test discriminates**: stash just the production file with `git stash push -q`,
+  confirm the test fails without it, then `git stash pop -q`. Both Part 2 steps did this, and it
+  is what separates a real assertion from a vacuous one.
 
-## Part 1 — failures are visible
+**Design decisions taken in the spec**, restated here because they govern every step: user lookup
+by Map with alias ids left on their id threshold; new feature folders under `src/`;
+behaviour-preserving unless deliberately and visibly decided otherwise.
 
-Small, independent, and first: every later step is easier to diagnose once a failure says so.
-
-### Step 1.1 — an error boundary, and a global handler behind it
-
-- [x] Add a React error boundary wrapping `App` in `Loader.tsx`, rendering the error and its
-      component stack rather than a blank page. Reuse the existing error-list markup so a
-      render-time failure looks like a load-time one.
-- [x] Register `window.onerror` and an `unhandledrejection` listener in `index.tsx`, so anything
-      thrown outside React's render — a D3 callback, a rejected fetch — is logged rather than lost.
-- [x] Check the boundary does not interfere with `Viz.tsx`'s deliberate GL context-loss recovery,
-      which handles its own failures and must keep doing so.
-
-**Verify:** a unit test rendering a component that throws, asserting the boundary shows the
-message instead of unmounting. Manual: temporarily make `Inspector` throw, confirm the page shows
-the error rather than going blank, then revert. `npm run e2e:strict` clean.
-
-### Step 1.2 — the data-loading path reports what went wrong
-
-- [x] `Loader.tsx`: check `response.ok` before `response.json()`, so an HTTP failure reports
-      itself rather than surfacing as a JSON syntax error.
-- [x] `Loader.tsx`: fail early and clearly on a data file too large to load — read
-      `Content-Length` first and refuse, with the size and the limit in the message. The
-      threshold is **V8's maximum string length**, 536,870,888 bytes, not a chosen number: see
-      `spec.md`, which this step corrected. `spring-projects.json` (514 MB) turned out to load
-      fine with 8.6x heap headroom, so a threshold below it would have refused a working file.
-- [x] `vite.config.ts`: handle `'error'` on the read stream and on the response in
-      `serveDataDir`, logging the path and the cause. This is the most likely reason the Vite
-      console said nothing.
-- [x] `vite.config.ts`: log the reason in the `statSync` `catch` before answering 404, so a
-      permissions or path problem is distinguishable from a missing file. `ENOENT` stays quiet —
-      every data file without a `_state.json` sidecar asks for one and misses.
-
-**Verify:** unit test the size and `response.ok` guards against a stubbed `fetch`. Manual, and the
-real proof: run `EXPLORER_DATA=spring-projects npm start` and confirm the app now says why it
-will not load rather than dying silently. Manually confirm a small file still loads.
-`npm run e2e:strict` clean.
-
----
-
-## Part 2 — dates are UTC
-
-### Step 2.1 — UTC week bucketing
-
-- [ ] Replace `preprocess.ts`'s `startOfUnit`/`startOfWeek` with integer arithmetic on unix
-      seconds: `d = floor(t / 86400)`, bucket start day `d - ((d + 4) % 7)`. Keep `TimescaleUnit`
-      as the extension point.
-- [ ] Drop the now-unused date-fns imports from `preprocess.ts`.
-
-**Verify:** existing `gatherTimescaleData` tests still pass unchanged (they assert Sunday
-pinning and same-week merging already). Add one test asserting the same bucket start for the
-same timestamp under `TZ=America/New_York`, `TZ=Europe/London` and `TZ=Australia/Sydney` — run
-via `process.env.TZ` set before the call, or three explicit expectations against known epochs.
-`npm run e2e:strict` **must be clean**: in the UK the old and new buckets fall in the same week.
-
-### Step 2.2 — UTC date display
-
-- [ ] `datetimes.ts`'s `humanizeDate` uses `Intl.DateTimeFormat` with `timeZone: "UTC"`,
-      preserving the exact `dd-MMM-yyyy` output the current baselines contain.
-- [ ] Leave `state.ts`'s `subYears`/`addDays` on date-fns, with a comment saying they are
-      deliberate ±2-day slider leeway rather than an oversight.
-- [ ] Check `Viz.tsx`'s `scaleUtc`/`addUtcDays` against the new helpers; they are already
-      correct, so this is a read-and-confirm, not a rewrite.
-
-**Verify:** unit test asserting `humanizeDate(1554768000) === "09-Apr-2019"` under all three
-timezones — this is the assertion that fails today in `America/New_York`. `npm run e2e:strict`
-must be clean, since the UK output is unchanged. If any shot moves, stop and find out why.
-
-### Step 2.3 — document it
-
-- [ ] Write `docs/dates-and-timezones.md` per the spec: what the dates mean, the non-UK edge
-      cases, why UTC is the honest choice given day-aligned scanner timestamps, and that the UI
-      never shows a timezone.
-- [ ] Add a "Design notes" section to `README.md` linking it, and picking up the currently
-      unlinked `docs/rendering-performance.md`.
-- [ ] Remove the timezone entry from `CLAUDE.md`'s "Known follow-ups".
-
-**Verify:** `npm run format:check`; read the page back for a reader who does not know the code.
-No code change, so no screenshot run needed.
+**Ordering rationale.** The remaining correctness fix comes first: it is small and independent of
+the refactor. Within the refactor, each file starts with its best-tested seam so the first cut is
+the safest one. `UsersAndTeams.tsx` gets its tests before anything moves.
 
 ---
 
@@ -187,7 +137,9 @@ enabled but no screenshot covers it, so this is eyes-on via `npm start`.
 ### Step 5.1 — config and its defaults out
 
 - [ ] `src/state/config.ts`: the `Config` type, `initialiseGlobalState`, `themedColours`,
-      colour-key helpers.
+      colour-key helpers. `initialiseGlobalState` holds the one deliberate piece of local-time
+      date arithmetic left in the app (`subYears`/`addDays` for the slider bounds) — move the
+      comment with it.
 
 **Verify:** `npm run check`; `vizUpdatePaths.test.ts` and `state.test.ts` exercise these heavily
 and must pass unchanged. `npm run e2e:strict` clean.
@@ -216,9 +168,9 @@ Tests before anything moves.
 
 ### Step 6.1 — whole-panel tests
 
-- [ ] First use of `@testing-library/react` in this repo, so this step also sets the pattern:
-      render the real panel against a `minimalState`, assert on **dispatched actions** rather
-      than markup so the tests survive the restructure.
+- [ ] Follow the `@testing-library/react` pattern Part 1 established (`ErrorBoundary.test.tsx`,
+      `Loader.test.tsx`): render the real panel against a `minimalState`, assert on **dispatched
+      actions** rather than markup so the tests survive the restructure.
 - [ ] Cover: create a team, assign users to it, create an alias, ignore a user, filter the user
       list, sort by a column.
 - [ ] Check `index.tsx`'s missing `React.StrictMode` does not bite — this component is ordinary
@@ -262,10 +214,12 @@ Manual: open the panel and exercise each table by hand.
 ### Step 7.2 — timescale brush out
 
 - [ ] The timescale chart and its brush are self-contained: extract them, keeping the pure
-      date-to-scale mapping testable.
+      date-to-scale mapping testable. `addUtcDays` and `scaleUtc` live here and are correct —
+      move them unchanged.
 
-**Verify:** `npm run e2e:strict` — the timescale is visible in shots 1, 10, and every nested
-shot, so this step has real screenshot coverage. Clean means faithful.
+**Verify:** `npm run e2e:strict` — the timescale is the bottom ~65px of the `.Viz` element, so it
+is covered by shots 2-6 and every nested shot. It is _not_ in shots 1 and 10, which are viewport
+shots at 1600x1000 and cut off above it. Clean means faithful.
 
 ### Step 7.3 — zoom and camera wiring out
 
@@ -296,3 +250,7 @@ loss — the WebGL recovery path described in `CLAUDE.md`.
 - **Screenshot coverage is uneven.** Coupling arcs and the Users and Teams panel have none, so
   steps 4.3, 6.3 and 7.1 lean on manual checks. Consider adding shots for them if the manual
   check proves fiddly.
+- **A plan step's stated premise can be wrong.** Step 1.2 was written around a file that turned
+  out to load fine, and following it literally would have shipped a guard refusing a working
+  file. Check a step's factual claims before building on them, and correct `spec.md` when one
+  does not hold.

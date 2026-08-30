@@ -322,6 +322,11 @@ function initialiseGlobalState(initialDataRef: VizDataRef) {
 
   let earliest: number;
   let latest: number;
+  // These four stay on date-fns' local-calendar arithmetic, unlike everything else in the app
+  // (see `docs/dates-and-timezones.md`), and that is deliberate rather than an oversight. They
+  // pick where the date slider *starts*, with two days of leeway either side so "everything" is
+  // easy to select; an hour of local-vs-UTC drift in a bound that exists to be dragged changes
+  // nothing anyone can see. Dates that are displayed or bucketed are UTC throughout.
   if (hasDates) {
     const twoYearsAgo = getUnixTime(subYears(fromUnixTime(latestData), 2));
 

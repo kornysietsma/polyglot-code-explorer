@@ -1,7 +1,30 @@
-import { format, fromUnixTime, getUnixTime } from "date-fns";
+import { fromUnixTime, getUnixTime } from "date-fns";
+
+/**
+ * Every date in the app is UTC — see `docs/dates-and-timezones.md`. date-fns's `format` used the
+ * machine's local time, so on any machine behind UTC the scanner's day-aligned timestamps
+ * rendered as the previous day: 1554768000 showed as 08-Apr-2019 in `America/New_York`.
+ *
+ * The locale is `en-US` deliberately, and not `en-GB` despite this being a UK tool: en-GB
+ * abbreviates September as "Sept", which would quietly change the output. en-US matches
+ * date-fns's `MMM` for all twelve months, so this reformatting changes nothing but the timezone.
+ *
+ * Built once — constructing an `Intl.DateTimeFormat` is far more expensive than using one.
+ */
+const utcDateFormat = new Intl.DateTimeFormat("en-US", {
+  timeZone: "UTC",
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+});
 
 export function humanizeDate(unixdate: number) {
-  return format(fromUnixTime(unixdate), "dd-MMM-yyyy");
+  const parts = new Map(
+    utcDateFormat
+      .formatToParts(fromUnixTime(unixdate))
+      .map((part) => [part.type, part.value])
+  );
+  return `${parts.get("day")}-${parts.get("month")}-${parts.get("year")}`;
 }
 
 export function dateToUnix(jsDate: Date): number {

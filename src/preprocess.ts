@@ -1,5 +1,5 @@
 import * as d3 from "d3";
-import { fromUnixTime, getUnixTime, startOfWeek } from "date-fns";
+import { fromUnixTime } from "date-fns";
 import _ from "lodash";
 
 import { nodeLinesOfCode, nodeLocData } from "./nodeData";
@@ -168,11 +168,29 @@ export type TimescaleIntervalData = {
 // gatherTimescaleData is only ever called with "week"; widen this union if that changes.
 export type TimescaleUnit = "week";
 
-function startOfUnit(date: Date, timeUnit: TimescaleUnit): Date {
+const SECONDS_PER_DAY = 86400;
+
+/**
+ * The start of the UTC week containing `unixSeconds`, in unix seconds.
+ *
+ * Integer arithmetic on whole days rather than a `Date`, so there is no timezone to get wrong:
+ * the scanner emits day-aligned UTC timestamps, and the old `startOfWeek` pushed them through
+ * local time, landing every bucket on local midnight instead of a real week boundary.
+ *
+ * The epoch was a Thursday, so `+ 4` shifts the day count to make Sunday the start of the week;
+ * the remainder is then how far into that week the day falls. Leap years need no special case -
+ * unix time is 86400 seconds per day by definition, leap seconds included, so the day count and
+ * the weekday cycle never drift. The double modulo is belt and braces for timestamps before
+ * 1969-12-28, where JavaScript's `%` returns a negative remainder; no source file is that old,
+ * but the guard costs nothing, so don't "simplify" it away.
+ */
+function startOfUnit(unixSeconds: number, timeUnit: TimescaleUnit): number {
   switch (timeUnit) {
-    case "week":
-      // pinned to Sunday so bucket boundaries don't shift with the machine's locale
-      return startOfWeek(date, { weekStartsOn: 0 });
+    case "week": {
+      const day = Math.floor(unixSeconds / SECONDS_PER_DAY);
+      const dayOfWeek = (((day + 4) % 7) + 7) % 7;
+      return (day - dayOfWeek) * SECONDS_PER_DAY;
+    }
   }
 }
 
@@ -184,7 +202,7 @@ function addToUnitBucket(
   date: number,
   accumulate: (bucket: TimescaleData) => void
 ) {
-  const bucketStart = getUnixTime(startOfUnit(fromUnixTime(date), timeUnit));
+  const bucketStart = startOfUnit(date, timeUnit);
   const bucket = timescaleData.get(bucketStart) ?? {
     files: 0,
     commits: 0,

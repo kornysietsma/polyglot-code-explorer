@@ -73,6 +73,16 @@ easy to test - and initially, just where I'm doing something new, and complex, a
 
 I'm a huge fan of proper testing for code that anyone depends on day-to-day - if someone wants to fund me to quit my job and write a comprehensive test suite, I'd be very happy!
 
+## Design notes
+
+Longer write-ups of decisions that are hard to reconstruct from the code:
+
+- [Dates and timezones](docs/dates-and-timezones.md) — every date and week bucket in the Explorer
+  is UTC. Worth reading if you are not in the UK, where a late-evening commit is dated the
+  following day.
+- [Rendering performance](docs/rendering-performance.md) — why the visualisation is drawn with
+  WebGL rather than SVG, and the measurements behind that change.
+
 ## A note on typescript and eslint checks
 
 I found, after some digging, that Typescript by default doesn't check or warn you
