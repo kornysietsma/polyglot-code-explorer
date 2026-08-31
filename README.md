@@ -82,6 +82,8 @@ Longer write-ups of decisions that are hard to reconstruct from the code:
   following day.
 - [Rendering performance](docs/rendering-performance.md) — why the visualisation is drawn with
   WebGL rather than SVG, and the measurements behind that change.
+- [Large data files](docs/large-data-files.md) — why a data file over 512 MB will not load, and
+  the options for changing that. Not implemented; a record of what was measured.
 
 ## A note on typescript and eslint checks
 

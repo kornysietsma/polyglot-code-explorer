@@ -358,6 +358,11 @@ Deliberately not done; all still open:
   `polyglot-code-offline-layout`'s `nested-circles` branch lands. The nested groups in the local
   `omf.json` smoke-test file were hand-built to match what `packChildren` produces; a real scan is
   the final word.
+- **Data files above 512 MB cannot be loaded**, and the guard in `Loader.tsx` that refuses them
+  reads `Content-Length`, so it is wrong behind gzip. Options for lifting the limit — streaming
+  parsers, a chunked native parse, an NDJSON or columnar wire format — are measured and written
+  up in `docs/large-data-files.md`. The heap cost of the parsed tree (~2.5x the JSON text), not
+  the string cap, is what actually bounds this.
 - **Consolidate the four `publish_*.sh` scripts.**
 - **TypeScript 7** once `typescript-eslint` lifts its peer cap.
 - **Better test coverage.** `src/model/`, `src/state/`, `src/teams/` and `src/viz/` now have
