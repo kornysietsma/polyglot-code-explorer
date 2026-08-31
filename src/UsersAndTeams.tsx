@@ -1,5 +1,3 @@
-import * as d3 from "d3";
-import _ from "lodash";
 import React, { useId } from "react";
 import ReactModal from "react-modal";
 
@@ -15,116 +13,24 @@ import {
   StandaloneExportTeamsAndAliases,
   teamsAndAliasesFromImport,
 } from "./exportImport";
-import {
-  aggregateTeamStats,
-  aggregateUserStats,
-  DEFAULT_USER_STATS,
-  UserStats,
-} from "./model/teamStats";
-import { displayUser, UserData } from "./polyglot_data.types";
-import {
-  errorMessage,
-  infoMessage,
-  Message,
-  sortTeamsByName,
-  Team,
-  Teams,
-  TeamsAndAliases,
-  UserAliasData,
-  UserAliases,
-} from "./state";
+import { displayUser } from "./polyglot_data.types";
+import { errorMessage, infoMessage, Message, sortTeamsByName } from "./state";
 import { themedColours } from "./state/colours";
-import { buildUserTeams } from "./state/derived";
+import { colourSchemeAt, colourSchemes } from "./teams/colourSchemes";
+import {
+  initialPageState,
+  pageStateToSaveData,
+  recalcStatsForPageState,
+  UsersAndTeamsPageState,
+  usersAndTeamsToPageFormat,
+} from "./teams/pageState";
+import * as edits from "./teams/pageStateEdits";
+import { nextSort, sortHeaderStyle, visibleUsers } from "./teams/userList";
 import { UserTeamList } from "./UserTeamList";
 import { ColourPicker } from "./widgets/ColourPicker";
 import DelayedInput from "./widgets/DelayedInput";
 import HelpPanel from "./widgets/HelpPanel";
 import ToggleablePanel from "./widgets/ToggleablePanel";
-
-export type UserAndStatsAndAliases = UserData &
-  UserStats & { isAlias: boolean };
-
-export type UsersAndTeamsPageState = {
-  usersAndAliases: UserAndStatsAndAliases[];
-  aliases: UserAliases;
-  teams: Teams;
-  ignoredUsers: Set<number>;
-  teamStats: Map<string, UserStats>;
-  usersSort: { key: string; ascending: boolean };
-  checkedUsers: Set<number>;
-  checkedIgnoredUsers: Set<number>;
-  userFilter: string;
-  showCheckedUsers: boolean;
-  importMessages: Message[];
-  colourScheme: number;
-  noTeamColour: string;
-};
-const initialPageState: () => UsersAndTeamsPageState = () => {
-  return {
-    usersAndAliases: [],
-    teams: new Map(),
-    ignoredUsers: new Set(),
-    checkedIgnoredUsers: new Set(),
-    teamStats: new Map(),
-    hiddenTeams: new Set(),
-    aliases: new Map(),
-    usersSort: { key: "files", ascending: true },
-    checkedUsers: new Set(),
-    userFilter: "",
-    showCheckedUsers: false,
-    importMessages: [],
-    colourScheme: 0,
-    noTeamColour: "#ffffff",
-  };
-};
-
-function sortUsers(
-  users: UserAndStatsAndAliases[],
-  usersSort: { key: string; ascending: boolean }
-): UserAndStatsAndAliases[] {
-  const { key } = usersSort;
-  return [...users].sort((a, b) => {
-    switch (key) {
-      case "name": {
-        const aName = a.name ?? "";
-        const bName = b.name ?? "";
-        return usersSort.ascending
-          ? aName.localeCompare(bName, "en", {
-              ignorePunctuation: true,
-              sensitivity: "accent",
-            })
-          : bName.localeCompare(aName, "en", {
-              ignorePunctuation: true,
-              sensitivity: "accent",
-            });
-      }
-      case "email": {
-        const aEmail = a.email ?? "";
-        const bEmail = b.email ?? "";
-        return usersSort.ascending
-          ? aEmail.localeCompare(bEmail, "en", {
-              ignorePunctuation: true,
-              sensitivity: "accent",
-            })
-          : bEmail.localeCompare(aEmail, "en", {
-              ignorePunctuation: true,
-              sensitivity: "accent",
-            });
-      }
-      case "id":
-      case "files":
-      case "commits":
-      case "lines":
-        return usersSort.ascending ? b[key] - a[key] : a[key] - b[key];
-      case "days":
-        return usersSort.ascending
-          ? b.days.size - a.days.size
-          : a.days.size - b.days.size;
-      default:
-        throw new Error(`Unknown sort key ${key}`);
-    }
-  });
-}
 
 const UsersAndTeams = (props: DefaultProps) => {
   const { dataRef, state, dispatch } = props;
@@ -151,86 +57,13 @@ const UsersAndTeams = (props: DefaultProps) => {
 
   const hiddenFileInput = React.useRef<HTMLInputElement>(null);
 
-  /** converts users as stored in global state into format needed here, with stats */
-  function usersAndTeamsToPageFormat(
-    users: UserData[],
-    teamsAndAliases: TeamsAndAliases,
-    earliest: number,
-    latest: number,
-    recalcStats: boolean
-  ): {
-    usersAndAliases: UserAndStatsAndAliases[];
-    aliases: UserAliases;
-    teams: Teams;
-    ignoredUsers: Set<number>;
-    teamStats?: Map<string, UserStats>;
-  } {
-    const userStats = recalcStats
-      ? aggregateUserStats(
-          tree,
-          earliest,
-          latest,
-          teamsAndAliases.aliases,
-          teamsAndAliases.ignoredUsers
-        )
-      : undefined;
-    const userTeams = buildUserTeams(teamsAndAliases.teams);
-    const teamStats = recalcStats
-      ? aggregateTeamStats(
-          tree,
-          earliest,
-          latest,
-          teamsAndAliases.aliases,
-          teamsAndAliases.ignoredUsers,
-          userTeams,
-          false
-        )
-      : undefined;
-
-    const usersWithStats: UserAndStatsAndAliases[] = users.map((user) => {
-      const stats = userStats?.get(user.id);
-      if (stats) {
-        return { ...user, ...stats, isAlias: false };
-      } else {
-        return {
-          ...user,
-          ...DEFAULT_USER_STATS,
-          isAlias: false,
-        };
-      }
-    });
-    const aliasUserData: UserAndStatsAndAliases[] = [
-      ...teamsAndAliases.aliasData,
-    ]
-      .sort(([aliasIdA], [aliasIdB]) => aliasIdA - aliasIdB)
-      .map(([aliasId, userData]) => {
-        const stats = userStats?.get(aliasId);
-        if (stats) {
-          return { ...userData, ...stats, isAlias: true };
-        } else {
-          return {
-            ...userData,
-            ...DEFAULT_USER_STATS,
-            isAlias: true,
-          };
-        }
-      });
-
-    return {
-      usersAndAliases: [...usersWithStats, ...aliasUserData],
-      aliases: teamsAndAliases.aliases,
-      teams: teamsAndAliases.teams,
-      ignoredUsers: teamsAndAliases.ignoredUsers,
-      teamStats,
-    };
-  }
-
   function openModal() {
     // Need to re-initialise local state from parent state every time we open the modal
     const { earliest, latest } = state.config.filters.dateRange;
 
     const { usersAndAliases, aliases, teams, ignoredUsers, teamStats } =
       usersAndTeamsToPageFormat(
+        tree,
         users,
         state.config.teamsAndAliases,
         earliest,
@@ -251,84 +84,50 @@ const UsersAndTeams = (props: DefaultProps) => {
     setIsOpen(true);
   }
 
-  function recalcStatsForPageState(
-    workingPageState: UsersAndTeamsPageState,
-    alreadyCloned: boolean
-  ): UsersAndTeamsPageState {
-    const { aliases, ignoredUsers } = workingPageState;
-    const userStats = aggregateUserStats(
-      tree,
-      earliest,
-      latest,
-      aliases,
-      ignoredUsers
-    );
-    const userTeams = buildUserTeams(workingPageState.teams);
-    const teamStats = aggregateTeamStats(
-      tree,
-      earliest,
-      latest,
-      workingPageState.aliases,
-      ignoredUsers,
-      userTeams,
-      false
-    );
-
-    const newPageState = alreadyCloned
-      ? workingPageState
-      : _.cloneDeep(workingPageState);
-    newPageState.usersAndAliases.forEach((user, index, arr) => {
-      const stats = userStats.get(user.id);
-      if (stats) {
-        arr[index] = { ...user, ...stats };
-      } else {
-        arr[index] = { ...user, ...DEFAULT_USER_STATS };
-      }
-    });
-    newPageState.teamStats = teamStats;
-    return newPageState;
-  }
+  /**
+   * The "refresh stats after editing" checkbox decides whether an edit recomputes statistics.
+   * `alreadyCloned` says whether the edit that produced `workingPageState` deep-copied it - see
+   * `recalcStatsForPageState`.
+   */
   function maybeRecalc(
     workingPageState: UsersAndTeamsPageState,
     alreadyCloned: boolean
   ): UsersAndTeamsPageState {
     return recalcStats
-      ? recalcStatsForPageState(workingPageState, alreadyCloned)
+      ? recalcStatsForPageState(
+          tree,
+          earliest,
+          latest,
+          workingPageState,
+          alreadyCloned
+        )
       : workingPageState;
   }
+  /** Applies an edit and recalculates if the checkbox says to. */
+  function applyEdit(
+    newState: UsersAndTeamsPageState,
+    alreadyCloned = false
+  ): void {
+    setPageState(maybeRecalc(newState, alreadyCloned));
+  }
+  /** What `EditAlias` hands its edits back through - it deep-clones the state it is given. */
   function setPageStateAndMaybeRecalc(newState: UsersAndTeamsPageState): void {
-    setPageState(maybeRecalc(newState, true));
+    applyEdit(newState, true);
   }
 
   function manuallyRecalcStats() {
-    const newPageState = recalcStatsForPageState(pageState, false);
-    setPageState(newPageState);
+    setPageState(
+      recalcStatsForPageState(tree, earliest, latest, pageState, false)
+    );
   }
 
   function cancel() {
     setIsOpen(false);
   }
   function save() {
-    const aliasData: UserAliasData = new Map();
-    for (const user of pageState.usersAndAliases) {
-      if (user.isAlias) {
-        aliasData.set(user.id, {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-        });
-      }
-    }
-
     dispatch({
       type: "setUserTeamAliasData",
-      payload: {
-        teams: pageState.teams,
-        aliases: pageState.aliases,
-        ignoredUsers: pageState.ignoredUsers,
-        aliasData,
-        noTeamColour: pageState.noTeamColour,
-      },
+      payload: pageStateToSaveData(pageState),
     });
     setIsOpen(false);
   }
@@ -458,6 +257,7 @@ const UsersAndTeams = (props: DefaultProps) => {
 
       const { usersAndAliases, aliases, ignoredUsers, teams } =
         usersAndTeamsToPageFormat(
+          tree,
           users,
           newTeamsAndAliases,
           earliest,
@@ -512,155 +312,37 @@ const UsersAndTeams = (props: DefaultProps) => {
     };
   }
 
-  const setSort = (key: string) => {
-    const usersSort =
-      key == pageState.usersSort.key
-        ? { key, ascending: !pageState.usersSort.ascending }
-        : { key, ascending: true };
+  // --- wiring: every edit goes through `applyEdit`, which recalculates stats if asked to ------
 
-    setPageState({ ...pageState, usersSort });
-  };
-
-  const sortHeaderStyle = (key: string): string | undefined => {
-    if (key == pageState.usersSort.key) {
-      return pageState.usersSort.ascending
-        ? "sortable sortAscending"
-        : "sortable sortDescending";
-    }
-    return "sortable unsorted";
-  };
+  const setSort = (key: string) =>
+    setPageState(
+      edits.setUsersSort(pageState, nextSort(pageState.usersSort, key))
+    );
 
   function handleUserCheck(user: number, checked: boolean) {
-    const checkedUsers = pageState.checkedUsers;
-
-    if (checked) {
-      checkedUsers.add(user);
-    } else {
-      checkedUsers.delete(user);
-    }
-    setPageState({ ...pageState, checkedUsers });
+    setPageState(edits.setUserChecked(pageState, user, checked));
   }
 
   function handleTeamCheck(team: string, checked: boolean) {
-    const teams = _.clone(pageState.teams);
-
-    teams.get(team)!.hidden = checked;
-
-    setPageState(maybeRecalc({ ...pageState, teams }, false));
+    applyEdit(edits.setTeamHidden(pageState, team, checked));
   }
 
   function handleIgnoredUserCheck(user: number, checked: boolean) {
-    const checkedIgnoredUsers = pageState.checkedIgnoredUsers;
-
-    if (checked) {
-      checkedIgnoredUsers.add(user);
-    } else {
-      checkedIgnoredUsers.delete(user);
-    }
-    setPageState({ ...pageState, checkedIgnoredUsers });
+    setPageState(edits.setIgnoredUserChecked(pageState, user, checked));
   }
 
   const showCheckedUsersId = useId();
 
-  const filterUsers: (user: UserAndStatsAndAliases) => boolean = (user) => {
-    if (pageState.aliases.has(user.id) || pageState.ignoredUsers.has(user.id)) {
-      return false; // don't show ignored or aliased users at all
-    }
-    if (pageState.checkedUsers.has(user.id)) {
-      return true; // always show checked users - too confusing otherwise!
-    }
-    if (pageState.showCheckedUsers && !pageState.checkedUsers.has(user.id)) {
-      return false;
-    }
-    if (pageState.userFilter == "") {
-      return true;
-    }
-    return (
-      (user.name ?? "").toLowerCase().includes(pageState.userFilter) ||
-      (user.email ?? "").toLowerCase().includes(pageState.userFilter)
-    );
-  };
-
   const setUserFilter = (userFilter: string) =>
-    setPageState({
-      ...pageState,
-      userFilter,
-    });
+    setPageState(edits.setUserFilter(pageState, userFilter));
 
-  const newTeam = () => {
-    let teamName =
-      pageState.checkedUsers.size == 1
-        ? pageState.usersAndAliases[
-            pageState.checkedUsers.values().next().value!
-          ]?.name
-        : undefined;
-    if (!teamName) {
-      teamName = `team ${pageState.teams.size + 1}`;
-    }
-    // unlikely but if people have been fiddling with names could collide
-    if (pageState.teams.has(teamName)) {
-      let suffix = pageState.teams.size + 2;
-      while (pageState.teams.has(teamName)) {
-        teamName = `${teamName}${suffix}`;
-        suffix += 1;
-      }
-    }
-    const newTeams = pageState.teams;
-    newTeams.set(teamName, {
-      users: pageState.checkedUsers,
-      colour: themedColours(state.config).neutralColour,
-      hidden: false,
-    });
-    setPageState(
-      maybeRecalc(
-        { ...pageState, teams: newTeams, checkedUsers: new Set() },
-        false
-      )
+  const newTeam = () =>
+    applyEdit(
+      edits.createTeam(pageState, themedColours(state.config).neutralColour)
     );
-  };
-
-  // Generated with http://vrl.cs.brown.edu/color
-  const bigColourRange: readonly string[] = [
-    "#a1def0",
-    "#335862",
-    "#8dfa9d",
-    "#2d7a2c",
-    "#e6faa2",
-    "#a93713",
-    "#47faf4",
-    "#7a2f9b",
-    "#f7c5f1",
-    "#5e497a",
-    "#b97bbd",
-    "#ec4dd8",
-    "#11a0aa",
-    "#7191ce",
-    "#b9f617",
-    "#ec102f",
-    "#a0b460",
-    "#a20655",
-    "#efaa79",
-    "#76480d",
-  ];
-  const colourSchemes: [string, readonly string[]][] = [
-    ["d3 schemeCategory10", d3.schemeCategory10],
-    ["d3 schemeTableau10", d3.schemeTableau10],
-    ["d3 schemeSet1", d3.schemeSet1],
-    ["d3 schemeSet2", d3.schemeSet2],
-    ["d3 schemeSet3", d3.schemeSet3],
-    ["d3 schemeAccent", d3.schemeAccent],
-    ["d3 schemeDark2", d3.schemeDark2],
-    ["d3 schemePaired", d3.schemePaired],
-    ["d3 schemePastel1", d3.schemePastel1],
-    ["d3 schemePastel2", d3.schemePastel2],
-    ["Korny custom scheme", bigColourRange],
-  ];
 
   function selectColourScheme(scheme: number) {
-    if (scheme < 0 || scheme >= colourSchemes.length) {
-      throw new Error("Logic error - impossible colour scheme");
-    }
-    setPageState({ ...pageState, colourScheme: scheme });
+    setPageState(edits.selectColourScheme(pageState, scheme));
   }
 
   const colourSelectId = useId();
@@ -682,102 +364,46 @@ const UsersAndTeams = (props: DefaultProps) => {
       </select>
     </label>
   );
-  const [_schemeName, currentScheme] = colourSchemes[pageState.colourScheme]!;
+  const currentScheme = colourSchemeAt(pageState.colourScheme);
   const visibleTeamCount = [...pageState.teams].filter(
     ([, team]) => !team.hidden
   ).length;
 
-  const reColourTeams = () => {
-    let visibleTeams = [...pageState.teams].filter(([, team]) => !team.hidden);
-    if (visibleTeams.length == 0) {
-      console.log("Can't recolour teams as none are shown");
-      return;
-    }
-    const hiddenTeams = [...pageState.teams].filter(([, team]) => team.hidden);
-    visibleTeams = _.shuffle(visibleTeams);
-
-    // note any colours outside the colour range will be white!  Remap those yourself...
-    const { neutralColour } = themedColours(state.config);
-
-    visibleTeams.forEach(([, team], index) => {
-      if (index < currentScheme.length) {
-        team.colour = currentScheme[index]!;
-      } else {
-        team.colour = neutralColour;
-      }
-    });
-    setPageState({
-      ...pageState,
-      teams: new Map([...visibleTeams, ...hiddenTeams]),
-    });
-  };
+  const reColourTeams = () =>
+    setPageState(
+      edits.recolourTeams(pageState, themedColours(state.config).neutralColour)
+    );
 
   const noTeamId = useId();
   function setNoTeamColour(value: string) {
-    setPageState({ ...pageState, noTeamColour: value });
+    setPageState(edits.setNoTeamColour(pageState, value));
   }
 
   function changeTeamColour(name: string, value: string) {
-    const teams = _.cloneDeep(pageState.teams);
-    const team = teams.get(name);
-    if (team !== undefined) team.colour = value;
-    setPageState({ ...pageState, teams });
+    setPageState(edits.changeTeamColour(pageState, name, value));
   }
 
   function validTeamChange(
     oldName: string,
     newName: string
   ): string | undefined {
-    if (oldName == newName) return undefined;
-    if (newName.trim() == "") return "cannot be blank";
-    if (pageState.teams.has(newName)) return "name already in use";
-    return undefined;
+    return edits.validTeamChange(pageState.teams, oldName, newName);
   }
 
   function renameTeam(oldName: string, newName: string) {
-    if (validTeamChange(oldName, newName) !== undefined) {
-      throw new Error("logic error - invalid team name change");
-    }
-    const oldTeam = pageState.teams.get(oldName);
-    if (oldTeam == undefined) {
-      throw new Error("Logic error - invalid old team");
-    }
-    const { teams } = pageState;
-    teams.set(newName, oldTeam);
-    teams.delete(oldName);
-    setPageState(maybeRecalc({ ...pageState, teams }, false));
+    applyEdit(edits.renameTeam(pageState, oldName, newName));
   }
 
   function selectTeamMembers(team: string) {
-    const users = pageState.teams.get(team)?.users;
-    if (users == undefined) {
-      throw new Error("logic error - invalid team name");
-    }
-    setPageState({ ...pageState, checkedUsers: new Set(users) });
+    setPageState(edits.selectTeamMembers(pageState, team));
   }
 
   function addUsersToTeam(teamName: string) {
-    const teams = _.cloneDeep(pageState.teams);
-    const team = teams.get(teamName);
-    if (team == undefined) {
-      throw new Error("logic error - invalid team name");
-    }
-    for (const user of pageState.checkedUsers) {
-      team.users.add(user);
-    }
-    setPageState(maybeRecalc({ ...pageState, teams }, false));
+    applyEdit(edits.addUsersToTeam(pageState, teamName));
   }
 
   function removeUsersFromTeam(teamName: string) {
-    const teams = _.cloneDeep(pageState.teams);
-    const team = teams.get(teamName);
-    if (team == undefined) {
-      throw new Error("logic error - invalid team name");
-    }
-    for (const user of pageState.checkedUsers) {
-      team.users.delete(user);
-    }
-    setPageState(maybeRecalc({ ...pageState, teams }, false));
+    applyEdit(edits.removeUsersFromTeam(pageState, teamName));
   }
 
   const checkedAliasUsers = modalIsOpen
@@ -802,75 +428,27 @@ const UsersAndTeams = (props: DefaultProps) => {
   };
 
   function ignoreCheckedUsers() {
-    const newPageState = _.cloneDeep(pageState);
-    for (const userId of pageState.checkedUsers) {
-      if (pageState.aliases.has(userId)) {
-        throw new Error("Logic error - can't ignore aliased user!");
-      }
-      if (pageState.usersAndAliases[userId]?.isAlias) {
-        throw new Error("Logic error - can't ignore alias user!");
-      }
-      newPageState.ignoredUsers.add(userId);
-    }
-    const newTeams: Teams = new Map(
-      [...newPageState.teams].map(([teamName, team]) => {
-        for (const userId of pageState.checkedUsers) {
-          team.users.delete(userId);
-        }
-        return [teamName, team];
-      })
-    );
-    setPageState(
-      maybeRecalc(
-        {
-          ...newPageState,
-          teams: newTeams,
-          checkedUsers: new Set(),
-          checkedIgnoredUsers: new Set(),
-        },
-        true
-      )
-    );
+    // `ignoreCheckedUsers` deep-clones, so the recalculation must not clone again.
+    applyEdit(edits.ignoreCheckedUsers(pageState), true);
   }
 
   function unIgnoreCheckedUsers() {
-    const newIgnoredUsers = _.cloneDeep(pageState.ignoredUsers);
-    for (const userId of pageState.checkedIgnoredUsers) {
-      newIgnoredUsers.delete(userId);
-    }
-    setPageState(
-      maybeRecalc(
-        {
-          ...pageState,
-          ignoredUsers: newIgnoredUsers,
-          checkedIgnoredUsers: new Set(),
-        },
-        false
-      )
-    );
+    applyEdit(edits.unIgnoreCheckedUsers(pageState));
   }
 
-  // this is a bit different from normal UserTeams as hidden teams are shown
-  function teamsForUserIncludingHidden(
-    userId: number
-  ): [name: string, data: Team][] {
-    const userTeams = [...pageState.teams].filter(([, teamData]) =>
-      teamData.users.has(userId)
-    );
-    return userTeams;
-  }
   function userTeamDisplay(userId: number) {
-    const teams = teamsForUserIncludingHidden(userId).sort(sortTeamsByName);
+    const teams = edits
+      .teamsForUserIncludingHidden(pageState.teams, userId)
+      .sort(sortTeamsByName);
     return <UserTeamList teams={teams} showNames={true}></UserTeamList>;
   }
 
   function selectAllUsers() {
-    const all = pageState.usersAndAliases.filter(filterUsers).map((u) => u.id);
-    setPageState({ ...pageState, checkedUsers: new Set(all) });
+    setPageState(edits.selectAllVisibleUsers(pageState));
   }
 
   function selectNoUsers() {
-    setPageState({ ...pageState, checkedUsers: new Set() });
+    setPageState(edits.selectNoUsers(pageState));
   }
 
   return (
@@ -1240,10 +818,12 @@ const UsersAndTeams = (props: DefaultProps) => {
                 type="checkbox"
                 id={showCheckedUsersId}
                 onChange={() =>
-                  setPageState({
-                    ...pageState,
-                    showCheckedUsers: !pageState.showCheckedUsers,
-                  })
+                  setPageState(
+                    edits.setShowCheckedUsers(
+                      pageState,
+                      !pageState.showCheckedUsers
+                    )
+                  )
                 }
                 checked={pageState.showCheckedUsers}
               ></input>
@@ -1255,43 +835,43 @@ const UsersAndTeams = (props: DefaultProps) => {
                 <th>select</th>
                 <th
                   onClick={() => setSort("id")}
-                  className={sortHeaderStyle("id")}
+                  className={sortHeaderStyle(pageState.usersSort, "id")}
                 >
                   ID
                 </th>
                 <th
                   onClick={() => setSort("name")}
-                  className={sortHeaderStyle("name")}
+                  className={sortHeaderStyle(pageState.usersSort, "name")}
                 >
                   Name
                 </th>
                 <th
                   onClick={() => setSort("email")}
-                  className={sortHeaderStyle("email")}
+                  className={sortHeaderStyle(pageState.usersSort, "email")}
                 >
                   Email
                 </th>
                 <th
                   onClick={() => setSort("files")}
-                  className={sortHeaderStyle("files")}
+                  className={sortHeaderStyle(pageState.usersSort, "files")}
                 >
                   Files changed
                 </th>
                 <th
                   onClick={() => setSort("commits")}
-                  className={sortHeaderStyle("commits")}
+                  className={sortHeaderStyle(pageState.usersSort, "commits")}
                 >
                   File commits
                 </th>
                 <th
                   onClick={() => setSort("days")}
-                  className={sortHeaderStyle("days")}
+                  className={sortHeaderStyle(pageState.usersSort, "days")}
                 >
                   Days with a change
                 </th>
                 <th
                   onClick={() => setSort("lines")}
-                  className={sortHeaderStyle("lines")}
+                  className={sortHeaderStyle(pageState.usersSort, "lines")}
                 >
                   Lines changed total
                 </th>
@@ -1300,43 +880,39 @@ const UsersAndTeams = (props: DefaultProps) => {
               </tr>
             </thead>
             <tbody>
-              {sortUsers(pageState.usersAndAliases, pageState.usersSort)
-                .filter(filterUsers)
-                .map((user) => {
-                  return (
-                    <tr key={user.id}>
-                      <td>
-                        <input
-                          type="checkbox"
-                          value={user.id}
-                          onChange={(event) =>
-                            handleUserCheck(
-                              parseInt(event.target.value),
-                              event.target.checked
-                            )
-                          }
-                          checked={pageState.checkedUsers.has(user.id)}
-                        ></input>
-                      </td>
-                      <td>{user.id}</td>
-                      <td>{user.name}</td>
-                      <td>{user.email}</td>
-                      <td>{user.files}</td>
-                      <td>{user.commits}</td>
-                      <td>{user.days.size}</td>
-                      <td>{user.lines}</td>
-                      <td>
-                        {user.isAlias ? (
-                          <button onClick={editAlias(user.id)}>
-                            Edit Alias
-                          </button>
-                        ) : null}
-                      </td>
+              {visibleUsers(pageState).map((user) => {
+                return (
+                  <tr key={user.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        value={user.id}
+                        onChange={(event) =>
+                          handleUserCheck(
+                            parseInt(event.target.value),
+                            event.target.checked
+                          )
+                        }
+                        checked={pageState.checkedUsers.has(user.id)}
+                      ></input>
+                    </td>
+                    <td>{user.id}</td>
+                    <td>{user.name}</td>
+                    <td>{user.email}</td>
+                    <td>{user.files}</td>
+                    <td>{user.commits}</td>
+                    <td>{user.days.size}</td>
+                    <td>{user.lines}</td>
+                    <td>
+                      {user.isAlias ? (
+                        <button onClick={editAlias(user.id)}>Edit Alias</button>
+                      ) : null}
+                    </td>
 
-                      <td>{userTeamDisplay(user.id)}</td>
-                    </tr>
-                  );
-                })}
+                    <td>{userTeamDisplay(user.id)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </ToggleablePanel>

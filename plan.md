@@ -3,21 +3,21 @@
 Read `spec.md` first. This is the ordered checklist; each step is one reviewable commit, sized
 for a single ~30-60 minute session, ending green and leaving the repo in a good state.
 
-**Parts 1-5 are done, and so is step 6.1.** Git holds the detail; what a later step still needs
-is below. **Step 6.2 is next.**
+**Parts 1-5 are done, and so are steps 6.1 and 6.2.** Git holds the detail; what a later step still needs
+is below. **Step 6.3 is next.**
 
 ## Technical context
 
-**Where things stand.** 196 unit tests across 19 files, plus 16 screenshots in two Playwright
+**Where things stand.** 244 unit tests across 22 files, plus 16 screenshots in two Playwright
 projects (`chromium` on `default.json`, `chromium-nested` on `nested.json`). The existing tests
 are the safety net for everything below — they are not to be rewritten to match new behaviour.
 
-The two files left to split:
+The files left to split:
 
-| file                | lines |
-| ------------------- | ----- |
-| `UsersAndTeams.tsx` | 1348  |
-| `Viz.tsx`           | 947   |
+| file                | lines | what is left                                          |
+| ------------------- | ----- | ----------------------------------------------------- |
+| `UsersAndTeams.tsx` | 923   | one component: the JSX, the import/export, the wiring |
+| `Viz.tsx`           | 947   | all of it                                             |
 
 Already split, for orientation:
 
@@ -27,12 +27,15 @@ Already split, for orientation:
 - `src/state/` — `config.ts` (397), `reducer.ts` (189), `actions.ts` (168), `derived.ts` (131),
   `colours.ts` (25). `state.ts` keeps 147 lines of shared types, the `Message` constructors and
   the user-lookup helpers, and imports nothing from `state/` at runtime.
+- `src/teams/` — `pageStateEdits.ts` (328), `pageState.ts` (196), `userList.ts` (109),
+  `colourSchemes.ts` (52), each with its tests beside it. `EditAlias.tsx` now takes the page
+  state type from `teams/pageState` rather than from the component.
 
 **Verification available to each step:**
 
 | tool                                         | what it proves                                                        |
 | -------------------------------------------- | --------------------------------------------------------------------- |
-| `npm run check`                              | typecheck, lint, format, 187 unit tests                               |
+| `npm run check`                              | typecheck, lint, format, 244 unit tests                               |
 | `npm run e2e:strict`                         | all 16 screenshots at **zero** tolerance — the real regression signal |
 | `npx playwright test --update-snapshots=all` | re-baseline, only ever with a stated reason (see below)               |
 
@@ -93,9 +96,9 @@ These are what made Parts 3-5 safe; reuse them rather than reinventing.
   anyway — so each is a deliberate behaviour change, noted in its commit, with a step 6.1 test
   updated alongside it. Those are the only two test edits Part 6 is allowed; any other test that
   has to change is still the signal that the restructure was not faithful.
-  - **Fix in step 6.2:** the user filter never lower-cases the query (`UsersAndTeams.tsx`,
-    `filterUsers`) although it lower-cases the name and email it compares against, so any
-    capital letter typed into the filter box matches nothing.
+  - **Fixed in step 6.2:** the user filter never lower-cased the query although it lower-cased
+    the name and email it compared against, so any capital letter typed into the filter box
+    matched nothing. Now in `teams/userList.ts`'s `userIsVisible`, with a comment.
   - **Fix in step 6.3:** `EditAlias.tsx`'s Email label carries `htmlFor={aliasNameId}` — the
     _name_ input's id — so both labels point at the same input and the email field has no label
     at all. This is why the alias test currently reaches those two inputs by role and order
@@ -109,7 +112,7 @@ These are what made Parts 3-5 safe; reuse them rather than reinventing.
 ## Part 6 — `UsersAndTeams.tsx` → `src/teams/`
 
 Tests before anything moves. This is the riskiest part of the plan and the only file with no
-coverage at all: 1348 lines, of which the `UsersAndTeams` component itself is one function from
+coverage at all: 1348 lines, of which the `UsersAndTeams` component itself was one function from
 line 129 to the end. `sortUsers` (line 81) and the `UsersAndTeamsPageState` type (line 47) are
 already outside it.
 
@@ -143,16 +146,40 @@ nine mutations in all: `newTeam`'s `set`, its single-user naming, `addUsersToTea
 `sortUsers`' comparator, and `cancel` wired to `save`. `npm run check` green;
 `npm run e2e:strict` 16/16 clean, as it must be with no production change.
 
-### Step 6.2 — pure logic out
+### Step 6.2 — pure logic out — **done**
 
-- [ ] `src/teams/` gets the non-React parts: `sortUsers`, filtering, `usersAndTeamsToPageFormat`,
+- [x] `src/teams/` gets the non-React parts: `sortUsers`, filtering, `usersAndTeamsToPageFormat`,
       the page-state shape and its transitions.
-- [ ] Unit-test them directly now they are reachable.
-- [ ] Lower-case the filter query as it is extracted (see the findings above), and update the one
+- [x] Unit-test them directly now they are reachable.
+- [x] Lower-case the filter query as it is extracted (see the findings above), and update the one
       step 6.1 assertion that pins the broken behaviour.
 
-**Verify:** step 6.1's tests pass, unchanged apart from that single filter assertion — that is
-the proof the extraction was faithful.
+Four modules, each stateable in a sentence: `pageState.ts` (196) is the panel's state — its
+shape, how it is built from the global state, how its stats are refreshed, and what it saves;
+`pageStateEdits.ts` (328) is every edit, each `(pageState, args) => pageState`; `userList.ts`
+(109) is the pure view of the user table, sorting and visibility; `colourSchemes.ts` (52) is the
+auto-colour palettes, a data leaf both the dropdown and `recolourTeams` read. `UsersAndTeams.tsx`
+is 1348 → 923, and what is left of it above the JSX is wiring: each handler now reads
+`applyEdit(edits.something(pageState, …))`.
+
+Two things worth knowing before step 6.3:
+
+- **The extracted edits are not pure, and their header says so.** Several copy only the part of
+  the state they change, and a few mutate the map or set they were handed. That is exactly why
+  `recalcStatsForPageState` takes `alreadyCloned` — each edit's caller passes what that edit
+  actually did. Made faithful rather than fixed: making them properly immutable is invisible in
+  principle but not provably so, and it is a change to make deliberately, not in passing.
+- **`initialPageState`'s `hiddenTeams: new Set()` was dropped**: not in
+  `UsersAndTeamsPageState`, read by nothing (`reColourTeams`' `hiddenTeams` is a local of its
+  own). Dead, like `nodeDepth` in Part 4.
+
+**Verified:** step 6.1's tests pass unchanged apart from the filter assertion, now capitalised so
+it proves the fix. The move was checked by the line-multiset diff, and every remaining difference
+is a `setPageState` wrapper that became `applyEdit`, a signature that gained a parameter, or
+prettier rejoining a line at lower indentation — the only JSX change in the file is
+`sortHeaderStyle` gaining its first argument. The filter fix was shown to be covered by
+reverting it: the unit test and the whole-panel test both fail. 244 unit tests (was 196);
+`npm run check` green; `npm run e2e:strict` 16/16 clean.
 
 ### Step 6.3 — split the component
 

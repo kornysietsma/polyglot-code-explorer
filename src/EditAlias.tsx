@@ -7,7 +7,7 @@ import { Teams } from "./state";
 import {
   UserAndStatsAndAliases,
   UsersAndTeamsPageState,
-} from "./UsersAndTeams";
+} from "./teams/pageState";
 
 type Props = {
   aliasBeingEdited: number | undefined;
