@@ -129,9 +129,13 @@ export function usersAndTeamsToPageFormat(
 
   return {
     usersAndAliases: [...usersWithStats, ...aliasUserData],
-    aliases: teamsAndAliases.aliases,
-    teams: teamsAndAliases.teams,
-    ignoredUsers: teamsAndAliases.ignoredUsers,
+    // Deep copies, and that is the whole point: the panel edits its state in place (see
+    // `pageStateEdits.ts`), so handing it the global state's own `Map`s would let an edit reach
+    // the rest of the app without a dispatch - and "cancel" could not undo it. A shallow copy
+    // is not enough, because `setTeamHidden` writes to a `Team` inside the map.
+    aliases: _.cloneDeep(teamsAndAliases.aliases),
+    teams: _.cloneDeep(teamsAndAliases.teams),
+    ignoredUsers: _.cloneDeep(teamsAndAliases.ignoredUsers),
     teamStats,
   };
 }

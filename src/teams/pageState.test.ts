@@ -134,6 +134,50 @@ describe("building the page state from the global state", () => {
     expect(byName.get("Bo again")!.files).toBe(2);
   });
 
+  /**
+   * The panel's edits mutate in place, so the state it starts from has to be its own. Handing
+   * over the global state's `Map`s let an edit escape without a dispatch - a created team
+   * survived "cancel". Deep, not shallow: `setTeamHidden` writes to a `Team` inside the map.
+   */
+  it("hands back copies, so an edit cannot reach the global state", () => {
+    const source = teamsAndAliases({
+      teams: teamsOf(["red", [0]]),
+      aliases: new Map([[1, 2]]),
+      ignoredUsers: new Set([0]),
+    });
+
+    const page = usersAndTeamsToPageFormat(
+      tree,
+      users,
+      source,
+      EARLIEST,
+      LATEST,
+      false
+    );
+
+    expect(page.teams).not.toBe(source.teams);
+    expect(page.aliases).not.toBe(source.aliases);
+    expect(page.ignoredUsers).not.toBe(source.ignoredUsers);
+    expect(page.teams.get("red")).not.toBe(source.teams.get("red"));
+    expect(page.teams.get("red")!.users).not.toBe(
+      source.teams.get("red")!.users
+    );
+
+    // The copies still hold the same contents, and editing one leaves the other alone.
+    expect(page.teams.get("red")!.users).toEqual(new Set([0]));
+    page.teams.set("blue", {
+      users: new Set([1]),
+      colour: "#fff",
+      hidden: false,
+    });
+    page.teams.get("red")!.hidden = true;
+    page.ignoredUsers.add(2);
+
+    expect([...source.teams.keys()]).toEqual(["red"]);
+    expect(source.teams.get("red")!.hidden).toBe(false);
+    expect(source.ignoredUsers).toEqual(new Set([0]));
+  });
+
   it("counts a team's changes once, however many of its members made them", () => {
     const { teamStats } = usersAndTeamsToPageFormat(
       tree,

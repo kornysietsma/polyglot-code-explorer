@@ -6,22 +6,23 @@ Phase 1 (test clarity, the `nestedCircles` screenshot suite, seven defect fixes)
 committed**: `174d284`, `b86044d`, `262bf9b`, `e268255`. Its findings are folded into `CLAUDE.md`;
 git holds the rest.
 
-Of this spec, **Parts 1, 2 and 3 are done**, and **Part 4's refactor is done for `nodeData.ts`
-and `state.ts`** — error visibility (`72f820c`, `e9e4453`), UTC dates (`4438d4c`, `70b73d3`,
-`89ed94b`), user lookup (`5e2fcd1`), `src/model/` (`40f700c`, `c3e4c16`, `e3cd0a8`, `c8685a4`)
-and `src/state/` (`ef69773`, `90f34bc`, `3319b1d`). Those sections now record what was decided and
-what was found, rather than what is planned. **`UsersAndTeams.tsx` and `Viz.tsx` remain**, with
-`plan.md` holding the ordered steps.
+Of this spec, **Parts 1, 2 and 3 are done**, and **Part 4's refactor is done for `nodeData.ts`,
+`state.ts` and `UsersAndTeams.tsx`** — error visibility (`72f820c`, `e9e4453`), UTC dates
+(`4438d4c`, `70b73d3`, `89ed94b`), user lookup (`5e2fcd1`), `src/model/` (`40f700c`, `c3e4c16`,
+`e3cd0a8`, `c8685a4`), `src/state/` (`ef69773`, `90f34bc`, `3319b1d`) and `src/teams/`
+(`4b71355`, `bdf07b2`, `02e77cf`, `8152876`). Those sections now record what was decided and what
+was found, rather than what is planned. **Only `Viz.tsx` remains**, with `plan.md` holding the
+ordered steps.
 
 ## Why
 
-The codebase works and is now reasonably well tested — 187 unit tests and 16 screenshots — but it
-sprawled. Four files carried 4,172 lines between them, each mixing several unrelated concerns in
-one namespace:
+The codebase works and is now reasonably well tested — 187 unit tests and 16 screenshots when
+this started, 247 now — but it sprawled. Four files carried 4,172 lines between them, each mixing
+several unrelated concerns in one namespace:
 
 | file                | lines | what was tangled together                                                                                                        | now                                      |
 | ------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| `UsersAndTeams.tsx` | 1348  | one 1219-line component: modal, three sortable tables, selection, filters, alias/team creation, import/export, colour management | to do                                    |
+| `UsersAndTeams.tsx` | 1348  | one 1219-line component: modal, three sortable tables, selection, filters, alias/team creation, import/export, colour management | ten modules in `src/teams/` + 199 lines  |
 | `state.ts`          | 998   | the `Config` shape, a ~25-case `Action` union, the reducer, and `postprocessState`'s derived-data cache                          | five modules in `src/state/` + 147 lines |
 | `Viz.tsx`           | 944   | imperative D3/WebGL: draw, update, coupling arcs, timescale brush, zoom wiring, tooltip, GL recovery                             | to do                                    |
 | `nodeData.ts`       | 882   | ~50 `nodeXxx` functions over four unrelated concerns: git change details, coupling, layout accessors, team aggregation           | five modules in `src/model/`; file gone  |
@@ -38,6 +39,12 @@ and the user lookup. All three are done.
 In scope: all four files above, plus the three fixes below. Out of scope: the accessibility
 regression, the visualisation-switch performance target, the tooltip contents, and regenerating
 `default.json` — all remain in `CLAUDE.md`'s follow-ups.
+
+Defects **found** while restructuring an in-scope file are a third category, and Part 6 hit four
+of them. The rule that settled it: a defect is fixed in the step already touching that code, as a
+deliberate change with its own test and a note in the commit — never silently, and never by
+editing an existing assertion to match. Where the fix was foreseeable it was agreed with Korny
+first. This is not a licence to go looking; see the working agreement below.
 
 ## Working agreements
 
@@ -248,16 +255,54 @@ the folder is a clean line, `config.ts` → `derived.ts` → `reducer.ts` → `c
 function calls and what calls it before choosing where it lands. A small leaf module is a cheap
 fix, and a type-only import is not an edge at all.
 
-### `UsersAndTeams.tsx` → `src/teams/`
+### `UsersAndTeams.tsx` → `src/teams/` — **done**
 
-The riskiest step in the plan, and the only file with no coverage at all. **Whole-panel tests
-come first**, before anything moves: create a team, assign users, create an alias, ignore a user,
-filter, sort. They assert on the actions dispatched rather than on markup, so they survive the
-restructure and document what the panel is for. Part 1 put `@testing-library/react` into use for
-the first time (`ErrorBoundary.test.tsx`, `Loader.test.tsx`), so the pattern exists to follow
-rather than invent — this step only has to scale it to a much larger component.
+1348 lines became ten modules and a 199-line shell. Logic: `pageStateEdits.ts` (328),
+`pageState.ts` (229), `importExport.ts` (166), `userList.ts` (109), `colourSchemes.ts` (52), the
+first three with tests beside them. Components: `UsersTable.tsx` (219), `TeamsTable.tsx` (185),
+`ImportExportControls.tsx` (144), `IgnoredUsersTable.tsx` (71), `UsersAndTeamsHelp.tsx` (69).
+`EditAlias.tsx` was left alone beyond re-pointing its imports.
 
-Only once those are green does the component get broken up.
+**The tests came first, and the panel's shape made them easy.** This was the riskiest step and
+the only file with no coverage, so whole-panel tests were written before anything moved. What
+made them cheap is a fact about the panel that was not obvious until looked for: **it dispatches
+exactly one action, `setUserTeamAliasData`, and only on "save and close"**. That single action is
+the panel's entire output, so seven of the nine tests drive the DOM and assert on its payload,
+depending on no markup at all. Only filtering and sorting — which dispatch nothing — read the
+rendered table. All nine survived both later steps untouched, apart from the two assertions
+deliberately changed to prove a fix.
+
+**Sections take state, not callbacks.** Each component gets `PageStateProps` — `pageState`,
+`setPageState`, `applyEdit` — and calls the `pageStateEdits` functions itself. The alternative,
+passing twenty callbacks down from the shell, would have moved the markup without moving the
+coupling. The shell keeps only the decision no section can make: whether an edit recalculates
+statistics, which is what `applyEdit` wraps.
+
+**The mutation problem, and where it got fixed.** The extracted edits are not pure — several copy
+only the part of the state they change, and some mutate the map or set they were handed. That is
+inherited, and it is why `recalcStatsForPageState` takes an `alreadyCloned` flag. It was moved
+faithfully rather than fixed, on the grounds that making it immutable is invisible in principle
+but not provably so.
+
+That turned out to be too generous. A manual check found a real bug: **creating a team and
+pressing cancel left the team in the global state**, because `usersAndTeamsToPageFormat` returned
+`teams: teamsAndAliases.teams` — the global state's own `Map` — and `createTeam` writes into it
+in place. Confirmed pre-existing by checking out the commit before this work and reproducing it.
+
+The fix is one line in three, and deliberately at the boundary rather than in the edits:
+**`usersAndTeamsToPageFormat` deep-copies the teams, aliases and ignored users it is handed.**
+The edits mutate in place, which is fine as long as what they mutate belongs to the panel;
+copying once when the modal opens makes that true for every edit at once, and costs nothing —
+these collections are bounded by the user count, not the node count. Making all of
+`pageStateEdits` immutable would have been a far larger change for the same result. Deep, not
+shallow: `setTeamHidden` writes to a `Team` inside the map.
+
+**Three further defects were fixed, each with a test shown to fail without it:** the user filter
+lower-cased the values it compared against but not the query, so any capital letter matched
+nothing; and two `<label htmlFor>` pairs — in `EditAlias` and in the panel toolbar — where both
+labels pointed at the same input, leaving one field with two labels and another with none. The
+first two were agreed with Korny in advance as deliberate, noted-in-the-commit changes; the third
+was the same mistake found next door while fixing the second.
 
 ### `Viz.tsx`
 
@@ -270,8 +315,8 @@ the arcs needs a synthetic fixture — see `plan.md`.
 
 ## What done looks like
 
-- No file over ~400 lines among the four. Two down: `nodeData.ts` is gone and `state.ts` is 147
-  lines; `UsersAndTeams.tsx` (1348) and `Viz.tsx` (947) remain.
+- No file over ~400 lines among the four. Three down: `nodeData.ts` is gone, `state.ts` is 147
+  lines and `UsersAndTeams.tsx` is 199; `Viz.tsx` (947) is the last.
 - Every new module has a name that says what it holds, and its tests sit beside it.
 - `npm run check` green; `npm run e2e:strict` at zero tolerance either clean or deliberately
   re-baselined with the reason recorded.
