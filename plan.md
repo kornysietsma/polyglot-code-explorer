@@ -3,21 +3,16 @@
 Read `spec.md` first. This is the ordered checklist; each step is one reviewable commit, sized
 for a single ~30-60 minute session, ending green and leaving the repo in a good state.
 
-**Parts 1-5 are done, and so are steps 6.1 and 6.2.** Git holds the detail; what a later step still needs
-is below. **Step 6.3 is next.**
+**Parts 1-5 and all of Part 6 are done.** Git holds the detail; what a later step still needs
+is below. **Part 7 is next.**
 
 ## Technical context
 
-**Where things stand.** 244 unit tests across 22 files, plus 16 screenshots in two Playwright
+**Where things stand.** 245 unit tests across 22 files, plus 16 screenshots in two Playwright
 projects (`chromium` on `default.json`, `chromium-nested` on `nested.json`). The existing tests
 are the safety net for everything below — they are not to be rewritten to match new behaviour.
 
-The files left to split:
-
-| file                | lines | what is left                                          |
-| ------------------- | ----- | ----------------------------------------------------- |
-| `UsersAndTeams.tsx` | 923   | one component: the JSX, the import/export, the wiring |
-| `Viz.tsx`           | 947   | all of it                                             |
+**`Viz.tsx` (947 lines) is the only file left to split.**
 
 Already split, for orientation:
 
@@ -27,15 +22,18 @@ Already split, for orientation:
 - `src/state/` — `config.ts` (397), `reducer.ts` (189), `actions.ts` (168), `derived.ts` (131),
   `colours.ts` (25). `state.ts` keeps 147 lines of shared types, the `Message` constructors and
   the user-lookup helpers, and imports nothing from `state/` at runtime.
-- `src/teams/` — `pageStateEdits.ts` (328), `pageState.ts` (196), `userList.ts` (109),
-  `colourSchemes.ts` (52), each with its tests beside it. `EditAlias.tsx` now takes the page
-  state type from `teams/pageState` rather than from the component.
+- `src/teams/` — logic: `pageStateEdits.ts` (328), `pageState.ts` (225), `importExport.ts` (166),
+  `userList.ts` (109), `colourSchemes.ts` (52), the first three with tests beside them.
+  Components: `UsersTable.tsx` (219), `TeamsTable.tsx` (185), `ImportExportControls.tsx` (144),
+  `IgnoredUsersTable.tsx` (71), `UsersAndTeamsHelp.tsx` (69). `UsersAndTeams.tsx` is 199 lines of
+  modal shell; `EditAlias.tsx` (356) takes the page state type from `teams/pageState`, and is the
+  one part of the panel Part 6 did not restructure.
 
 **Verification available to each step:**
 
 | tool                                         | what it proves                                                        |
 | -------------------------------------------- | --------------------------------------------------------------------- |
-| `npm run check`                              | typecheck, lint, format, 244 unit tests                               |
+| `npm run check`                              | typecheck, lint, format, 245 unit tests                               |
 | `npm run e2e:strict`                         | all 16 screenshots at **zero** tolerance — the real regression signal |
 | `npx playwright test --update-snapshots=all` | re-baseline, only ever with a stated reason (see below)               |
 
@@ -99,13 +97,25 @@ These are what made Parts 3-5 safe; reuse them rather than reinventing.
   - **Fixed in step 6.2:** the user filter never lower-cased the query although it lower-cased
     the name and email it compared against, so any capital letter typed into the filter box
     matched nothing. Now in `teams/userList.ts`'s `userIsVisible`, with a comment.
-  - **Fix in step 6.3:** `EditAlias.tsx`'s Email label carries `htmlFor={aliasNameId}` — the
-    _name_ input's id — so both labels point at the same input and the email field has no label
-    at all. This is why the alias test currently reaches those two inputs by role and order
-    rather than by label text.
+  - **Fixed in step 6.3:** `EditAlias.tsx`'s Email label carried `htmlFor={aliasNameId}` — the
+    _name_ input's id — so both labels pointed at the same input and the email field had no
+    label at all. The panel's own toolbar turned out to have the same defect, and both are
+    fixed; the alias test now reaches its inputs by label text, which proves it.
 - **react-modal calls `onAfterOpen` from a `requestAnimationFrame`**, so a test that opens the
   alias modal has to `await` before the modal's seeded state is there. `EditAlias` is the only
   user of `onAfterOpen`.
+- **Cancelling the users panel does not discard everything it should — a real bug, pre-existing,
+  and _not_ fixed.** Create a team and press cancel: the team is still there when the panel is
+  reopened, without any dispatch. `usersAndTeamsToPageFormat` returns
+  `teams: teamsAndAliases.teams` — the global state's own `Map` — and `createTeam` does
+  `const newTeams = pageState.teams; newTeams.set(…)`, so the first team lands in global state
+  directly. Later edits do not, because the recalculation deep-clones. Found during step 6.3's
+  manual check and **confirmed at `4b71355`, before any of this refactoring**, by checking that
+  commit out and reproducing it.
+
+  This is the sharp end of the mutation caveat recorded against step 6.2: the fix is to have
+  `usersAndTeamsToPageFormat` hand back a copy, or to make the edits immutable, and it wants its
+  own step with a test rather than being smuggled into a refactor. Raised with Korny.
 
 ---
 
@@ -181,20 +191,47 @@ prettier rejoining a line at lower indentation — the only JSX change in the fi
 reverting it: the unit test and the whole-panel test both fail. 244 unit tests (was 196);
 `npm run check` green; `npm run e2e:strict` 16/16 clean.
 
-### Step 6.3 — split the component
+### Step 6.3 — split the component — **done**
 
-- [ ] Break the remaining markup into components per section: the teams table, the ignored-users
+- [x] Break the remaining markup into components per section: the teams table, the ignored-users
       table, the users table, the import/export controls.
-- [ ] This is where the "UI change is permitted, not sought" rule earns its keep: if some
+- [x] This is where the "UI change is permitted, not sought" rule earns its keep: if some
       behaviour forces an ugly structure, change it deliberately and note it in the commit.
-- [ ] Point `EditAlias.tsx`'s Email label at the email input (see the findings above), and
+- [x] Point `EditAlias.tsx`'s Email label at the email input (see the findings above), and
       switch the alias test to `getByLabelText` — which then proves the fix rather than merely
       surviving it.
 
-**Verify:** step 6.1's tests pass, unchanged apart from how the alias test reaches those two
-inputs. `npm run e2e:strict` — shots 8 and 9 cover the Colours and Lines panel, not this one, so
-expect clean; any diff means something moved that should not have. Manual: open the panel and
-exercise each table by hand.
+Six modules: `TeamsTable.tsx` (185), `UsersTable.tsx` (219), `IgnoredUsersTable.tsx` (71),
+`ImportExportControls.tsx` (144) with its pure half in `importExport.ts` (166), and
+`UsersAndTeamsHelp.tsx` (69) for the static help text that was obscuring the markup.
+**`UsersAndTeams.tsx` is 199 lines** — the modal shell, the page state, and the seed-on-open and
+dispatch-on-save that bracket it.
+
+Each section takes `PageStateProps` (`pageState`, `setPageState`, `applyEdit`) and calls the
+`pageStateEdits` functions itself, rather than being handed twenty callbacks. The shell keeps
+what only it can decide: whether an edit recalculates statistics.
+
+Two deliberate changes beyond the split:
+
+- **The toolbar's second checkbox had the same label defect as `EditAlias`** — "Refresh stats
+  after import or editing" also carried `htmlFor={tolerantCheckId}`, so it was unlabelled and
+  clicking its label toggled the tolerance checkbox instead. Fixed with the other one; a new
+  step-6.1 test asserts the two checkboxes have distinct labels, and it fails if either
+  `htmlFor` is put back.
+- **`checkedAliasUsers`/`checkedNormalUsers` lost their `modalIsOpen` guard.** They needed it
+  only because they were computed in the shell, which renders whether or not the modal is open.
+  In `UsersTable` they cannot run while it is shut: `ModalPortal.render()` returns `null` before
+  touching its children, checked in `node_modules/react-modal`.
+
+**Verified:** step 6.1's tests pass, changed only in how the alias test reaches the two inputs
+(now `getByLabelText`, which proves the fix). Both label fixes shown to discriminate by reverting
+each `htmlFor`. The help text was checked word-for-word against the original, since prettier
+reflowed it at its new indentation. 245 unit tests; `npm run check` green; `npm run e2e:strict`
+16/16 clean. Manual check with `playwright-cli` against the real app, since no screenshot covers
+this panel: create a team, add and remove members, hide and unhide it, rename it (including the
+blank-name validation greying out the ✓, and the ✖ revert), auto-colour it, create an alias,
+ignore and un-ignore a user, filter with capitals, sort both directions, export to JSON, and
+import that file back.
 
 ---
 
@@ -234,8 +271,8 @@ loss — the WebGL recovery path described in `CLAUDE.md`.
 
 ## Close out
 
-- [ ] Confirm no file among the original four is over ~400 lines. Two already pass
-      (`nodeData.ts` gone, `state.ts` 147); `UsersAndTeams.tsx` and `Viz.tsx` are the test.
+- [ ] Confirm no file among the original four is over ~400 lines. Three already pass
+      (`nodeData.ts` gone, `state.ts` 147, `UsersAndTeams.tsx` 199); `Viz.tsx` is the test.
 - [ ] Update `CLAUDE.md`'s architecture section to describe the new layout, replacing the
       file-by-file descriptions this work invalidates — `nodeData.ts` and `state.ts` are
       described there as they no longer are.

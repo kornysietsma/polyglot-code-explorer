@@ -208,3 +208,18 @@ export function pageStateToSaveData(
     noTeamColour: pageState.noTeamColour,
   };
 }
+
+/**
+ * What the panel's sections are handed. They read and edit the page state; the shell owns it,
+ * and owns the decision of whether an edit recalculates statistics.
+ *
+ * `applyEdit`'s `alreadyCloned` is passed through to `recalcStatsForPageState` - see above.
+ */
+export type PageStateProps = {
+  pageState: UsersAndTeamsPageState;
+  setPageState: (newState: UsersAndTeamsPageState) => void;
+  applyEdit: (
+    newState: UsersAndTeamsPageState,
+    alreadyCloned?: boolean
+  ) => void;
+};
