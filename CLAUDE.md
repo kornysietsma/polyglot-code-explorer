@@ -69,12 +69,59 @@ playwright-cli.
 ### Data flow: Loader → preprocess → App state → Visualizations
 
 1. **`Loader.tsx`** fetches the raw JSON data file (`PolyglotData`, shape defined in `polyglot_data.types.ts`) and an optional saved-state file (`*_state.json`), checks the data file's semver against `SUPPORTED_FILE_VERSION`, then runs it through `preprocess.ts` (`linkParents`, `countLanguagesIn`, `gatherGlobalStats`, `gatherNodesByPath`, `gatherTimescaleData`, `postprocessUsers`) to build `VizMetadata`. Only once this is done does it render `App`.
-2. **`App.tsx`** owns the single `useReducer` global state (`state.ts`), optionally hydrated from an imported/saved state file via `exportImport.ts`, and renders `Viz`, `Controller`, and `Inspector` side by side against the same `dataRef`/`state`/`dispatch`.
-3. **`state.ts`** is the core of the app: one big `State` object (`config`, `couplingConfig`, `expensiveConfig`, `calculated`, `messages`) manipulated by a single `Action` union and `updateStateFromAction` reducer (Redux-style, exhaustive switch with a `never` check at the bottom so unhandled actions are a compile error). Every dispatch also runs through `postprocessState`, which recomputes derived (`calculated`) data — user→team lookups, file maxima, SVG stripe patterns — only when the relevant inputs actually changed (diffed with lodash `_.isEqual`), or unconditionally when `calculated.forceRecalculateAll` is set. This recompute-on-diff pattern is deliberate for performance on large trees; preserve it rather than recomputing eagerly.
+2. **`App.tsx`** owns the single `useReducer` global state (`src/state/`), optionally hydrated from an imported/saved state file via `exportImport.ts`, and renders `Viz`, `Controller`, and `Inspector` side by side against the same `dataRef`/`state`/`dispatch`.
+3. **`src/state/`** is the core of the app: one big `State` object (`config`, `couplingConfig`, `expensiveConfig`, `calculated`, `messages`) manipulated by a single `Action` union and `updateStateFromAction` reducer (Redux-style, exhaustive switch with a `never` check at the bottom so unhandled actions are a compile error). Every dispatch also runs through `postprocessState`, which recomputes derived (`calculated`) data — user→team lookups, file maxima, SVG stripe patterns — only when the relevant inputs actually changed (diffed with lodash `_.isEqual`), or unconditionally when `calculated.forceRecalculateAll` is set. This recompute-on-diff pattern is deliberate for performance on large trees; preserve it rather than recomputing eagerly.
 4. **`VisualizationData.tsx`** is the registry of all visualisations (`Visualizations` map), including "parent" visualisations with sub-children (e.g. Indentation → sum/p99/stddev, Churn → days/commits/lines). Each entry knows its display order, help text, an optional `featureCheck` against the data file's `FeatureFlags` (git/coupling/git_details/file_stats — used to hide visualisations the loaded data can't support), and a `buildVisualization` factory.
 5. **`src/visualizations/*.tsx`** implement `BaseVisualization<ScaleUnit>` (`BaseVisualization.tsx`): each provides `dataFn`/`parentFn` (extract a value from a file/directory node) and a `scale` (value → colour), and the base class handles the shared `fillFn` logic (neutral colour for undefined values, overrides for circle-pack backgrounds and not-yet-created files given the current date range).
-6. **`Viz.tsx`** does the actual D3 rendering (Voronoi treemap / circle pack) against the `HierarchyNode<TreeNode>` tree, calling into the active visualisation's `fillFn`.
+6. **`Viz.tsx`** does the actual D3 rendering (Voronoi treemap / circle pack) against the `HierarchyNode<TreeNode>` tree, calling into the active visualisation's `fillFn`. It keeps the imperative shell — `draw`, `update`, the selection outline and the React component; everything separable lives in **`src/viz/`** (see below).
 7. **`Controller.tsx`** / **`VisControlPanel.tsx`** / **`ColoursAndLinesControls.tsx`** hold the UI controls that dispatch `Action`s. **`inspectors/*`** render details about the currently selected node/path/team.
+
+### Where things live
+
+Four folders each hold one area's modules, with unit tests beside whatever is pure. They came out
+of four files that had grown to 4,172 lines between them, each mixing several unrelated concerns
+in one namespace, so the rule going in is that a module is about one thing and named for it.
+
+- **`src/model/`** — reading a `TreeNode`: `teamStats.ts` (team and user aggregation),
+  `gitChanges.ts`, `coupling.ts` and `couplingBuckets.ts`, `nodeAccessors.ts`. The accessors are a
+  convenience layer, **not** an abstraction barrier over the JSON shape — that shape already leaks
+  in seven other places, and `nodeAccessors.ts`'s header says so. The test for keeping a one-line
+  accessor is whether its name says more than the field path it stands for.
+- **`src/state/`** — `config.ts` (the `Config` shape, its defaults and `initialiseGlobalState`),
+  `actions.ts`, `reducer.ts`, `derived.ts` (`postprocessState`) and `colours.ts`. `state.ts` itself
+  keeps only the `State` shape, the small types it is built from, the `Message` constructors and
+  the user-lookup helpers — what every module needs and none owns. The folder is a clean line,
+  `config.ts` → `derived.ts` → `reducer.ts` → `colours.ts`, and `state.ts` imports nothing from it
+  at runtime. `colours.ts` exists to keep it that way: `initialiseGlobalState` calls
+  `postprocessState`, which needs `themedColours`, so without a leaf module `config.ts` and
+  `derived.ts` would each need a value from the other.
+- **`src/teams/`** — the Users and Teams modal. Logic: `pageStateEdits.ts`, `pageState.ts`,
+  `importExport.ts`, `userList.ts`, `colourSchemes.ts`. Components: `UsersTable.tsx`,
+  `TeamsTable.tsx`, `ImportExportControls.tsx`, `IgnoredUsersTable.tsx`, `UsersAndTeamsHelp.tsx`,
+  plus `EditAlias.tsx`. `UsersAndTeams.tsx` is the modal shell. Two things to know: **the panel
+  dispatches exactly one action, `setUserTeamAliasData`, and only on "save and close"** — that
+  single action is its whole output, which is what makes `UsersAndTeams.test.tsx` cheap to write.
+  And **`usersAndTeamsToPageFormat` deep-copies** the teams, aliases and ignored users it is
+  handed, because the edits below it mutate in place; copying once when the modal opens is what
+  makes cancel actually discard.
+- **`src/viz/`** — everything separable out of `Viz.tsx`: `couplingArcs.ts` (the SVG arcs between
+  coupled files), `timescale.ts` (the activity chart and its date brush), `cameraWiring.ts` (the
+  imperative side of the camera — `refitCamera`, the `d3.zoom` behaviour, the resize/DPR watcher
+  and GL context-loss recovery) and `vizRefs.ts` (the `VizRefs` bundle, its own leaf module so
+  `Viz.tsx` and `cameraWiring.ts` need not import each other). `vizNodeSelection.ts` and
+  `vizUpdatePaths.ts` predate the folder and are still at the top level. `Viz.tsx` is left at ~500
+  lines on purpose: what remains is imperative D3 against a WebGL canvas with nothing pure left to
+  lift out, and breaking up its effects would cost more than it bought.
+
+**No tracked data file can render a coupling arc.** `default.json` has the coupling feature on and
+14 buckets, but every `coupled_files` list in it is empty, and `nested.json` has coupling off
+entirely. So neither the screenshot suite nor any manual look can exercise `couplingArcs.ts`
+without a synthetic fixture — write `coupled_files` into a few of `default.json`'s coupling-bearing
+nodes with `jq`, load it via `EXPLORER_DATA`, and delete it afterwards. Watch two things when you
+do: a file's coupling buckets may sit outside the default date range, and the default
+`minRatio` of 0.9 hides anything weaker until you drag the Coupling Ratio slider down. This is also
+the sharpest reason to regenerate `default.json` (see "Known follow-ups") — the shipped sample
+cannot demonstrate coupling at all.
 
 ### Tree data model
 
@@ -129,8 +176,9 @@ numbers: `docs/rendering-performance.md`.
   the old `viewBox`'s `xMidYMid meet` fit; `screenToWorld()`/`worldToClipTransform()`
   compose that fit with the live `d3.zoom` transform. `d3.zoom` is attached to a
   plain wrapper `div` (`.chart-stack`), not to either the canvas or the overlay
-  SVG — attaching to an SVG element makes `d3.pointer()` resolve through that
-  element's own `viewBox`, which double-applies the fit. `overlayGroupTransform()`
+  SVG (`viz/cameraWiring.ts` attaches it) — attaching to an SVG element makes
+  `d3.pointer()` resolve through that element's own `viewBox`, which
+  double-applies the fit. `overlayGroupTransform()`
   pre-compensates the overlay `<g>`'s transform for the fact that its SVG also has
   a `viewBox`, so the browser doesn't apply the fit twice.
 - `GlRenderer.ts` — the only stateful object: GL context, two programs (fill,
@@ -138,9 +186,10 @@ numbers: `docs/rendering-performance.md`.
   `OES_element_index_uint` (WebGL1's native index type is `UNSIGNED_SHORT`, too
   small for these buffers) and throws in the constructor if it's unavailable.
   Exposes three update methods instead of one `render()` — see below. It holds no
-  recovery logic of its own: a lost GL context is handled in `Viz.tsx`, which
-  drops the renderer on `webglcontextrestored` and rebuilds from scratch via the
-  `redrawAllRef` thunk the main effect keeps current.
+  recovery logic of its own: a lost GL context is handled by
+  `viz/cameraWiring.ts`'s `watchContextLoss`, which drops the renderer on
+  `webglcontextrestored` and rebuilds from scratch via the `redrawAllRef` thunk
+  `Viz.tsx`'s main effect keeps current.
 - `geometry.ts` — `buildFills()`/`buildOutlines()`: tree nodes → typed arrays.
   Polygons are convex (Voronoi cells, circle approximations), so
   `triangulate.ts`'s `fanTriangulate()` is an exact triangulation, no earcut
@@ -173,11 +222,11 @@ numbers: `docs/rendering-performance.md`.
 Pan/zoom writes only uniforms; switching visualisation rewrites only the colour
 buffer; only a depth (`expensiveConfig`) change re-triangulates and reallocates
 both buffers plus the picking index. `vizUpdatePaths.ts`'s `isNestingOnlyChange()`
-detects the finest-grained case exactly (not heuristically): `state.ts`'s
+detects the finest-grained case exactly (not heuristically): the `state/` reducer's
 `setLines` action is the only one that ever touches nesting colours/widths and
 touches nothing else, so "nesting fields differ, nothing else does" routes
 straight to a uniform-only `setNestingStyle()` update with no buffer touched at
-all. Node lists are cached per-`draw()` in `Viz.tsx`'s `VizRefs` as
+all. Node lists are cached per-`draw()` in `viz/vizRefs.ts`'s `VizRefs` as
 `visibleNodes` (the fill/cell set, also what the picking index is built from) and
 `outlineNodes` (a strict superset — outlines are one per node, unioning what used
 to be two overlapping SVG layers). `setColours()` throws if handed a `visibleNodes`
@@ -204,7 +253,9 @@ patterned and flat vertices (`neutralColour`/`circlePackBackground` overrides in
 `camera.ts`, `triangulate.ts`, `colours.ts`, `picking.ts`, and `geometry.ts`'s
 pure functions are unit-tested and must never import `gl`. `GlRenderer.ts` and
 `shaders.ts` are verified manually and by the screenshot suite only — keep that
-line clean rather than reaching for a WebGL mock.
+line clean rather than reaching for a WebGL mock. The same line runs through
+`src/viz/`: its pure parts (`arcPath`, `brushedDateRange`, `layoutSize` and the
+rest) have unit tests, while the D3 selection code beside them does not.
 
 **Known regression:** the canvas is opaque to screen readers, where the old SVG
 `.cell`/`.nesting` paths were (unlabelled, but still) DOM nodes. Not fixed — see
@@ -212,7 +263,7 @@ line clean rather than reaching for a WebGL mock.
 
 ### State import/export
 
-`exportImport.ts` + `SaveLoadControls.tsx` let users save/load the `State` (config, teams/aliases, colours, etc., but not `calculated`) as JSON, independent of the underlying data file — this is how `*_state.json` sidecar files work.
+`exportImport.ts` + `SaveLoadControls.tsx` let users save/load the whole `State` (config, teams/aliases, colours, etc., but not `calculated`) as JSON, independent of the underlying data file — this is how `*_state.json` sidecar files work. Not to be confused with `src/teams/importExport.ts`, which is the Users and Teams panel's own much narrower import/export of just the users, teams and aliases.
 
 ### Serving the data files
 
@@ -227,7 +278,7 @@ sharp edges; read them before changing either.
 - **Every displayed date and week bucket is UTC**, deliberately and throughout — see
   `docs/dates-and-timezones.md`. `humanizeDate` uses `Intl` with `timeZone: "UTC"` and the
   `en-US` locale (`en-GB` abbreviates September as "Sept"); week bucketing is integer arithmetic
-  on unix days, with no `Date` involved. The single exception is `state.ts`'s
+  on unix days, with no `Date` involved. The single exception is `state/config.ts`'s
   `subYears`/`addDays`, which set the date slider's default bounds with ±2 days of deliberate
   leeway and stay on date-fns' local-calendar arithmetic; it is commented in place. That
   exception is also the only thing left that can make a screenshot baseline timezone-dependent,
@@ -247,11 +298,15 @@ sharp edges; read them before changing either.
   from a local `omf.json`, an open-source project whose committers are real people, so
   `metadata.git.users` was replaced wholesale with random names and `@example.com` addresses.
   Everything else references a user by numeric id, so that one list is the whole of it. All 210
-  users are kept even though the pruned tree references far fewer, because `state.ts`'s
-  `getUserData` indexes the array **positionally** (`users[userId]`) and `isAlias` treats any id
-  `>= users.length` as an alias — a sparse list makes the Inspector throw
-  `Invalid user id` on the first commit it renders. Pruning that list is the obvious "shrink the
-  fixture" move and it does not work.
+  users are kept even though the pruned tree references far fewer, because the list must stay
+  **dense**: `preprocess.indexUsersById` throws on load if `users[i].id !== i`, and `isAlias`
+  treats any id `>= users.length` as an alias, so a gap makes the first alias collide with a real
+  user. Pruning that list is the obvious "shrink the fixture" move and it does not work.
+- **Two gotchas for any `@testing-library/react` test that drives a modal**, both solved in
+  `UsersAndTeams.test.tsx`: react-modal hides the app element while the modal is open and
+  Testing Library's role queries skip `aria-hidden`, so render into a container registered with
+  `ReactModal.setAppElement`; and `onAfterOpen` fires from a `requestAnimationFrame`, so `await`
+  before reading anything it seeded.
 - **The screenshot suite's 2% tolerance (`maxDiffPixelRatio` in `playwright.config.ts`) can
   make `npm run e2e` pass clean while the actual pixels differ.** A real re-baseline (not just
   "does it currently pass") needs checking at zero tolerance first, or
@@ -297,13 +352,15 @@ Deliberately not done; all still open:
 - **Regenerate `data/default.json` with the current scanner** — a `nestedCircles` root with
   coupling enabled and real git history. The tracked file is a hand-bumped 1.0.4-shaped one. The
   `chromium-nested` screenshot project now covers `nestedCircles` rendering, so this is no
-  longer about test coverage — it is about the _shipped sample_ showing the awkward layout.
+  longer about test coverage — it is about the _shipped sample_ showing the awkward layout, and
+  about coupling, which no tracked data file can draw at all (see "Where things live").
 - **Re-verify against real scanner-generated multi-repo output** once
   `polyglot-code-offline-layout`'s `nested-circles` branch lands. The nested groups in the local
   `omf.json` smoke-test file were hand-built to match what `packChildren` produces; a real scan is
   the final word.
 - **Consolidate the four `publish_*.sh` scripts.**
 - **TypeScript 7** once `typescript-eslint` lifts its peer cap.
-- **Better test coverage.** `datetimes.ts` and `preprocess.ts` now have their own tests; `state.ts`'s no-git-dates branch calls
-  `new Date()` directly, so it isn't testable as written. Korny is aware and content with this for
-  now — don't add tests unasked.
+- **Better test coverage.** `src/model/`, `src/state/`, `src/teams/` and `src/viz/` now have
+  tests beside their pure modules, and `datetimes.ts` and `preprocess.ts` have their own.
+  `state/config.ts`'s no-git-dates branch calls `new Date()` directly, so it isn't testable as
+  written. Korny is aware and content with this for now — don't add tests unasked.
