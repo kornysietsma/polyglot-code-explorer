@@ -333,12 +333,14 @@ describe("UsersAndTeams panel", () => {
     expect(teamNamed(teams, "Carol Clark").users).toEqual(new Set());
   });
 
-  it("filters the user list by name or email", () => {
+  it("filters the user list by name or email, ignoring case", () => {
     renderPanel();
     openPanel();
     const filter = screen.getByRole("textbox");
 
-    fireEvent.change(filter, { target: { value: "brown" } });
+    // Capitalised deliberately: the filter used to lower-case only the values it compared
+    // against, so any capital letter typed here matched nothing at all.
+    fireEvent.change(filter, { target: { value: "Brown" } });
     expect(shownUserNames()).toEqual(["Bob Brown"]);
 
     fireEvent.change(filter, { target: { value: "carol@example" } });

@@ -16,8 +16,13 @@ import {
   TreeNode,
 } from "./polyglot_data.types";
 import { indexUsersById } from "./preprocess";
-import { State } from "./state";
+import { State, Team, Teams } from "./state";
 import { initialiseGlobalState } from "./state/config";
+import {
+  initialPageState,
+  UserAndStatsAndAliases,
+  UsersAndTeamsPageState,
+} from "./teams/pageState";
 import { VizData, VizDataRef, VizMetadata } from "./viz.types";
 
 export const DUMMY_LOC: LocData = {
@@ -152,4 +157,42 @@ export function minimalState(): State {
   const vizData: VizData = { data, metadata: vizMetadata() };
   const dataRef: VizDataRef = { current: vizData };
   return initialiseGlobalState(dataRef);
+}
+
+// A user row as the Users and Teams panel holds it: the data-file user plus the statistics and
+// alias flag the panel adds. Defaults are an ordinary user who has changed nothing.
+export function pageStateUser(
+  id: number,
+  overrides: Partial<UserAndStatsAndAliases> = {}
+): UserAndStatsAndAliases {
+  return {
+    id,
+    name: `user ${id}`,
+    email: `user${id}@example.com`,
+    isAlias: false,
+    commits: 0,
+    lines: 0,
+    files: 0,
+    days: new Set(),
+    ...overrides,
+  };
+}
+
+// The panel's local state, empty except for what a test sets. `initialPageState` is what the
+// component starts from, so a test that overrides nothing gets exactly what the user first sees.
+export function minimalPageState(
+  overrides: Partial<UsersAndTeamsPageState> = {}
+): UsersAndTeamsPageState {
+  return { ...initialPageState(), ...overrides };
+}
+
+export function teamsOf(
+  ...teams: [name: string, users: number[], rest?: Partial<Team>][]
+): Teams {
+  return new Map(
+    teams.map(([name, users, rest]) => [
+      name,
+      { users: new Set(users), colour: "#000000", hidden: false, ...rest },
+    ])
+  );
 }
