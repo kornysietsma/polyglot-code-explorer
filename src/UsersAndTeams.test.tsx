@@ -111,7 +111,9 @@ function renderPanel({ strict = false } = {}) {
   render(strict ? <StrictMode>{panel}</StrictMode> : panel, {
     container: appRoot,
   });
-  return { dispatch };
+  // `state` is returned so a test can check the panel did *not* reach into it: the panel is
+  // supposed to edit a private copy and communicate only by dispatching.
+  return { dispatch, state };
 }
 
 function openPanel() {
@@ -220,6 +222,30 @@ describe("UsersAndTeams panel", () => {
     fireEvent.click(screen.getByRole("button", { name: "cancel" }));
 
     expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Not dispatching is only half of it: the panel must not have edited the global state behind
+   * the reducer's back either. It used to - `usersAndTeamsToPageFormat` handed out the global
+   * state's own `Map`, and creating a team wrote straight into it, so a cancelled team came back
+   * the next time the panel was opened.
+   */
+  it("discards a cancelled edit instead of leaving it in the global state", () => {
+    const { state } = renderPanel();
+    openPanel();
+    selectUser("Alice Adams");
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Create a new team with selected user(s)",
+      })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "cancel" }));
+
+    expect([...state.config.teamsAndAliases.teams.keys()]).toEqual([]);
+
+    // And so the team is gone when the panel is opened again.
+    openPanel();
+    expect(bodyRows(teamsTable())).toEqual([]);
   });
 
   it("creates a team from the selected users, named after a single selection", () => {
