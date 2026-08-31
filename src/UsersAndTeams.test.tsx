@@ -192,6 +192,22 @@ describe("UsersAndTeams panel", () => {
     vi.restoreAllMocks();
   });
 
+  // Both toolbar checkboxes used to carry the same `htmlFor`, so "refresh stats" was unlabelled
+  // and clicking its label toggled the tolerance checkbox instead.
+  it("gives each toolbar checkbox its own label", () => {
+    renderPanel();
+    openPanel();
+
+    const tolerant = screen.getByLabelText("Ignore non-fatal import errors:");
+    const refresh = screen.getByLabelText(
+      "Refresh stats after import or editing:"
+    );
+
+    expect(tolerant).not.toBe(refresh);
+    expect(tolerant).not.toBeChecked();
+    expect(refresh).toBeChecked();
+  });
+
   it("dispatches nothing until the panel is saved", () => {
     const { dispatch } = renderPanel();
     openPanel();
@@ -272,13 +288,14 @@ describe("UsersAndTeams panel", () => {
     selectUser("Bob Brown");
     fireEvent.click(screen.getByRole("button", { name: "Create alias" }));
 
-    // The alias modal is a sibling portal, so it is scoped by its own content. Its name and
-    // email labels both point at the name input (`htmlFor={aliasNameId}` twice), so they cannot
-    // be reached by label text - the two text boxes are taken in order instead.
+    // The alias modal is a sibling portal, so it is scoped by its own content. Both fields are
+    // reached by their labels, which also checks that each label points at its own input - the
+    // Email label used to carry the *name* input's id, leaving the email field unlabelled.
     const aliasModal = screen
       .getByText("Alias Name:")
       .closest(".ModalContent") as HTMLElement;
-    const [nameInput, emailInput] = within(aliasModal).getAllByRole("textbox");
+    const nameInput = within(aliasModal).getByLabelText("Alias Name:");
+    const emailInput = within(aliasModal).getByLabelText("Email:");
     // react-modal calls `onAfterOpen` from a `requestAnimationFrame`, so the modal's state is
     // seeded a frame after it renders. Waiting for the prefill - the most recent selected user's
     // details - is what proves that has happened before anything is typed over it.
@@ -287,8 +304,8 @@ describe("UsersAndTeams panel", () => {
         "Bob Brown" // the later of the two commit days
       )
     );
-    fireEvent.change(nameInput!, { target: { value: "A. B. Person" } });
-    fireEvent.change(emailInput!, { target: { value: "ab@example.com" } });
+    fireEvent.change(nameInput, { target: { value: "A. B. Person" } });
+    fireEvent.change(emailInput, { target: { value: "ab@example.com" } });
     fireEvent.click(
       within(aliasModal).getByRole("button", { name: "save and close" })
     );

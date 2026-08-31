@@ -290,7 +290,7 @@ const EditAlias = (props: Props) => {
             onChange={(evt) => setAliasName(evt.target.value)}
           />
         </label>
-        <label htmlFor={aliasNameId}>
+        <label htmlFor={aliasEmailId}>
           Email:
           <input
             type="text"
